@@ -1,0 +1,121 @@
+# Ahata — Project Handoff for Claude Code
+
+This is a custom acoustic-panel business website. Five static HTML pages with embedded CSS/JS, no build step, no backend. Primary user is the founder testing on Firefox/tablet.
+
+## Brand
+
+**Ahata** — Sanskrit, "human effort striking sound." Five logo shapes = five fingers = five letters of name. Email `hello@ahata.in`.
+
+Logo files in `assets/` (3 SVG variants). The horizontal logo is also inlined directly into every HTML file's nav (no external dependency).
+
+## Files
+
+- `r5-index.html` — landing page, design-led
+- `r5-configurator.html` — panel designer (3D viewer, image upload, transform)
+- `r5-room-visualizer.html` — wall layout planner with drag/marquee/snap
+- `r5-how-it-works.html` — explainer (myths above CTA)
+- `r5-about.html` — about page
+
+Naming prefix `r5-` is from iteration history. Drop the prefix when shipping.
+
+## Color tokens
+
+```
+--ink:#093d53      navy primary — borders, text, dark surfaces, selection states
+--shadow:#00171f   near-black — drop shadow tints, modal backdrops only
+--paper:#f2f2f9    off-white background
+--primary:#093d53  same as ink (kept for semantic clarity)
+--primary-light:#007da6   light blue — link hovers, alignment guide lines
+--accent:#ecad49   warm yellow — CTA fills, brand dot ◆, "ART" word
+--wood/--wood-mid/--wood-dark/--wood-edge   3D panel frame gradient
+--wrap-black       fabric wrap color when full-wrap is selected
+```
+
+Selection states use navy (`--ink`). Highlights use light blue. Yellow is reserved for CTAs and content accents — use sparingly.
+
+## Layout
+
+`body { max-width: 1320px; margin: 0 auto; }` so content centers on wide screens with paper-colored gutters.
+
+## Data model
+
+### Cart item shape (saved in localStorage as `acousticCart`)
+
+```js
+{
+  id: number,
+  size: '1x1' | '2x1' | '2x2' | '4x2' | '1x4',
+  baseW: number, baseH: number,         // canonical feet (immutable per size)
+  orientation: 'horizontal' | 'vertical',
+  effectiveW: number, effectiveH: number, // rendered feet after orientation
+  image: string,                         // data URL
+  imagePosition: { x, y },               // pixel offset in saved-panel space
+  imageScale: number,                    // 0.5..2.0 user zoom
+  imageNaturalWidth: number, imageNaturalHeight: number,
+  flipH: boolean, flipV: boolean,
+  rotate: 0 | 90 | 180 | 270,
+  fileName: string, fileSize: number,
+  woodVarnish: 'light' | 'dark',
+  fabricWrap: 'half' | 'full',
+  quantity: number,                      // user can buy 2+ identical panels
+  savedPanelWidth: number,               // configurator pixel size at save time
+  savedPanelHeight: number               //   → used to rescale image transform downstream
+}
+```
+
+### Room plan shape (`acousticRoomPlan`)
+
+```js
+{
+  room: { length, width, height },       // feet
+  panels: [{ id, wall, x, y, w, h, ... }]
+}
+```
+
+## Critical functions
+
+### `computeArtTransform(panel, targetW, targetH)` (visualizer)
+
+Reproduces the configurator's image transform at a different panel size. The math:
+1. `scale = min(targetW/savedW, targetH/savedH)` — uniform, never overflows
+2. Final image transform = `translate(cssTx, cssTy) scale(zoom * scale) rotate(r) scaleX(±1) scaleY(±1)`
+3. Bounding-box correction handles rotation/flip so the visible image stays inside the panel
+
+This function ports `renderCartCardPreview` from configurator. Both should stay in sync — if you change image transform behavior in the configurator, port it here too.
+
+### `panelToCartItem(p)` (configurator)
+
+Captures the full state needed to reproduce the design later. Always includes `savedPanelWidth/Height` so downstream renderers can scale properly.
+
+### `loadDesignedCart()` (visualizer)
+
+Runs on:
+- Initial load
+- `pageshow` with `e.persisted === true` (bfcache restore on browser back/forward)
+- `storage` events (other tabs updating localStorage)
+
+This handles the sync bug where designed panels wouldn't appear on the visualizer.
+
+## Known issues / not yet validated
+
+1. **1×4 panel sync** — works mathematically (verified manually), but user testing has been inconsistent. Recommend: write an actual test that uploads a 1200×4800 image into a 1×4 panel, saves to localStorage, opens visualizer, and asserts no clipping.
+2. **Replace button** — fixed by removing `setTimeout` wrapper around `fileInput.click()`. The setTimeout broke the user-gesture chain on touch browsers. Test on actual touch device to confirm.
+3. **Equal-distance arrows** for alignment (PowerPoint-style) — not implemented. Edge/center snapping IS implemented.
+
+## What to ship next
+
+Content rewrites are the user's bottleneck. They're working on copy + real photos for:
+- Hero copy with Ahata "human effort" origin story
+- Audience-segmented entry points (Home Studios / Listening Rooms / Podcasters & Creators — bar/pub is B2B and probably belongs on a separate page)
+- About page Carnatic music origin
+- Real workshop photos to replace SVG mockups in hero showcase
+
+## Conventions
+
+- Use `--ink` for borders and dark text
+- Use `var(--mute)` for secondary text (62% navy)
+- Use `var(--accent)` sparingly — primary CTAs, brand dots, single emphasized word
+- All buttons: `border:1.5px solid var(--ink)` with hover-fill or accent variant
+- All section borders: 1.5px solid `--ink`
+- `font-family: 'Archivo Black'` for headlines; `'Archivo'` for body
+- Letter-spacing `-0.02em` to `-0.04em` on Black weights; `0.05em` to `0.15em` on Regular/uppercase

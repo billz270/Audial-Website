@@ -1,0 +1,1432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ahata — Visualize Your Space</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#093d53;
+    --shadow:#00171f;
+    --paper:#f2f2f9;
+    --primary:#093d53;
+    --primary-light:#007da6;
+    --accent:#ecad49;
+    --line:rgba(9,61,83,0.18);
+    --mute:rgba(9,61,83,0.62);
+    --wood:#7A5F3A;
+    --wood-mid:#4A3622;
+    --wood-dark:#2A1C10;
+    --wood-edge:#1A0F08;
+    --wrap-black:#0F0904;
+  }
+  /* Inverted (dark) surfaces use the navy primary color, not ink */
+  .cta-strip,.marquee{background:var(--primary)}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:'Archivo',sans-serif;background:var(--paper);color:var(--ink);overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+  body.modal-open{overflow:hidden}
+
+  nav{position:sticky;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:18px 32px;border-bottom:1.5px solid var(--ink);background:var(--paper);z-index:100}
+  .logo{display:inline-flex;align-items:center;text-decoration:none;line-height:0;color:var(--ink)}
+  .logo .brand-logo{height:32px;width:auto;display:block;flex-shrink:0}
+  .nav-links{display:flex;gap:32px;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em}
+  .nav-links a,.nav-links button{color:var(--ink);text-decoration:none;position:relative;background:none;border:none;font:inherit;cursor:pointer;padding:0;letter-spacing:inherit;text-transform:inherit}
+  .nav-links a.active{color:var(--accent)}
+  .nav-links a:hover::after,.nav-links a.active::after,.nav-links button:hover::after{content:'';position:absolute;left:0;right:0;bottom:-4px;height:2px;background:var(--accent)}
+
+  .page-header{padding:18px 32px;border-bottom:1.5px solid var(--ink);display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center}
+  .page-header .page-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--mute);display:flex;align-items:center;gap:10px}
+  .page-header .page-label::before{content:'';width:24px;height:2px;background:var(--accent)}
+  .page-header .page-title{font-family:'Archivo Black',sans-serif;font-size:clamp(22px,3vw,32px);line-height:0.95;letter-spacing:-0.02em;text-transform:uppercase;margin:0}
+  .page-header .page-title .accent{color:var(--accent)}
+  .page-header .page-desc{font-size:12px;line-height:1.5;color:var(--mute);max-width:520px;margin:0}
+  .page-header .page-progress{font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);white-space:nowrap}
+  .page-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:14px;display:flex;align-items:center;gap:12px}
+  .page-label::before{content:'';width:40px;height:2px;background:var(--accent)}
+  .page-title{font-family:'Archivo Black',sans-serif;font-size:clamp(32px,5.5vw,64px);line-height:0.85;letter-spacing:-0.04em;text-transform:uppercase}
+  .page-title .accent{color:var(--accent)}
+  .page-desc{font-size:14px;line-height:1.5;max-width:440px}
+  .page-progress{margin-top:10px;font-size:11px;font-weight:700;letter-spacing:0.1em}
+
+  .cart-banner{display:none;padding:12px 32px;background:var(--accent);color:var(--ink);border-bottom:1.5px solid var(--ink);justify-content:space-between;align-items:center;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em}
+  .cart-banner.visible{display:flex}
+  .cart-banner button{background:var(--ink);color:var(--paper);border:none;padding:8px 14px;font-family:inherit;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;cursor:pointer;transition:all 0.2s}
+  .cart-banner button:hover{background:var(--paper);color:var(--ink)}
+
+  /* ============ SETUP SECTION - side by side ============ */
+  .setup-section{
+    padding:14px 32px;
+    border-bottom:1.5px solid var(--ink);
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:24px;
+    align-items:start;
+  }
+  .setup-block{display:flex;flex-direction:column;gap:8px;min-width:0}
+  .subsection-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em}
+  .subsection-label::before{content:'◆';color:var(--accent);margin-right:8px}
+
+  .preset-grid{
+    display:grid;grid-template-columns:repeat(2,1fr);
+    border:1.5px solid var(--ink);
+  }
+  .preset-card{
+    padding:14px 16px;border-right:1.5px solid var(--ink);
+    border-bottom:1.5px solid var(--ink);
+    cursor:pointer;transition:all 0.25s;
+    background:var(--paper);position:relative;overflow:hidden;
+  }
+  .preset-card:nth-child(2n){border-right:none}
+  .preset-card:nth-last-child(-n+2){border-bottom:none}
+  .preset-card::before{content:'';position:absolute;inset:0;background:var(--ink);transform:translateY(100%);transition:transform 0.3s;z-index:0}
+  .preset-card:hover::before,.preset-card.active::before{transform:translateY(0)}
+  .preset-card > *{position:relative;z-index:1;transition:color 0.25s}
+  .preset-card:hover > *,.preset-card.active > *{color:var(--paper)}
+  .preset-card:hover .preset-dims,.preset-card.active .preset-dims{color:var(--accent)}
+  .preset-name{font-family:'Archivo Black',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:-0.01em;margin-bottom:3px}
+  .preset-dims{font-size:10px;color:var(--mute);text-transform:uppercase;letter-spacing:0.05em}
+
+  .dim-bar-vertical{
+    display:flex;flex-direction:column;border:1.5px solid var(--ink);
+  }
+  .dim-row{
+    display:flex;border-bottom:1.5px solid var(--ink);
+  }
+  .dim-row:last-child{border-bottom:none}
+  .dim-field{
+    flex:1;padding:10px 14px;
+    border-right:1.5px solid var(--ink);
+    display:flex;flex-direction:column;gap:2px;
+    min-width:0;
+  }
+  .dim-field:last-child{border-right:none}
+  .dim-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--mute)}
+  .dim-input{display:flex;align-items:baseline;gap:6px}
+  .dim-input input{font-family:'Archivo Black',sans-serif;font-size:20px;border:none;background:transparent;width:56px;outline:none;color:var(--ink);letter-spacing:-0.02em;min-width:0}
+  .dim-input .readonly{font-family:'Archivo Black',sans-serif;font-size:20px;color:var(--ink);letter-spacing:-0.02em}
+  .dim-unit{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--mute)}
+
+  /* ============ MAIN: walls + sidebar (right-side panel selector) ============ */
+  .visualizer-layout{
+    display:grid;
+    grid-template-columns:minmax(0,1fr) 280px;
+    border-bottom:1.5px solid var(--ink);
+  }
+
+  .walls-area{
+    padding:20px 28px;
+    border-right:1.5px solid var(--ink);
+    background:linear-gradient(to right,rgba(0,23,31,0.04) 1px,transparent 1px),linear-gradient(to bottom,rgba(0,23,31,0.04) 1px,transparent 1px);
+    background-size:20px 20px;
+    display:flex;flex-direction:column;gap:14px;min-width:0;
+  }
+
+  .walls-title{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
+  .walls-hint{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--mute);padding:6px 10px;border:1.5px solid var(--ink)}
+  .walls-hint.active{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+
+  .big-wall-wrap{display:flex;flex-direction:column;gap:8px}
+  .big-wall-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
+  .big-wall-name{font-family:'Archivo Black',sans-serif;font-size:16px;text-transform:uppercase;letter-spacing:-0.01em}
+  .big-wall-meta{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute)}
+
+  .big-wall-scene{position:relative;background:var(--paper);border:1.5px solid var(--ink);overflow:hidden;min-height:560px;padding:26px}
+  .wall-ground{position:absolute;bottom:0;left:0;right:0;height:26px;background:#D8D3C6;border-top:1px solid var(--ink)}
+  .side-wall{position:absolute;top:0;bottom:26px;width:26px;pointer-events:none}
+  .side-wall.left{left:0;background:linear-gradient(to right,rgba(0,23,31,0.12),transparent)}
+  .side-wall.right{right:0;background:linear-gradient(to left,rgba(0,23,31,0.12),transparent)}
+  .side-wall-label{position:absolute;top:50%;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute);white-space:nowrap;cursor:pointer;padding:5px 9px;background:var(--paper);border:1.5px solid var(--ink);transition:all 0.2s;pointer-events:auto;z-index:5;user-select:none}
+  .side-wall-label.left{left:2px;transform-origin:center;transform:translateY(-50%) rotate(-90deg)}
+  .side-wall-label.right{right:2px;transform-origin:center;transform:translateY(-50%) rotate(90deg)}
+  .side-wall-label:hover,.side-wall-label:active{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+
+  .wall-surface-big{position:relative;background:var(--wall);border:1.5px solid var(--ink);overflow:hidden;cursor:default;margin:0 auto;max-width:100%;max-height:100%;transition:outline 0.2s, background 0.2s;touch-action:none}
+  .wall-surface-big.armed{cursor:crosshair;outline:2px solid var(--accent);outline-offset:-2px;background:#FAF4EA}
+  .wall-surface-big::before{content:attr(data-empty);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--mute);pointer-events:none;white-space:nowrap;text-align:center}
+  .wall-surface-big.has-panels::before{display:none}
+
+  .big-wall-inner{position:absolute;top:26px;bottom:26px;left:26px;right:26px;display:flex;align-items:center;justify-content:center}
+
+  /* Compact thumbnails — small enough to keep wall-in-focus dominant */
+  .wall-thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .wall-thumb{background:var(--paper);border:1.5px solid var(--ink);padding:6px 8px;display:flex;flex-direction:column;gap:3px;cursor:pointer;transition:all 0.2s;position:relative;min-width:0}
+  .wall-thumb:hover{background:var(--ink);color:var(--paper)}
+  .wall-thumb:hover .thumb-meta{color:var(--paper);opacity:0.7}
+  .thumb-label{font-family:'Archivo Black',sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:-0.01em}
+  .thumb-meta{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--mute);transition:color 0.2s}
+  .thumb-surface-wrap{aspect-ratio:16/7;display:flex;align-items:center;justify-content:center;background:#D8D3C6;padding:3px;border:1.5px solid var(--ink)}
+  .thumb-surface{position:relative;background:var(--wall);border:1px solid var(--ink);overflow:hidden}
+  .thumb-surface .mini-panel{position:absolute;background:var(--accent);border:0.5px solid var(--ink);overflow:hidden}
+  .thumb-surface .mini-panel img{display:block;pointer-events:none}
+  .wall-thumb:hover .mini-panel{border-color:var(--paper)}
+  .thumb-count{position:absolute;top:3px;right:3px;font-size:9px;font-weight:700;color:var(--mute);background:var(--paper);padding:1px 4px;border:1px solid var(--ink);z-index:2}
+  .wall-thumb:hover .thumb-count{background:var(--ink);color:var(--paper);border-color:var(--paper)}
+
+  .placed-panel{position:absolute;background:var(--accent);border:1.5px solid var(--ink);cursor:grab;transition:transform 0.1s, z-index 0s, box-shadow 0.15s, outline 0.15s;display:flex;align-items:center;justify-content:center;color:var(--ink);font-family:'Archivo Black',sans-serif;font-size:10px;text-align:center;user-select:none;overflow:hidden;touch-action:none}
+  .placed-panel.dragging{cursor:grabbing;z-index:20;box-shadow:0 6px 20px rgba(0,23,31,0.3)}
+  .placed-panel.selected{outline:2.5px solid var(--ink);outline-offset:2px;box-shadow:0 4px 14px rgba(9,61,83,0.45);z-index:15}
+  .placed-panel.selected.dragging{z-index:25}
+  .placed-panel img{pointer-events:none;display:block}
+  .placed-panel .panel-label{position:absolute;font-size:9px;color:var(--paper);background:rgba(0,23,31,0.7);padding:2px 5px;opacity:0;transition:opacity 0.15s;pointer-events:none}
+  .placed-panel:hover .panel-label{opacity:1}
+  .placed-panel .remove-btn{position:absolute;top:-8px;right:-8px;width:22px;height:22px;background:var(--paper);color:var(--ink);border:1.5px solid var(--ink);font-size:12px;font-weight:700;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:2;border-radius:50%}
+  .placed-panel:hover .remove-btn,.placed-panel.selected .remove-btn{display:flex}
+  .placed-panel .remove-btn:hover{background:#C03020;color:var(--paper);border-color:#C03020}
+
+  /* Marquee selection box */
+  .marquee-box{position:absolute;border:1.5px dashed var(--ink);background:rgba(9,61,83,0.10);pointer-events:none;z-index:30}
+  .selection-hint{position:absolute;top:8px;left:8px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--paper);background:var(--ink);padding:5px 9px;border:1.5px solid var(--accent);z-index:6;pointer-events:none;display:none}
+  .selection-hint.visible{display:block}
+  /* Alignment guides — appear during drag when a panel/group aligns with another */
+  .snap-guide{position:absolute;pointer-events:none;z-index:40;background:var(--primary-light)}
+  .snap-guide.vertical{width:1px}
+  .snap-guide.horizontal{height:1px}
+
+  /* SIDEBAR */
+  .sidebar{padding:22px 18px;display:flex;flex-direction:column;background:var(--paper);min-width:0}
+  .sidebar-section{padding-bottom:16px;margin-bottom:16px;border-bottom:1.5px solid var(--ink)}
+  .sidebar-section:last-child{border-bottom:none;margin-bottom:0;padding-bottom:0}
+  .sidebar-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:12px;display:flex;justify-content:space-between;align-items:center}
+  .sidebar-title::before{content:'◆';color:var(--accent);margin-right:6px}
+  .sidebar-title .deselect-hint{font-size:9px;font-weight:500;color:var(--mute);letter-spacing:0.05em}
+  .sidebar-title .deselect-hint::before{content:''}
+
+  .orient-toggle{display:none;gap:0;border:1.5px solid var(--ink);margin-bottom:10px}
+  .orient-toggle.visible{display:flex}
+  .orient-btn{flex:1;padding:7px 4px;background:var(--paper);border:none;border-right:1.5px solid var(--ink);font-family:inherit;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;transition:all 0.2s;color:var(--ink);display:flex;align-items:center;justify-content:center;gap:4px;min-height:32px}
+  .orient-btn:last-child{border-right:none}
+  .orient-btn svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:1.5}
+  .orient-btn.active{background:var(--ink);color:var(--paper)}
+  .orient-btn:hover:not(.active){background:var(--ink);color:var(--paper)}
+
+  .panel-sizes{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .size-chip{padding:9px 8px;border:1.5px solid var(--ink);background:var(--paper);cursor:pointer;transition:all 0.2s;display:flex;flex-direction:column;gap:3px;text-align:left;font-family:inherit;min-height:48px}
+  .size-chip:hover{background:var(--ink);color:var(--paper)}
+  .size-chip:hover .size-price{color:var(--accent)}
+  .size-chip.active{background:var(--ink);color:var(--paper);border-color:var(--ink)}
+  .size-chip.active .size-price{color:var(--paper)}
+  .size-name{font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:-0.01em}
+  .size-price{font-size:10px;font-weight:700;letter-spacing:0.05em;color:var(--mute);transition:color 0.2s}
+
+  /* DESIGNED STRIP — horizontal scrollable cards below big wall */
+  .designed-strip-wrap{margin-top:18px;border:1.5px solid var(--ink);background:var(--paper)}
+  .designed-strip-header{padding:10px 14px;border-bottom:1.5px solid var(--ink);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
+  .designed-strip-hint{font-size:9.5px;font-weight:500;color:var(--mute);text-transform:uppercase;letter-spacing:0.08em}
+  .designed-strip{display:flex;gap:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+  .designed-strip::-webkit-scrollbar{height:6px}
+  .designed-strip::-webkit-scrollbar-track{background:rgba(9,61,83,0.08)}
+  .designed-strip::-webkit-scrollbar-thumb{background:var(--ink)}
+  .designed-card{flex:0 0 auto;width:170px;border-right:1.5px solid var(--ink);background:var(--paper);cursor:pointer;display:flex;flex-direction:column;font-family:inherit;text-align:left;position:relative;scroll-snap-align:start;transition:background 0.2s;padding:0;color:var(--ink)}
+  .designed-card:last-child{border-right:none}
+  .designed-card:hover{background:#EAEAF1}
+  .designed-card.active{background:var(--ink);color:var(--paper)}
+  .designed-card.depleted{opacity:0.4;pointer-events:none}
+  .designed-card-preview{position:relative;aspect-ratio:1.2;background:#F8F8FA;border-bottom:1.5px solid var(--ink);overflow:hidden;display:flex;align-items:center;justify-content:center;padding:10px}
+  .designed-card.active .designed-card-preview{background:#0d4a63;border-bottom-color:var(--ink)}
+  .designed-card-thumb{position:relative;overflow:hidden;border:1px solid rgba(9,61,83,0.4);box-shadow:0 4px 10px rgba(0,23,31,0.2)}
+  .designed-card.active .designed-card-thumb{border-color:rgba(255,255,255,0.3)}
+  .designed-card-thumb img{display:block}
+  .designed-card-remaining{position:absolute;top:6px;right:6px;background:var(--accent);color:var(--ink);font-family:'Archivo Black',sans-serif;font-size:11px;padding:2px 7px;letter-spacing:-0.01em;z-index:2;border:1px solid var(--ink);min-width:22px;text-align:center}
+  .designed-card-info{padding:9px 10px 11px;display:flex;flex-direction:column;gap:3px}
+  .designed-card-size{font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:-0.01em}
+  .designed-card-qty{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;opacity:0.65}
+  .designed-card.active .designed-card-qty{opacity:0.85}
+  .designed-card-finish{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+  .designed-card-tag{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:2px 6px;border:1px solid currentColor;opacity:0.75}
+  .designed-empty{padding:24px 18px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;width:100%}
+  .designed-empty p{font-size:11.5px;color:var(--mute);font-weight:500}
+  .designed-empty-cta{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink);text-decoration:none;padding:8px 16px;border:1.5px solid var(--ink);background:var(--paper);transition:all 0.2s}
+  .designed-empty-cta:hover{background:var(--ink);color:var(--paper)}
+
+  .stats{display:flex;flex-direction:column;gap:8px}
+  .stat-row{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:7px;border-bottom:1px solid var(--line)}
+  .stat-row:last-child{border-bottom:none}
+  .stat-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute)}
+  .stat-value{font-family:'Archivo Black',sans-serif;font-size:14px;letter-spacing:-0.01em}
+  .stat-value.highlight{color:var(--accent);font-size:18px}
+
+  .action-btns{display:flex;flex-direction:column;gap:7px}
+  .action-btn{padding:12px 14px;font-family:'Archivo',sans-serif;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;text-decoration:none;text-align:center;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;transition:all 0.2s;min-height:40px}
+  .action-btn:hover{background:var(--ink);color:var(--paper)}
+  .action-btn.primary{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  .action-btn.primary:hover{background:var(--ink);border-color:var(--ink)}
+  .action-btn.danger:hover{background:#C03020;border-color:#C03020;color:var(--paper)}
+
+  .cta-strip{padding:56px 32px;text-align:center;background:var(--ink);color:var(--paper);border-bottom:1.5px solid var(--ink)}
+  .cta-strip h2{font-family:'Archivo Black',sans-serif;font-size:clamp(28px,4vw,48px);line-height:0.95;letter-spacing:-0.03em;text-transform:uppercase;margin-bottom:18px}
+  .cta-strip h2 .accent{color:var(--accent)}
+  .cta-strip p{font-size:14px;max-width:540px;margin:0 auto 24px;opacity:0.8;line-height:1.6}
+  .cta-big{display:inline-block;padding:16px 36px;background:var(--accent);color:var(--ink);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;text-decoration:none;border:1.5px solid var(--accent);transition:all 0.2s;margin:0 6px 10px;min-height:44px;font-family:inherit;cursor:pointer}
+  .cta-big:hover{background:var(--paper);border-color:var(--paper)}
+  .cta-big.ghost{background:transparent;color:var(--paper);border-color:var(--paper)}
+  .cta-big.ghost:hover{background:var(--paper);color:var(--ink)}
+
+  footer{padding:28px 32px;display:flex;justify-content:space-between;font-size:11px;text-transform:uppercase;letter-spacing:0.1em}
+
+  /* CONSULT MODAL */
+  .consult-modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  .consult-modal.open{display:flex}
+  .consult-backdrop{position:absolute;inset:0;background:rgba(0,23,31,0.7);backdrop-filter:blur(4px)}
+  .consult-panel{position:relative;background:var(--paper);border:2px solid var(--ink);max-width:560px;width:100%;max-height:92vh;overflow-y:auto;padding:32px}
+  .consult-close{position:absolute;top:14px;right:14px;width:36px;height:36px;background:var(--paper);border:1.5px solid var(--ink);font-family:inherit;font-size:18px;font-weight:700;cursor:pointer;transition:all 0.2s}
+  .consult-close:hover{background:var(--ink);color:var(--paper)}
+  .consult-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--accent);margin-bottom:10px}
+  .consult-panel h3{font-family:'Archivo Black',sans-serif;font-size:clamp(28px,4vw,40px);line-height:0.9;letter-spacing:-0.03em;text-transform:uppercase;margin-bottom:12px}
+  .consult-accent{color:var(--accent)}
+  .consult-desc{font-size:13px;line-height:1.5;color:var(--mute);margin-bottom:22px}
+  .consult-form{display:flex;flex-direction:column;gap:14px}
+  .consult-field{display:flex;flex-direction:column;gap:6px}
+  .consult-field label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute)}
+  .consult-field input,.consult-field select,.consult-field textarea{padding:10px 12px;border:1.5px solid var(--ink);background:var(--paper);font-family:inherit;font-size:14px;color:var(--ink);outline:none;transition:border-color 0.2s}
+  .consult-field input:focus,.consult-field select:focus,.consult-field textarea:focus{border-color:var(--accent)}
+  .consult-field textarea{resize:vertical;min-height:70px;font-family:inherit}
+  .consult-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .consult-actions{display:flex;gap:10px;margin-top:8px}
+  .consult-btn{flex:1;padding:14px 16px;font-family:inherit;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;border:1.5px solid var(--ink);cursor:pointer;transition:all 0.2s;min-height:44px}
+  .consult-btn.ghost{background:var(--paper);color:var(--ink)}
+  .consult-btn.ghost:hover{background:var(--ink);color:var(--paper)}
+  .consult-btn.primary{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  .consult-btn.primary:hover{background:var(--ink);border-color:var(--ink)}
+
+  @media (max-width:760px){
+    .visualizer-layout{grid-template-columns:1fr}
+    .walls-area{border-right:none;border-bottom:1.5px solid var(--ink)}
+  }
+  @media (max-width:900px){
+    nav{padding:14px 20px}
+    .nav-links{display:none}
+    .page-header{grid-template-columns:1fr;padding:14px 20px;gap:8px;text-align:left}
+    .page-header .page-desc{display:none}
+    .page-header .page-progress{display:none}
+    .setup-section{grid-template-columns:1fr;padding:16px 20px;gap:14px}
+    .walls-area{padding:16px 20px}
+    .sidebar{padding:18px 20px}
+    .cta-strip{padding:40px 20px}
+    footer{padding:20px;flex-direction:column;gap:10px}
+    .consult-panel{padding:22px 20px;max-height:88vh}
+    .consult-row{grid-template-columns:1fr}
+    .big-wall-scene{min-height:380px}
+    .designed-card{width:140px}
+    .designed-card-size{font-size:12px}
+    .designed-card-tag{font-size:8px}
+  }
+  @media (max-width:560px){
+    .preset-grid{grid-template-columns:1fr}
+    .preset-card{border-right:none !important}
+    .preset-card:not(:last-child){border-bottom:1.5px solid var(--ink) !important}
+    .wall-thumbs{grid-template-columns:1fr}
+    .dim-row{flex-direction:column}
+    .dim-field{border-right:none;border-bottom:1.5px solid var(--ink)}
+    .dim-field:last-child{border-bottom:none}
+  }
+
+  /* Site max-width container — content constrained on wide screens */
+  html{background:var(--paper)}body{max-width:1320px;margin:0 auto;background:var(--paper)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo" aria-label="Ahata — home"><svg fill="currentColor" class="brand-logo" preserveAspectRatio="xMidYMid" version="1.0" viewBox="0 0 1874.9 750" xmlns="http://www.w3.org/2000/svg" zoomAndPan="magnify"><defs><clipPath id="nav_u"><path d="m0 0.023438h1874.8v749.95h-1874.8z"/></clipPath><clipPath id="nav_n"><path d="m5 92h40v118h-40z"/></clipPath><clipPath id="nav_a"><path d="m20.301 89.734 34.594 5.1758-17.527 117.2-34.594-5.1758z"/></clipPath><clipPath id="nav_r"><path d="m44.215 100.44-4.168 92.508c-0.22266 4.9219-2.5195 9.5195-6.3242 12.652-3.8047 3.1289-8.7578 4.5-13.633 3.7734-4.8711-0.73047-9.207-3.4922-11.93-7.5977-2.7188-4.1055-3.5742-9.1758-2.3438-13.945l23.082-89.684c0.99219-3.8633 4.7461-6.3477 8.6914-5.7578 3.9414 0.58984 6.8047 4.0664 6.625 8.0508z"/></clipPath><clipPath id="nav_f"><path d="m0 0h39.551v118h-39.551z"/></clipPath><clipPath id="nav_z"><path d="m15.301-2.2656 34.594 5.1758-17.527 117.2-34.594-5.1758z"/></clipPath><clipPath id="nav_g"><path d="m39.215 8.4414-4.168 92.508c-0.22266 4.9219-2.5195 9.5195-6.3242 12.652-3.8047 3.1289-8.7578 4.5-13.633 3.7734-4.8711-0.73047-9.207-3.4922-11.93-7.5977-2.7188-4.1055-3.5742-9.1758-2.3438-13.945l23.082-89.684c0.99219-3.8633 4.7461-6.3477 8.6914-5.7578 3.9414 0.58984 6.8047 4.0664 6.625 8.0508z"/></clipPath><clipPath id="nav_ab"><rect width="40" height="118"/></clipPath><clipPath id="nav_x"><path d="m217 92h41v118h-41z"/></clipPath><clipPath id="nav_d"><path d="m207.04 95.094 34.547-5.4805 18.574 117.04-34.547 5.4805z"/></clipPath><clipPath id="nav_ag"><path d="m233.06 98.102 23.883 89.473c1.2695 4.7617 0.46094 9.8359-2.2226 13.969-2.6836 4.1289-6.9961 6.9297-11.863 7.7031-4.8633 0.76953-9.8281-0.55468-13.66-3.6523s-6.1719-7.6758-6.4375-12.594l-4.9961-92.469c-0.21484-3.9844 2.6133-7.4844 6.5547-8.1094 3.9375-0.625 7.7148 1.8281 8.7422 5.6797z"/></clipPath><clipPath id="nav_b"><path d="m0.33984 0h40.66v118h-40.66z"/></clipPath><clipPath id="nav_t"><path d="m-9.9648 3.0938 34.547-5.4805 18.574 117.04-34.547 5.4805z"/></clipPath><clipPath id="nav_ak"><path d="m16.062 6.1016 23.883 89.473c1.2695 4.7617 0.46094 9.8359-2.2227 13.969-2.6836 4.1289-6.9961 6.9297-11.863 7.7031-4.8633 0.76954-9.8281-0.55468-13.66-3.6523s-6.1719-7.6758-6.4375-12.594l-4.9961-92.469c-0.21484-3.9844 2.6133-7.4844 6.5547-8.1094 3.9375-0.625 7.7148 1.8281 8.7422 5.6797z"/></clipPath><clipPath id="nav_aa"><rect width="41" height="118"/></clipPath><clipPath id="nav_l"><path d="m72 2h36v147h-36z"/></clipPath><clipPath id="nav_ad"><path d="m96.863 150.46-35.457-2.957 12.191-146.19 35.457 2.9531z"/></clipPath><clipPath id="nav_v"><path d="m72.977 142.2-0.76172-121.71c-0.03125-4.9531 2.0195-9.6914 5.6562-13.055 3.6328-3.3672 8.5156-5.0508 13.453-4.6367 4.9375 0.41016 9.4727 2.8789 12.5 6.8008 3.0273 3.918 4.2656 8.9336 3.418 13.812l-20.91 119.9c-0.59766 3.4336-3.7148 5.8398-7.1875 5.5508-3.4688-0.28906-6.1445-3.1797-6.168-6.6641z"/></clipPath><clipPath id="nav_h"><path d="m0.14844 0.16797h35.852v146.83h-35.852z"/></clipPath><clipPath id="nav_j"><path d="m24.863 148.46-35.457-2.957 12.191-146.19 35.457 2.9531z"/></clipPath><clipPath id="nav_ai"><path d="m0.97656 140.2-0.76172-121.71c-0.03125-4.9531 2.0195-9.6914 5.6562-13.055 3.6328-3.3672 8.5156-5.0508 13.453-4.6367 4.9375 0.41016 9.4727 2.8789 12.5 6.8008 3.0273 3.918 4.2656 8.9336 3.418 13.812l-20.91 119.9c-0.59766 3.4336-3.7148 5.8398-7.1875 5.5508-3.4688-0.28906-6.1445-3.1797-6.168-6.6641z"/></clipPath><clipPath id="nav_ah"><rect width="36" height="147"/></clipPath><clipPath id="nav_k"><path d="m154 2h36v147h-36z"/></clipPath><clipPath id="nav_y"><path d="m200.78 147.47-35.453 3.0078-12.406-146.17 35.453-3.0078z"/></clipPath><clipPath id="nav_m"><path d="m175.85 143.32-21.086-119.87c-0.85937-4.8789 0.3711-9.8945 3.3945-13.82 3.0195-3.9219 7.5547-6.3984 12.488-6.8164 4.9375-0.41797 9.8203 1.2539 13.461 4.6172 3.6406 3.3594 5.6992 8.0938 5.6758 13.047l-0.58204 121.71c-0.0156 3.4805-2.6875 6.375-6.1602 6.668-3.4688 0.29688-6.5898-2.1055-7.1914-5.5352z"/></clipPath><clipPath id="nav_e"><path d="m0 0.16797h35.98v146.83h-35.98z"/></clipPath><clipPath id="nav_ac"><path d="m46.781 145.47-35.453 3.0078-12.406-146.17 35.453-3.0078z"/></clipPath><clipPath id="nav_q"><path d="m21.852 141.32-21.086-119.87c-0.85938-4.8789 0.37109-9.8945 3.3945-13.82 3.0195-3.9219 7.5547-6.3984 12.488-6.8164 4.9375-0.41797 9.8203 1.2539 13.461 4.6172 3.6406 3.3594 5.6992 8.0938 5.6758 13.047l-0.58203 121.71c-0.01563 3.4805-2.6875 6.375-6.1602 6.668-3.4688 0.29688-6.5898-2.1055-7.1914-5.5352z"/></clipPath><clipPath id="nav_i"><rect width="36" height="147"/></clipPath><clipPath id="nav_ae"><path d="m113.35 70.91h35.582v161.93h-35.582z"/></clipPath><clipPath id="nav_aj"><path d="m137.39 76.746 11.441 136.81c0.41407 4.9492-1.2617 9.8438-4.625 13.496-3.3594 3.6562-8.0976 5.7344-13.062 5.7344-4.9687 0-9.707-2.0781-13.066-5.7344-3.3633-3.6523-5.0391-8.5469-4.625-13.496l11.441-136.81c0.26953-3.25 2.9883-5.75 6.25-5.75 3.2578 0 5.9766 2.5 6.2461 5.75z"/></clipPath><clipPath id="nav_p"><path d="m0.34766 0.91016h35.582v161.88h-35.582z"/></clipPath><clipPath id="nav_c"><path d="m24.387 6.7461 11.441 136.81c0.41406 4.9492-1.2617 9.8438-4.625 13.496-3.3594 3.6562-8.0977 5.7344-13.062 5.7344-4.9688 0-9.707-2.0781-13.066-5.7344-3.3633-3.6523-5.0391-8.5469-4.625-13.496l11.441-136.81c0.26953-3.25 2.9883-5.75 6.25-5.75 3.2578 0 5.9766 2.5 6.2461 5.75z"/></clipPath><clipPath id="nav_o"><rect width="36" height="163"/></clipPath><clipPath id="nav_w"><rect width="263" height="234"/></clipPath><clipPath id="nav_af"><path d="m505 284h1369.8v180h-1369.8z"/></clipPath><clipPath id="nav_s"><rect width="1370" height="180"/></clipPath></defs><g clip-path="url(#nav_u)" fill="#fff"><path d="m0 0.023438h1874.9v749.95h-1874.9z"/><path d="m0 0.023438h1874.9v749.95h-1874.9z"/></g><g transform="translate(125.83 258)"><g clip-path="url(#nav_w)"><g clip-path="url(#nav_n)"><g clip-path="url(#nav_a)"><g clip-path="url(#nav_r)"><g transform="translate(5,92)"><g clip-path="url(#nav_ab)"><g clip-path="url(#nav_f)"><g clip-path="url(#nav_z)"><g clip-path="url(#nav_g)"><path d="m23.504-69.336 38.172 5.7109-27.543 184.15-38.172-5.707z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_x)"><g clip-path="url(#nav_d)"><g clip-path="url(#nav_ag)"><g transform="translate(217,92)"><g clip-path="url(#nav_aa)"><g clip-path="url(#nav_b)"><g clip-path="url(#nav_t)"><g clip-path="url(#nav_ak)"><path d="m-22.34-63.332 38.121-6.0469 29.188 183.89-38.121 6.0508z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_l)"><g clip-path="url(#nav_ad)"><g clip-path="url(#nav_v)"><g transform="translate(72,2)"><g clip-path="url(#nav_ah)"><g clip-path="url(#nav_h)"><g clip-path="url(#nav_j)"><g clip-path="url(#nav_ai)"><path d="m20.68 216.8-38.461-3.207 17.914-214.85 38.461 3.207z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_k)"><g clip-path="url(#nav_y)"><g clip-path="url(#nav_m)"><g transform="translate(154,2)"><g clip-path="url(#nav_i)"><g clip-path="url(#nav_e)"><g clip-path="url(#nav_ac)"><g clip-path="url(#nav_q)"><path d="m54.07 213.54-38.457 3.2656-18.23-214.82 38.457-3.2656z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_ae)"><g clip-path="url(#nav_aj)"><g transform="translate(113,70)"><g clip-path="url(#nav_o)"><g clip-path="url(#nav_p)"><g clip-path="url(#nav_c)"><rect x="-905.46" y="-601" width="3239.8" height="1296"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_af)"><g transform="translate(505,284)"><g clip-path="url(#nav_s)"><g><g transform="translate(1.338 158.39)"><path d="m9.75-136.41c0-13 6.4922-19.5 19.484-19.5h68.203c12.988 0 19.484 6.5 19.484 19.5v136.41h-19.484v-136.41h-68.203v136.41h-19.484zm38.969 97.438v-19.5h29.234v19.5z"/></g><g transform="translate(283.9 158.39)"><path d="m116.92-155.91v155.91h-19.484v-155.91zm-107.17 155.91v-155.91h19.484v155.91zm38.969-38.969v-19.5h29.234v19.5z"/></g><g transform="translate(566.47 158.39)"><path d="m9.75-136.41c0-13 6.4922-19.5 19.484-19.5h68.203c12.988 0 19.484 6.5 19.484 19.5v136.41h-19.484v-136.41h-68.203v136.41h-19.484zm38.969 97.438v-19.5h29.234v19.5z"/></g><g transform="translate(849.03 158.39)"><path d="m68.203-116.92v116.92h-19.484v-116.92zm-58.453-19.484v-19.5h97.438v19.5z"/></g><g transform="translate(1121.9 158.39)"><path d="m9.75-136.41c0-13 6.4922-19.5 19.484-19.5h68.203c12.988 0 19.484 6.5 19.484 19.5v136.41h-19.484v-136.41h-68.203v136.41h-19.484zm38.969 97.438v-19.5h29.234v19.5z"/></g></g></g></g></g></svg></a>
+  <div class="nav-links">
+    <a href="configurator.html">Design</a>
+    <a href="room-visualizer.html" class="active">Visualize</a>
+    <a href="how-it-works.html">How It Works</a>
+    <button data-open-consult>Consult</button>
+    <a href="about.html">About</a>
+  </div>
+</nav>
+
+<section class="page-header">
+  <div>
+    <div class="page-label">Step 01 · Visualize</div>
+    <h1 class="page-title">Your <span class="accent">space</span>, mapped.</h1>
+  </div>
+  <p class="page-desc">Set room dimensions, pick a panel size, tap a wall to place it. Drag panels to reposition.</p>
+  <div class="page-progress">→ Step 02: Design</div>
+</section>
+
+<div class="cart-banner" id="cartBanner">
+  <div>◆ <span id="cartBannerText">0 designed panels loaded</span></div>
+  <button id="clearCartBtn">Dismiss</button>
+</div>
+
+<!-- SETUP: presets + dimensions side by side -->
+<section class="setup-section">
+  <div class="setup-block">
+    <div class="subsection-label">Start with a preset</div>
+    <div class="preset-grid">
+      <div class="preset-card" data-preset="studio" data-length="12" data-width="10">
+        <div class="preset-name">Home Studio</div>
+        <div class="preset-dims">12 × 10 ft</div>
+      </div>
+      <div class="preset-card" data-preset="living" data-length="16" data-width="14">
+        <div class="preset-name">Living Room</div>
+        <div class="preset-dims">16 × 14 ft</div>
+      </div>
+      <div class="preset-card" data-preset="theater" data-length="20" data-width="16">
+        <div class="preset-name">Home Theater</div>
+        <div class="preset-dims">20 × 16 ft</div>
+      </div>
+      <div class="preset-card" data-preset="custom" data-length="14" data-width="12">
+        <div class="preset-name">Custom</div>
+        <div class="preset-dims">Set dimensions →</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="setup-block">
+    <div class="subsection-label">Or enter exact dimensions</div>
+    <div class="dim-bar-vertical">
+      <div class="dim-row">
+        <div class="dim-field">
+          <div class="dim-label">Length</div>
+          <div class="dim-input"><input type="number" id="lengthInput" value="14" min="6" max="40"><span class="dim-unit">ft</span></div>
+        </div>
+        <div class="dim-field">
+          <div class="dim-label">Width</div>
+          <div class="dim-input"><input type="number" id="widthInput" value="12" min="6" max="40"><span class="dim-unit">ft</span></div>
+        </div>
+      </div>
+      <div class="dim-row">
+        <div class="dim-field">
+          <div class="dim-label">Wall Height</div>
+          <div class="dim-input"><input type="number" id="heightInput" value="10" min="7" max="14"><span class="dim-unit">ft</span></div>
+        </div>
+        <div class="dim-field">
+          <div class="dim-label">Total Wall Area</div>
+          <div class="dim-input"><span class="readonly" id="totalArea">520</span><span class="dim-unit">sq ft</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- MAIN 70/30: walls + panel sizes sidebar -->
+<section class="visualizer-layout">
+  <div class="walls-area">
+    <div class="walls-title">
+      <div class="subsection-label" style="margin-bottom:0">Place panels on walls</div>
+      <div class="walls-hint" id="wallsHint">Select a panel size first</div>
+    </div>
+
+    <div class="big-wall-wrap">
+      <div class="big-wall-header">
+        <div>
+          <div class="big-wall-name" id="activeWallName">Front Wall</div>
+          <div class="big-wall-meta" id="activeWallMeta">14 × 10 ft</div>
+        </div>
+      </div>
+      <div class="big-wall-scene" id="bigWallScene">
+        <div class="side-wall left"></div>
+        <div class="side-wall right"></div>
+        <div class="side-wall-label left" id="sideLabelLeft">← Left Wall</div>
+        <div class="side-wall-label right" id="sideLabelRight">Right Wall →</div>
+        <div class="wall-ground"></div>
+        <div class="selection-hint" id="selectionHint">Drag to select multiple · Esc to clear</div>
+        <div class="big-wall-inner">
+          <div class="wall-surface-big" id="activeWallSurface" data-wall="front" data-empty="Select a panel size to start"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- DESIGNED PANELS HORIZONTAL STRIP -->
+    <div class="designed-strip-wrap" id="designedStripWrap">
+      <div class="designed-strip-header">
+        <div class="subsection-label" style="margin-bottom:0">Your Designs</div>
+        <div class="designed-strip-hint" id="designedStripHint">Tap a card, then click anywhere on the wall to place</div>
+      </div>
+      <div class="designed-strip" id="designedPanels"></div>
+    </div>
+
+    <div class="wall-thumbs" id="wallThumbs"></div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="sidebar-section">
+      <div class="sidebar-title">
+        <span>Panel sizes</span>
+        <span class="deselect-hint">tap to toggle</span>
+      </div>
+
+      <div class="orient-toggle" id="orientToggle">
+        <button class="orient-btn active" data-orient="horizontal">
+          <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8"/></svg>
+          Horizontal
+        </button>
+        <button class="orient-btn" data-orient="vertical">
+          <svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="18"/></svg>
+          Vertical
+        </button>
+      </div>
+
+      <div class="panel-sizes">
+        <button class="size-chip" data-size="1x1" data-w="1" data-h="1" data-price="2500"><span class="size-name">1×1 ft</span><span class="size-price">₹2,500</span></button>
+        <button class="size-chip" data-size="2x1" data-w="2" data-h="1" data-price="3500"><span class="size-name">2×1 ft</span><span class="size-price">₹3,500</span></button>
+        <button class="size-chip" data-size="2x2" data-w="2" data-h="2" data-price="4500"><span class="size-name">2×2 ft</span><span class="size-price">₹4,500</span></button>
+        <button class="size-chip" data-size="4x2" data-w="4" data-h="2" data-price="6500"><span class="size-name">4×2 ft</span><span class="size-price">₹6,500</span></button>
+        <button class="size-chip" data-size="1x4" data-w="1" data-h="4" data-price="5500"><span class="size-name">1×4 ft</span><span class="size-price">₹5,500</span></button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">Your plan</div>
+      <div class="stats">
+        <div class="stat-row"><span class="stat-label">Panels placed</span><span class="stat-value" id="statCount">0</span></div>
+        <div class="stat-row"><span class="stat-label">Wall coverage</span><span class="stat-value" id="statCoverage">0%</span></div>
+        <div class="stat-row"><span class="stat-label">Estimated total</span><span class="stat-value highlight" id="statTotal">₹0</span></div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">Next step</div>
+      <div class="action-btns">
+        <a href="configurator.html" class="action-btn primary" id="designBtn">Design These Panels →</a>
+        <button class="action-btn" data-open-consult>Book Consultation</button>
+        <button class="action-btn danger" id="clearBtn">Clear All Panels</button>
+      </div>
+    </div>
+  </aside>
+</section>
+
+<section class="cta-strip">
+  <h2>NOT SURE WHAT YOU<br><span class="accent">ACTUALLY NEED?</span></h2>
+  <p>Acoustic treatment is part science, part art. Our paid consultation maps your room's specific sound characteristics and recommends precise panel placement.</p>
+  <button class="cta-big" data-open-consult>Book a Consultation</button>
+  <a href="configurator.html" class="cta-big ghost">Skip & Design Panels</a>
+</section>
+
+<footer>
+  <span>© 2026 Ahata◆</span>
+  <span>Hand built · Mumbai</span>
+</footer>
+
+<!-- CONSULT MODAL -->
+<div class="consult-modal" id="consultModal" aria-hidden="true">
+  <div class="consult-backdrop" data-close-consult></div>
+  <div class="consult-panel">
+    <button class="consult-close" data-close-consult>×</button>
+    <div class="consult-label">◆ Book a Consultation</div>
+    <h3>Let's talk about your <span class="consult-accent">room.</span></h3>
+    <p class="consult-desc">A paid 45-minute session — we map your room's acoustics, recommend panel count and placement, and give you a plan. ₹2,500 · credited toward your first order.</p>
+    <form class="consult-form" id="consultForm" novalidate>
+      <div class="consult-field"><label for="cfName">Your name</label><input type="text" id="cfName" name="name" autocomplete="name" required></div>
+      <div class="consult-row">
+        <div class="consult-field"><label for="cfEmail">Email</label><input type="email" id="cfEmail" name="email" autocomplete="email" required></div>
+        <div class="consult-field"><label for="cfPhone">Phone</label><input type="tel" id="cfPhone" name="phone" autocomplete="tel" required></div>
+      </div>
+      <div class="consult-row">
+        <div class="consult-field"><label for="cfRoom">Room type</label><select id="cfRoom" name="room"><option value="Home studio">Home studio</option><option value="Home theater">Home theater</option><option value="Living room">Living room</option><option value="Office / commercial">Office / commercial</option><option value="Other">Other</option></select></div>
+        <div class="consult-field"><label for="cfDate">Preferred date</label><input type="date" id="cfDate" name="date"></div>
+      </div>
+      <div class="consult-field"><label for="cfNotes">Tell us a bit about your space</label><textarea id="cfNotes" name="notes" rows="3" placeholder="Approx. size, what you're solving for, anything we should know..."></textarea></div>
+      <div class="consult-actions">
+        <button type="button" class="consult-btn ghost" data-close-consult>Cancel</button>
+        <button type="submit" class="consult-btn primary">Request Consultation →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// CONSULT MODAL
+const consultModal = document.getElementById('consultModal');
+document.querySelectorAll('[data-open-consult]').forEach(el=>{
+  el.addEventListener('click',e=>{e.preventDefault();consultModal.classList.add('open');document.body.classList.add('modal-open')});
+});
+document.querySelectorAll('[data-close-consult]').forEach(el=>{
+  el.addEventListener('click',()=>{consultModal.classList.remove('open');document.body.classList.remove('modal-open')});
+});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape' && consultModal.classList.contains('open')){
+    consultModal.classList.remove('open');document.body.classList.remove('modal-open');
+  }
+});
+document.getElementById('consultForm').addEventListener('submit',e=>{
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = `Name: ${fd.get('name')}\nEmail: ${fd.get('email')}\nPhone: ${fd.get('phone')}\nRoom type: ${fd.get('room')}\nPreferred date: ${fd.get('date')||'—'}\n\nNotes:\n${fd.get('notes')||'—'}`;
+  window.location.href = `mailto:hello@ahata.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
+});
+
+const state = {roomLength:14, roomWidth:12, roomHeight:10, activeWall:'front', selectedSize:null, selectedDesignedId:null, orientation:'horizontal', panels:[], designedCart:[], selectedPanelIds:new Set()};
+const PANEL_PRICES = { '1x1':2500, '2x1':3500, '2x2':4500, '4x2':6500, '1x4':5500 };
+const WALL_ORDER = ['front','right','back','left'];
+const WALL_LABELS = {front:'Front Wall', back:'Back Wall', left:'Left Wall', right:'Right Wall'};
+const WALL_ADJACENTS = {
+  front:{left:'left', right:'right'},
+  right:{left:'front', right:'back'},
+  back: {left:'right', right:'left'},
+  left: {left:'back', right:'front'}
+};
+
+const $ = id => document.getElementById(id);
+const lengthInput = $('lengthInput'), widthInput = $('widthInput'), heightInput = $('heightInput');
+const totalAreaEl = $('totalArea');
+const wallsHint = $('wallsHint');
+const statCount = $('statCount'), statCoverage = $('statCoverage'), statTotal = $('statTotal');
+const activeWallSurface = $('activeWallSurface');
+const wallThumbs = $('wallThumbs');
+const orientToggle = $('orientToggle');
+
+function loadDesignedCart(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('acousticCart'));
+    if(saved && Array.isArray(saved) && saved.length > 0){
+      state.designedCart = saved.map(p => ({...p, quantity: p.quantity || 1}));
+      const totalCount = state.designedCart.reduce((s,p)=>s+p.quantity,0);
+      $('cartBannerText').textContent = `${totalCount} designed panel${totalCount>1?'s':''} loaded · see Your Designs`;
+      $('cartBanner').classList.add('visible');
+    } else {
+      state.designedCart = [];
+      $('cartBanner').classList.remove('visible');
+    }
+  }catch(e){
+    state.designedCart = [];
+    $('cartBanner').classList.remove('visible');
+  }
+  // The designed strip is always visible; renderDesignedPanels handles empty state
+  renderDesignedPanels();
+}
+
+// Run on initial load
+loadDesignedCart();
+// Re-run on bfcache restore (browser back/forward) — pageshow fires with persisted=true
+window.addEventListener('pageshow', e => { if(e.persisted) loadDesignedCart(); });
+// Also re-sync if another tab/window updates localStorage
+window.addEventListener('storage', e => { if(e.key === 'acousticCart') loadDesignedCart(); });
+
+$('clearCartBtn').addEventListener('click',()=>{
+  $('cartBanner').classList.remove('visible');
+  state.designedCart = [];
+  state.selectedDesignedId = null;
+  try{localStorage.removeItem('acousticCart')}catch(e){}
+  renderDesignedPanels();
+});
+
+document.querySelectorAll('.preset-card').forEach(card=>{
+  card.addEventListener('click',()=>{
+    document.querySelectorAll('.preset-card').forEach(c=>c.classList.remove('active'));
+    card.classList.add('active');
+    lengthInput.value = parseInt(card.dataset.length);
+    widthInput.value = parseInt(card.dataset.width);
+    updateDimensions();
+  });
+});
+
+[lengthInput,widthInput,heightInput].forEach(input=>{input.addEventListener('input',updateDimensions)});
+
+function getWallDimensionsFt(wall){
+  const w = (wall === 'front' || wall === 'back') ? state.roomLength : state.roomWidth;
+  return {w, h: state.roomHeight};
+}
+
+function updateDimensions(){
+  state.roomLength = Math.max(6, parseInt(lengthInput.value)||14);
+  state.roomWidth = Math.max(6, parseInt(widthInput.value)||12);
+  state.roomHeight = Math.max(7, parseInt(heightInput.value)||10);
+  const area = 2*(state.roomLength + state.roomWidth)*state.roomHeight;
+  totalAreaEl.textContent = area;
+  refreshActiveWall();
+  renderThumbnails();
+  updateStats();
+}
+
+$('sideLabelLeft').addEventListener('click',()=>setActiveWall(WALL_ADJACENTS[state.activeWall].left));
+$('sideLabelRight').addEventListener('click',()=>setActiveWall(WALL_ADJACENTS[state.activeWall].right));
+
+function setActiveWall(wall){
+  state.activeWall = wall;
+  state.selectedPanelIds.clear();
+  if(typeof selectionHint !== 'undefined' && selectionHint) selectionHint.classList.remove('visible');
+  refreshActiveWall();
+  renderThumbnails();
+}
+
+function refreshActiveWall(){
+  const wall = state.activeWall;
+  const {w:wallWft, h:wallHft} = getWallDimensionsFt(wall);
+  $('activeWallName').textContent = WALL_LABELS[wall];
+  $('activeWallMeta').textContent = `${wallWft} × ${wallHft} ft`;
+  activeWallSurface.dataset.wall = wall;
+  activeWallSurface.dataset.wallWidth = wallWft;
+  sizeWallSurface();
+  const adj = WALL_ADJACENTS[wall];
+  $('sideLabelLeft').textContent = `← ${WALL_LABELS[adj.left]}`;
+  $('sideLabelRight').textContent = `${WALL_LABELS[adj.right]} →`;
+  renderActivePanels();
+  updateArmedState();
+}
+
+function sizeWallSurface(){
+  const {w:wallWft, h:wallHft} = getWallDimensionsFt(state.activeWall);
+  const inner = activeWallSurface.parentElement;
+  const availableW = inner.offsetWidth;
+  const availableH = inner.offsetHeight;
+  if(availableW === 0 || availableH === 0) return;
+  const ratio = wallWft / wallHft;
+  let w, h;
+  if(availableW / availableH > ratio){ h = availableH; w = h * ratio; }
+  else { w = availableW; h = w / ratio; }
+  activeWallSurface.style.width = w + 'px';
+  activeWallSurface.style.height = h + 'px';
+}
+
+document.querySelectorAll('.size-chip').forEach(chip=>{
+  chip.addEventListener('click',()=>{
+    if(chip.classList.contains('active')){
+      chip.classList.remove('active');
+      state.selectedSize = null;
+      orientToggle.classList.remove('visible');
+    } else {
+      document.querySelectorAll('.size-chip').forEach(c=>c.classList.remove('active'));
+      document.querySelectorAll('.designed-item').forEach(d=>d.classList.remove('active'));
+      chip.classList.add('active');
+      state.selectedDesignedId = null;
+      state.selectedSize = {size: chip.dataset.size, w: parseFloat(chip.dataset.w), h: parseFloat(chip.dataset.h), price: parseInt(chip.dataset.price)};
+      if(state.selectedSize.w !== state.selectedSize.h){
+        orientToggle.classList.add('visible');
+        state.orientation = state.selectedSize.w >= state.selectedSize.h ? 'horizontal' : 'vertical';
+        document.querySelectorAll('.orient-btn').forEach(b=>b.classList.toggle('active', b.dataset.orient===state.orientation));
+      } else { orientToggle.classList.remove('visible'); }
+      // Switching into placement mode clears any active panel selection
+      if(typeof clearSelection === 'function') clearSelection();
+    }
+    updateArmedState();
+  });
+});
+
+document.querySelectorAll('.orient-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.orient-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    state.orientation = btn.dataset.orient;
+  });
+});
+
+function renderDesignedPanels(){
+  const container = $('designedPanels');
+  container.innerHTML = '';
+  if(state.designedCart.length === 0){
+    container.innerHTML = `<div class="designed-empty"><p>No custom panels designed yet</p><a href="configurator.html" class="designed-empty-cta">Design your first panel →</a></div>`;
+    return;
+  }
+  state.designedCart.forEach(panel=>{
+    const placed = state.panels.filter(p=>p.designedId===panel.id).length;
+    const remaining = panel.quantity - placed;
+    const card = document.createElement('button');
+    card.className = 'designed-card';
+    card.type = 'button';
+    if(remaining <= 0) card.classList.add('depleted');
+    if(state.selectedDesignedId === panel.id) card.classList.add('active');
+    // Compute display dims: prefer effectiveW/effectiveH if present, else derive
+    let dispW, dispH;
+    if(typeof panel.effectiveW === 'number' && typeof panel.effectiveH === 'number'){
+      dispW = panel.effectiveW;
+      dispH = panel.effectiveH;
+    } else if(panel.orientation === 'vertical' && panel.baseW !== panel.baseH){
+      dispW = Math.min(panel.baseW, panel.baseH);
+      dispH = Math.max(panel.baseW, panel.baseH);
+    } else {
+      dispW = Math.max(panel.baseW, panel.baseH);
+      dispH = Math.min(panel.baseW, panel.baseH);
+    }
+    // Thumb sized to fit a ~110px wide × 90px tall preview area, preserving aspect
+    const PREVIEW_MAX_W = 130, PREVIEW_MAX_H = 105;
+    const aspect = dispW / dispH;
+    let thumbPxW, thumbPxH;
+    if(PREVIEW_MAX_W / PREVIEW_MAX_H > aspect){
+      thumbPxH = PREVIEW_MAX_H;
+      thumbPxW = thumbPxH * aspect;
+    } else {
+      thumbPxW = PREVIEW_MAX_W;
+      thumbPxH = thumbPxW / aspect;
+    }
+    const t = computeArtTransform(panel, thumbPxW, thumbPxH);
+    let imgHtml;
+    if(t && !t.useObjectFit){
+      imgHtml = `<img src="${panel.image}" alt="" style="position:absolute;top:0;left:0;width:${t.naturalW}px;height:${t.naturalH}px;transform-origin:0 0;transform:${t.transform};max-width:none;max-height:none">`;
+    } else {
+      imgHtml = `<img src="${panel.image}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover">`;
+    }
+    const woodLabel = panel.woodVarnish === 'dark' ? 'Dark wood' : 'Light wood';
+    const wrapLabel = panel.fabricWrap === 'full' ? 'Full wrap' : 'Half wrap';
+    card.innerHTML = `
+      <div class="designed-card-preview">
+        <div class="designed-card-remaining">${remaining > 0 ? remaining : '—'}</div>
+        <div class="designed-card-thumb" style="width:${thumbPxW}px;height:${thumbPxH}px">${imgHtml}</div>
+      </div>
+      <div class="designed-card-info">
+        <div class="designed-card-size">${dispW}×${dispH} ft</div>
+        <div class="designed-card-qty">${remaining > 0 ? `${remaining} of ${panel.quantity} left` : 'All placed'}</div>
+        <div class="designed-card-finish">
+          <span class="designed-card-tag">${woodLabel}</span>
+          <span class="designed-card-tag">${wrapLabel}</span>
+        </div>
+      </div>`;
+    card.addEventListener('click',()=>{
+      if(remaining <= 0) return;
+      if(state.selectedDesignedId === panel.id){
+        state.selectedDesignedId = null;
+      } else {
+        state.selectedDesignedId = panel.id;
+        state.selectedSize = null;
+        document.querySelectorAll('.size-chip').forEach(c=>c.classList.remove('active'));
+        orientToggle.classList.remove('visible');
+        if(typeof clearSelection === 'function') clearSelection();
+      }
+      renderDesignedPanels();
+      updateArmedState();
+    });
+    container.appendChild(card);
+  });
+}
+
+function updateArmedState(){
+  const hasSelection = state.selectedSize || state.selectedDesignedId;
+  if(hasSelection){
+    activeWallSurface.classList.add('armed');
+    let w, h;
+    if(state.selectedSize){
+      const sz = state.selectedSize;
+      const flip = state.orientation === 'vertical' && sz.w !== sz.h;
+      w = flip ? sz.h : sz.w;
+      h = flip ? sz.w : sz.h;
+    } else {
+      const designed = state.designedCart.find(p=>p.id===state.selectedDesignedId);
+      if(designed){
+        const flip = designed.orientation === 'vertical' && designed.baseW !== designed.baseH;
+        w = flip ? designed.baseH : designed.baseW;
+        h = flip ? designed.baseW : designed.baseH;
+      }
+    }
+    wallsHint.textContent = `${w}×${h} ft · Tap wall to place`;
+    wallsHint.classList.add('active');
+  } else {
+    activeWallSurface.classList.remove('armed');
+    wallsHint.textContent = 'Select a panel size first';
+    wallsHint.classList.remove('active');
+  }
+  activeWallSurface.dataset.empty = hasSelection ? 'Tap to place panel' : 'Select a panel size to start';
+}
+
+// =================================================================
+// UNIFIED POINTER EVENT FLOW
+// Branches on pointerdown:
+//   - target is a placed panel + size NOT armed: select / start panel-drag (single or group)
+//   - target is empty wall + size armed: place a panel on click (no drag)
+//   - target is empty wall + size NOT armed: start marquee selection
+// =================================================================
+
+const selectionHint = $('selectionHint');
+let interaction = null; // current pointer interaction state
+
+function isArmed(){ return !!(state.selectedSize || state.selectedDesignedId); }
+function clearSelection(){
+  state.selectedPanelIds.clear();
+  activeWallSurface.querySelectorAll('.placed-panel.selected').forEach(el=>el.classList.remove('selected'));
+  selectionHint.classList.remove('visible');
+}
+function selectPanel(id, additive=false){
+  if(!additive) state.selectedPanelIds.clear();
+  state.selectedPanelIds.add(id);
+  syncSelectionDOM();
+}
+function syncSelectionDOM(){
+  activeWallSurface.querySelectorAll('.placed-panel').forEach(el=>{
+    const id = el.dataset.panelId;
+    const isSelected = [...state.selectedPanelIds].some(sid => String(sid) === String(id));
+    el.classList.toggle('selected', isSelected);
+  });
+  selectionHint.classList.toggle('visible', state.selectedPanelIds.size > 1);
+}
+
+function getWallPxPerFt(){
+  const rect = activeWallSurface.getBoundingClientRect();
+  const {w:wWft, h:wHft} = getWallDimensionsFt(state.activeWall);
+  return {rect, wWft, wHft, pxPerFtX: rect.width / wWft, pxPerFtY: rect.height / wHft};
+}
+
+activeWallSurface.addEventListener('pointerdown', e => {
+  if(e.target.dataset.remove){
+    const id = e.target.dataset.remove;
+    state.panels = state.panels.filter(p=>String(p.id) !== id);
+    [...state.selectedPanelIds].forEach(sid => { if(String(sid) === id) state.selectedPanelIds.delete(sid); });
+    renderActivePanels(); renderThumbnails(); renderDesignedPanels(); updateStats();
+    return;
+  }
+
+  const panelEl = e.target.closest('.placed-panel');
+  const panelId = panelEl ? panelEl.dataset.panelId : null;
+  const panel = panelId ? state.panels.find(p => String(p.id) === String(panelId)) : null;
+
+  if(panelEl && panel){
+    // Drag a placed panel.
+    // - When NOT armed: behave as full multi-select drag (single or group).
+    // - When armed (placement mode): single-panel drag only, don't touch selection.
+    e.preventDefault();
+    let movingPanels;
+    if(!isArmed()){
+      const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+      const alreadySelected = [...state.selectedPanelIds].some(sid => String(sid) === String(panel.id));
+      if(!alreadySelected){
+        if(additive) state.selectedPanelIds.add(panel.id);
+        else { state.selectedPanelIds.clear(); state.selectedPanelIds.add(panel.id); }
+        syncSelectionDOM();
+      }
+      const ids = [...state.selectedPanelIds];
+      movingPanels = state.panels.filter(p => ids.some(id => String(id) === String(p.id)));
+    } else {
+      // Armed: drag just this one panel, leave selection state alone.
+      movingPanels = [panel];
+    }
+    const initPositions = movingPanels.map(p => ({id:p.id, initX:p.x, initY:p.y}));
+    const {wWft, wHft, pxPerFtX, pxPerFtY} = getWallPxPerFt();
+    interaction = {kind:'drag-panels', startX:e.clientX, startY:e.clientY, movingPanels, initPositions, wWft, wHft, pxPerFtX, pxPerFtY, moved:false};
+    movingPanels.forEach(p => {
+      const el = activeWallSurface.querySelector(`.placed-panel[data-panel-id="${p.id}"]`);
+      if(el) el.classList.add('dragging');
+    });
+    activeWallSurface.setPointerCapture(e.pointerId);
+    return;
+  }
+
+  // Empty wall area
+  if(isArmed()){
+    interaction = {kind:'place-pending', startX:e.clientX, startY:e.clientY, moved:false};
+  } else {
+    // Marquee selection
+    e.preventDefault();
+    const additive = e.shiftKey || e.metaKey || e.ctrlKey;
+    if(!additive) clearSelection();
+    const rect = activeWallSurface.getBoundingClientRect();
+    const startLocalX = e.clientX - rect.left;
+    const startLocalY = e.clientY - rect.top;
+    const box = document.createElement('div');
+    box.className = 'marquee-box';
+    box.style.left = startLocalX + 'px';
+    box.style.top = startLocalY + 'px';
+    box.style.width = '0px';
+    box.style.height = '0px';
+    activeWallSurface.appendChild(box);
+    const baseSelection = new Set(state.selectedPanelIds);
+    interaction = {kind:'marquee', startX:e.clientX, startY:e.clientY, startLocalX, startLocalY, box, baseSelection, moved:false};
+    activeWallSurface.setPointerCapture(e.pointerId);
+  }
+});
+
+activeWallSurface.addEventListener('pointermove', e => {
+  if(!interaction) return;
+  const dx = e.clientX - interaction.startX;
+  const dy = e.clientY - interaction.startY;
+  if(Math.abs(dx) > 4 || Math.abs(dy) > 4) interaction.moved = true;
+
+  if(interaction.kind === 'drag-panels'){
+    const {movingPanels, initPositions, wWft, wHft, pxPerFtX, pxPerFtY} = interaction;
+    const dxFt = dx / pxPerFtX;
+    const dyFt = dy / pxPerFtY;
+    // Clamp the GROUP delta so no panel goes off-wall
+    let allowedDx = dxFt, allowedDy = dyFt;
+    initPositions.forEach((ip, i) => {
+      const p = movingPanels[i];
+      const minDx = -ip.initX;
+      const maxDx = (wWft - p.w) - ip.initX;
+      const minDy = -ip.initY;
+      const maxDy = (wHft - p.h) - ip.initY;
+      if(allowedDx < minDx) allowedDx = minDx;
+      if(allowedDx > maxDx) allowedDx = maxDx;
+      if(allowedDy < minDy) allowedDy = minDy;
+      if(allowedDy > maxDy) allowedDy = maxDy;
+    });
+
+    // ALIGNMENT SNAPPING: check if group's left/center/right (or top/middle/bottom) lines
+    // up with another panel's or wall's. Snap if within SNAP_THRESHOLD_PX pixels.
+    const SNAP_THRESHOLD_PX = 6;
+    const snapThresholdFtX = SNAP_THRESHOLD_PX / pxPerFtX;
+    const snapThresholdFtY = SNAP_THRESHOLD_PX / pxPerFtY;
+    const movingIds = new Set(movingPanels.map(p => String(p.id)));
+    // Group bounding box at proposed position
+    let gMinX = Infinity, gMaxX = -Infinity, gMinY = Infinity, gMaxY = -Infinity;
+    initPositions.forEach((ip, i) => {
+      const p = movingPanels[i];
+      const x = ip.initX + allowedDx;
+      const y = ip.initY + allowedDy;
+      if(x < gMinX) gMinX = x;
+      if(x + p.w > gMaxX) gMaxX = x + p.w;
+      if(y < gMinY) gMinY = y;
+      if(y + p.h > gMaxY) gMaxY = y + p.h;
+    });
+    const gCenterX = (gMinX + gMaxX) / 2;
+    const gCenterY = (gMinY + gMaxY) / 2;
+
+    // Collect snap targets — other panels on same wall + wall edges/center
+    const otherPanels = state.panels.filter(p => p.wall === state.activeWall && !movingIds.has(String(p.id)));
+    const xTargets = []; // each: {value:ft, kind:'left'|'right'|'center'|'wall'}
+    const yTargets = [];
+    otherPanels.forEach(p => {
+      xTargets.push({value: p.x, kind:'panel-edge'});
+      xTargets.push({value: p.x + p.w, kind:'panel-edge'});
+      xTargets.push({value: p.x + p.w/2, kind:'panel-center'});
+      yTargets.push({value: p.y, kind:'panel-edge'});
+      yTargets.push({value: p.y + p.h, kind:'panel-edge'});
+      yTargets.push({value: p.y + p.h/2, kind:'panel-center'});
+    });
+    xTargets.push({value: 0, kind:'wall-edge'}, {value: wWft, kind:'wall-edge'}, {value: wWft/2, kind:'wall-center'});
+    yTargets.push({value: 0, kind:'wall-edge'}, {value: wHft, kind:'wall-edge'}, {value: wHft/2, kind:'wall-center'});
+
+    // Check each of the group's three X reference points against X targets
+    const xCandidates = [
+      {ref: gMinX, axis:'left'},
+      {ref: gCenterX, axis:'center'},
+      {ref: gMaxX, axis:'right'}
+    ];
+    let bestX = null;
+    xCandidates.forEach(c => {
+      xTargets.forEach(t => {
+        const diff = t.value - c.ref;
+        if(Math.abs(diff) < snapThresholdFtX){
+          if(!bestX || Math.abs(diff) < Math.abs(bestX.diff)){
+            bestX = {diff, target: t.value, refKind: c.axis, targetKind: t.kind};
+          }
+        }
+      });
+    });
+    if(bestX){
+      allowedDx += bestX.diff;
+    }
+    // Same for Y
+    const yCandidates = [
+      {ref: gMinY, axis:'top'},
+      {ref: gCenterY, axis:'middle'},
+      {ref: gMaxY, axis:'bottom'}
+    ];
+    let bestY = null;
+    yCandidates.forEach(c => {
+      yTargets.forEach(t => {
+        const diff = t.value - c.ref;
+        if(Math.abs(diff) < snapThresholdFtY){
+          if(!bestY || Math.abs(diff) < Math.abs(bestY.diff)){
+            bestY = {diff, target: t.value, refKind: c.axis, targetKind: t.kind};
+          }
+        }
+      });
+    });
+    if(bestY){
+      allowedDy += bestY.diff;
+    }
+
+    // Re-clamp after snap (in case snap pushed past wall edge)
+    initPositions.forEach((ip, i) => {
+      const p = movingPanels[i];
+      const minDx = -ip.initX;
+      const maxDx = (wWft - p.w) - ip.initX;
+      const minDy = -ip.initY;
+      const maxDy = (wHft - p.h) - ip.initY;
+      if(allowedDx < minDx) allowedDx = minDx;
+      if(allowedDx > maxDx) allowedDx = maxDx;
+      if(allowedDy < minDy) allowedDy = minDy;
+      if(allowedDy > maxDy) allowedDy = maxDy;
+    });
+
+    initPositions.forEach((ip, i) => {
+      const p = movingPanels[i];
+      p.x = ip.initX + allowedDx;
+      p.y = ip.initY + allowedDy;
+      const el = activeWallSurface.querySelector(`.placed-panel[data-panel-id="${p.id}"]`);
+      if(el){
+        el.style.left = (p.x * pxPerFtX) + 'px';
+        el.style.top = (p.y * pxPerFtY) + 'px';
+      }
+    });
+
+    // Render snap guide lines
+    activeWallSurface.querySelectorAll('.snap-guide').forEach(g => g.remove());
+    if(bestX){
+      const guide = document.createElement('div');
+      guide.className = 'snap-guide vertical';
+      guide.style.left = (bestX.target * pxPerFtX) + 'px';
+      guide.style.top = '0px';
+      guide.style.height = '100%';
+      activeWallSurface.appendChild(guide);
+    }
+    if(bestY){
+      const guide = document.createElement('div');
+      guide.className = 'snap-guide horizontal';
+      guide.style.top = (bestY.target * pxPerFtY) + 'px';
+      guide.style.left = '0px';
+      guide.style.width = '100%';
+      activeWallSurface.appendChild(guide);
+    }
+  } else if(interaction.kind === 'marquee'){
+    const rect = activeWallSurface.getBoundingClientRect();
+    const curLocalX = Math.max(0, Math.min(rect.width, e.clientX - rect.left));
+    const curLocalY = Math.max(0, Math.min(rect.height, e.clientY - rect.top));
+    const x = Math.min(interaction.startLocalX, curLocalX);
+    const y = Math.min(interaction.startLocalY, curLocalY);
+    const w = Math.abs(curLocalX - interaction.startLocalX);
+    const h = Math.abs(curLocalY - interaction.startLocalY);
+    interaction.box.style.left = x + 'px';
+    interaction.box.style.top = y + 'px';
+    interaction.box.style.width = w + 'px';
+    interaction.box.style.height = h + 'px';
+    // Update selection live based on panel centers within box
+    const {pxPerFtX, pxPerFtY} = getWallPxPerFt();
+    const newSelection = new Set(interaction.baseSelection);
+    state.panels.filter(p=>p.wall===state.activeWall).forEach(p => {
+      const cx = (p.x + p.w/2) * pxPerFtX;
+      const cy = (p.y + p.h/2) * pxPerFtY;
+      if(cx >= x && cx <= x + w && cy >= y && cy <= y + h) newSelection.add(p.id);
+    });
+    state.selectedPanelIds = newSelection;
+    syncSelectionDOM();
+  }
+});
+
+activeWallSurface.addEventListener('pointerup', e => {
+  if(!interaction) return;
+  try{ activeWallSurface.releasePointerCapture(e.pointerId); }catch(err){}
+  if(interaction.kind === 'drag-panels'){
+    interaction.movingPanels.forEach(p => {
+      const el = activeWallSurface.querySelector(`.placed-panel[data-panel-id="${p.id}"]`);
+      if(el) el.classList.remove('dragging');
+    });
+    activeWallSurface.querySelectorAll('.snap-guide').forEach(g => g.remove());
+    if(interaction.moved){ renderThumbnails(); updateStats(); }
+    syncSelectionDOM();
+  } else if(interaction.kind === 'marquee'){
+    interaction.box.remove();
+    syncSelectionDOM();
+  } else if(interaction.kind === 'place-pending' && !interaction.moved){
+    placePanelAt(e.clientX, e.clientY);
+  }
+  interaction = null;
+});
+
+activeWallSurface.addEventListener('pointercancel', () => {
+  if(interaction && interaction.kind === 'marquee') interaction.box.remove();
+  if(interaction && interaction.kind === 'drag-panels'){
+    interaction.movingPanels.forEach(p => {
+      const el = activeWallSurface.querySelector(`.placed-panel[data-panel-id="${p.id}"]`);
+      if(el) el.classList.remove('dragging');
+    });
+    activeWallSurface.querySelectorAll('.snap-guide').forEach(g => g.remove());
+  }
+  interaction = null;
+});
+
+// Keyboard: Esc clears selection, Delete/Backspace removes selected
+document.addEventListener('keydown', e => {
+  if(consultModal.classList.contains('open')) return;
+  const tag = (e.target.tagName || '').toLowerCase();
+  if(tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  if(e.key === 'Escape' && state.selectedPanelIds.size > 0){
+    clearSelection();
+  } else if((e.key === 'Delete' || e.key === 'Backspace') && state.selectedPanelIds.size > 0){
+    e.preventDefault();
+    const ids = new Set([...state.selectedPanelIds].map(String));
+    state.panels = state.panels.filter(p => !ids.has(String(p.id)));
+    state.selectedPanelIds.clear();
+    renderActivePanels(); renderThumbnails(); renderDesignedPanels(); updateStats();
+  }
+});
+
+// Given a designed panel (with imagePosition, imageScale, flipH, flipV, rotate, savedPanelWidth, etc.)
+// and a target panel size in PIXELS, compute the CSS transform to apply to the <img> so the
+// composition matches what the user designed. Returns null if the panel has no transform data.
+function computeArtTransform(panel, targetW, targetH){
+  if(!panel.image) return null;
+  const naturalW = panel.imageNaturalWidth || 0;
+  const naturalH = panel.imageNaturalHeight || 0;
+  if(naturalW === 0 || naturalH === 0){
+    // Old cart entry without natural dimensions — fall back to object-fit:cover (centered, fills panel)
+    return {transform:'none', useObjectFit:true};
+  }
+  // savedPanelWidth/Height should be present for new cart entries; if missing, derive a
+  // proxy from the panel's effective feet dimensions assuming the configurator's pxPerFt scale.
+  // For old entries we assume savedPanel had same aspect as targetPanel — so scale becomes 1.
+  let savedW = panel.savedPanelWidth;
+  let savedH = panel.savedPanelHeight;
+  if(!savedW || !savedH){
+    savedW = targetW;
+    savedH = targetH;
+  }
+  // CRITICAL: use a single uniform scale. We pick the AVERAGE of the two ratios to handle
+  // any pxPerFt non-uniformity in the wall display, then trust the panel's overflow:hidden
+  // to clip if needed. Falling back to targetW/savedW only would distort vertically when
+  // the wall has non-uniform pxPerFt.
+  const scaleX = targetW / savedW;
+  const scaleY = targetH / savedH;
+  // Use min(scaleX, scaleY) so the rendered art never appears LARGER than what fit in the
+  // configurator (prevents overflow on stretched walls). Then re-center.
+  const scale = Math.min(scaleX, scaleY);
+  const imgPos = panel.imagePosition || {x:0,y:0};
+  const imgScale = panel.imageScale || 1;
+  // Effective image scale at target panel size
+  const finalZoom = imgScale * scale;
+  // Re-center: account for any difference between scaleX and scaleY by adding margin
+  const marginX = (targetW - savedW * scale) / 2;
+  const marginY = (targetH - savedH * scale) / 2;
+  const finalPosX = imgPos.x * scale + marginX;
+  const finalPosY = imgPos.y * scale + marginY;
+  // Reproduce the same bounding-box correction the configurator uses
+  const r = panel.rotate || 0;
+  const fh = panel.flipH || false;
+  const fv = panel.flipV || false;
+  const rad = r * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const sx = fh ? -1 : 1, sy = fv ? -1 : 1;
+  const corners = [[0,0],[naturalW,0],[0,naturalH],[naturalW,naturalH]];
+  let minX = Infinity, minY = Infinity;
+  corners.forEach(([x,y])=>{
+    const px = x*sx, py = y*sy;
+    const rx = px*cos - py*sin;
+    const ry = px*sin + py*cos;
+    const szx = rx*finalZoom, szy = ry*finalZoom;
+    if(szx<minX) minX = szx;
+    if(szy<minY) minY = szy;
+  });
+  const cssTx = finalPosX - minX;
+  const cssTy = finalPosY - minY;
+  return {
+    transform: `translate(${cssTx}px, ${cssTy}px) scale(${finalZoom}) rotate(${r}deg) scaleX(${sx}) scaleY(${sy})`,
+    naturalW, naturalH,
+    useObjectFit: false
+  };
+}
+
+function placePanelAt(clientX, clientY){
+  if(!state.selectedSize && !state.selectedDesignedId){
+    wallsHint.textContent = 'Select a panel size first!';
+    wallsHint.classList.add('active');
+    setTimeout(updateArmedState, 1500);
+    return;
+  }
+  const rect = activeWallSurface.getBoundingClientRect();
+  const {w:wallWidthFt, h:wallHeightFt} = getWallDimensionsFt(state.activeWall);
+  const pxPerFtX = rect.width / wallWidthFt;
+  const pxPerFtY = rect.height / wallHeightFt;
+  const clickXft = (clientX - rect.left) / pxPerFtX;
+  const clickYft = (clientY - rect.top) / pxPerFtY;
+
+  let panelWft, panelHft, price, size, designedId = null, image = null, designedSnap = null;
+  if(state.selectedDesignedId){
+    const designed = state.designedCart.find(p=>p.id===state.selectedDesignedId);
+    if(!designed) return;
+    const placed = state.panels.filter(p=>p.designedId===designed.id).length;
+    if(placed >= designed.quantity) return;
+    // Prefer the canonical effectiveW/effectiveH that the configurator saved with the design.
+    // Fall back to deriving from baseW/baseH + orientation if missing (older cart shape).
+    if(typeof designed.effectiveW === 'number' && typeof designed.effectiveH === 'number'){
+      panelWft = designed.effectiveW;
+      panelHft = designed.effectiveH;
+    } else if(designed.orientation === 'vertical' && designed.baseW !== designed.baseH){
+      // Vertical: short side = width, long side = height
+      panelWft = Math.min(designed.baseW, designed.baseH);
+      panelHft = Math.max(designed.baseW, designed.baseH);
+    } else {
+      // Horizontal (default): long side = width, short side = height
+      panelWft = Math.max(designed.baseW, designed.baseH);
+      panelHft = Math.min(designed.baseW, designed.baseH);
+    }
+    price = PANEL_PRICES[designed.size] || 0;
+    size = designed.size;
+    designedId = designed.id;
+    image = designed.image;
+    // Carry the full image transform spec so we can reproduce the composition on the wall
+    designedSnap = {
+      imagePosition: designed.imagePosition,
+      imageScale: designed.imageScale,
+      imageNaturalWidth: designed.imageNaturalWidth,
+      imageNaturalHeight: designed.imageNaturalHeight,
+      flipH: designed.flipH,
+      flipV: designed.flipV,
+      rotate: designed.rotate,
+      savedPanelWidth: designed.savedPanelWidth,
+      savedPanelHeight: designed.savedPanelHeight
+    };
+  } else {
+    const sz = state.selectedSize;
+    if(state.orientation === 'vertical' && sz.w !== sz.h){
+      panelWft = Math.min(sz.w, sz.h);
+      panelHft = Math.max(sz.w, sz.h);
+    } else {
+      panelWft = Math.max(sz.w, sz.h);
+      panelHft = Math.min(sz.w, sz.h);
+    }
+    price = sz.price;
+    size = sz.size;
+  }
+  let x = clickXft - panelWft/2;
+  let y = clickYft - panelHft/2;
+  x = Math.max(0, Math.min(wallWidthFt - panelWft, x));
+  y = Math.max(0, Math.min(wallHeightFt - panelHft, y));
+  const placedPanel = {id: Date.now() + Math.random(), wall: state.activeWall, size, w: panelWft, h: panelHft, price, x, y, designedId, image};
+  if(designedSnap) Object.assign(placedPanel, designedSnap);
+  state.panels.push(placedPanel);
+  renderActivePanels();
+  renderThumbnails();
+  renderDesignedPanels();
+  updateStats();
+}
+
+function renderActivePanels(){
+  activeWallSurface.querySelectorAll('.placed-panel').forEach(p=>p.remove());
+  const rect = activeWallSurface.getBoundingClientRect();
+  if(rect.width === 0) return;
+  const {w:wallWidthFt, h:wallHeightFt} = getWallDimensionsFt(state.activeWall);
+  const pxPerFtX = rect.width / wallWidthFt;
+  const pxPerFtY = rect.height / wallHeightFt;
+
+  const wallPanels = state.panels.filter(p=>p.wall===state.activeWall);
+  activeWallSurface.classList.toggle('has-panels', wallPanels.length > 0);
+
+  // Prune any selectedPanelIds that no longer exist
+  const liveIds = new Set(state.panels.map(p=>String(p.id)));
+  [...state.selectedPanelIds].forEach(id => { if(!liveIds.has(String(id))) state.selectedPanelIds.delete(id); });
+
+  wallPanels.forEach(panel=>{
+    const el = document.createElement('div');
+    el.className = 'placed-panel';
+    const panelPxW = panel.w * pxPerFtX;
+    const panelPxH = panel.h * pxPerFtY;
+    el.style.left = (panel.x * pxPerFtX) + 'px';
+    el.style.top = (panel.y * pxPerFtY) + 'px';
+    el.style.width = panelPxW + 'px';
+    el.style.height = panelPxH + 'px';
+    el.dataset.panelId = panel.id;
+    if(panel.image){
+      const t = computeArtTransform(panel, panelPxW, panelPxH);
+      if(t && !t.useObjectFit){
+        el.innerHTML = `<img src="${panel.image}" alt="" style="position:absolute;top:0;left:0;width:${t.naturalW}px;height:${t.naturalH}px;transform-origin:0 0;transform:${t.transform};max-width:none;max-height:none"><button class="remove-btn" data-remove="${panel.id}">×</button><span class="panel-label">${panel.size}</span>`;
+      } else {
+        el.innerHTML = `<img src="${panel.image}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"><button class="remove-btn" data-remove="${panel.id}">×</button><span class="panel-label">${panel.size}</span>`;
+      }
+    } else {
+      el.innerHTML = `${panel.size}<button class="remove-btn" data-remove="${panel.id}">×</button>`;
+    }
+    activeWallSurface.appendChild(el);
+  });
+  syncSelectionDOM();
+}
+
+function renderThumbnails(){
+  wallThumbs.innerHTML = '';
+  // Order thumbnails to match the viewer's orientation when facing the active wall:
+  // [wall to your left] | [wall behind you] | [wall to your right]
+  const adj = WALL_ADJACENTS[state.activeWall];
+  const opposite = WALL_ORDER.find(w => w !== state.activeWall && w !== adj.left && w !== adj.right);
+  const otherWalls = [adj.left, opposite, adj.right];
+  otherWalls.forEach(wall => {
+    const {w:wWft, h:wHft} = getWallDimensionsFt(wall);
+    const panelsOnWall = state.panels.filter(p=>p.wall===wall);
+    const thumb = document.createElement('div');
+    thumb.className = 'wall-thumb';
+    thumb.innerHTML = `
+      <div class="thumb-label">${WALL_LABELS[wall]}</div>
+      <div class="thumb-meta">${wWft} × ${wHft} ft</div>
+      <div class="thumb-surface-wrap">
+        <div class="thumb-surface" data-wall="${wall}">
+          ${panelsOnWall.length > 0 ? `<div class="thumb-count">${panelsOnWall.length}</div>` : ''}
+        </div>
+      </div>`;
+    thumb.addEventListener('click',()=>setActiveWall(wall));
+    wallThumbs.appendChild(thumb);
+    paintThumbSurface(thumb, wall, wWft, wHft, panelsOnWall);
+  });
+}
+
+function paintThumbSurface(thumb, wall, wWft, wHft, panelsOnWall, attempt = 0){
+  const surfaceWrap = thumb.querySelector('.thumb-surface-wrap');
+  const thumbSurface = thumb.querySelector('.thumb-surface');
+  if(!surfaceWrap || !thumbSurface) return;
+
+  // Size the thumb-surface to fit the wrap while preserving the wall's aspect ratio.
+  const wrapRect = surfaceWrap.getBoundingClientRect();
+  const innerW = wrapRect.width - 6;  // minus the 3px padding * 2
+  const innerH = wrapRect.height - 6;
+
+  if(innerW <= 0 || innerH <= 0){
+    // Layout not ready yet — retry up to a few times
+    if(attempt < 5){
+      setTimeout(()=>paintThumbSurface(thumb, wall, wWft, wHft, panelsOnWall, attempt+1), 60);
+    }
+    return;
+  }
+
+  const wallRatio = wWft / wHft;
+  const wrapRatio = innerW / innerH;
+  let surfaceW, surfaceH;
+  if(wrapRatio > wallRatio){ surfaceH = innerH; surfaceW = surfaceH * wallRatio; }
+  else { surfaceW = innerW; surfaceH = surfaceW / wallRatio; }
+  thumbSurface.style.width = surfaceW + 'px';
+  thumbSurface.style.height = surfaceH + 'px';
+
+  // Clear any prior mini-panels (keep the count badge)
+  thumbSurface.querySelectorAll('.mini-panel').forEach(m => m.remove());
+
+  const pxPerFtX = surfaceW / wWft;
+  const pxPerFtY = surfaceH / wHft;
+  panelsOnWall.forEach(p => {
+    const mini = document.createElement('div');
+    mini.className = 'mini-panel';
+    const miniW = p.w * pxPerFtX;
+    const miniH = p.h * pxPerFtY;
+    mini.style.left = (p.x * pxPerFtX) + 'px';
+    mini.style.top = (p.y * pxPerFtY) + 'px';
+    mini.style.width = miniW + 'px';
+    mini.style.height = miniH + 'px';
+    if(p.image){
+      const t = computeArtTransform(p, miniW, miniH);
+      const img = document.createElement('img');
+      img.src = p.image;
+      img.alt = '';
+      if(t && !t.useObjectFit){
+        img.style.cssText = `position:absolute;top:0;left:0;width:${t.naturalW}px;height:${t.naturalH}px;transform-origin:0 0;transform:${t.transform};max-width:none;max-height:none`;
+      } else {
+        img.style.cssText = `position:absolute;inset:0;width:100%;height:100%;object-fit:cover`;
+      }
+      mini.appendChild(img);
+    }
+    thumbSurface.appendChild(mini);
+  });
+}
+
+function updateStats(){
+  statCount.textContent = state.panels.length;
+  const totalPanelArea = state.panels.reduce((s,p)=>s + p.w*p.h, 0);
+  const totalWallArea = 2*(state.roomLength + state.roomWidth)*state.roomHeight;
+  const coverage = totalWallArea > 0 ? (totalPanelArea / totalWallArea * 100).toFixed(1) : 0;
+  statCoverage.textContent = coverage + '%';
+  const total = state.panels.reduce((s,p)=>s + p.price, 0);
+  statTotal.textContent = '₹' + total.toLocaleString();
+}
+
+$('clearBtn').addEventListener('click',()=>{
+  if(state.panels.length === 0){
+    wallsHint.textContent = 'No panels to clear';
+    wallsHint.classList.add('active');
+    setTimeout(updateArmedState, 1500);
+    return;
+  }
+  if(confirm(`Clear all ${state.panels.length} placed panels?`)){
+    state.panels = [];
+    renderActivePanels(); renderThumbnails(); renderDesignedPanels(); updateStats();
+  }
+});
+
+$('designBtn').addEventListener('click',()=>{
+  try{localStorage.setItem('acousticRoomPlan', JSON.stringify({room:{length:state.roomLength, width:state.roomWidth, height:state.roomHeight}, panels: state.panels}))}catch(err){}
+});
+
+window.addEventListener('resize',()=>{setTimeout(()=>{sizeWallSurface();renderActivePanels();renderThumbnails()}, 50)});
+
+updateDimensions();
+requestAnimationFrame(()=>{sizeWallSurface();renderActivePanels();renderThumbnails()});
+</script>
+
+</body>
+</html>

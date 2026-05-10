@@ -1,0 +1,1601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Ahata — Design Your Panels</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#093d53;
+    --shadow:#00171f;
+    --paper:#f2f2f9;
+    --primary:#093d53;
+    --primary-light:#007da6;
+    --accent:#ecad49;
+    --line:rgba(9,61,83,0.18);
+    --mute:rgba(9,61,83,0.62);
+    --wood:#7A5F3A;
+    --wood-mid:#4A3622;
+    --wood-dark:#2A1C10;
+    --wood-edge:#1A0F08;
+    --wrap-black:#0F0904;
+  }
+  /* Inverted (dark) surfaces use the navy primary color, not ink */
+  .cta-strip,.marquee{background:var(--primary)}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:'Archivo',sans-serif;background:var(--paper);color:var(--ink);overflow-x:hidden;-webkit-tap-highlight-color:transparent}
+  body.modal-open{overflow:hidden}
+
+  /* ROUND BADGE */
+
+  nav{position:sticky;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:18px 32px;border-bottom:1.5px solid var(--ink);background:var(--paper);z-index:100}
+  .logo{display:inline-flex;align-items:center;text-decoration:none;line-height:0;color:var(--ink)}
+  .logo .brand-logo{height:32px;width:auto;display:block;flex-shrink:0}
+  .nav-links{display:flex;gap:28px;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em}
+  .nav-links a,.nav-links button{color:var(--ink);text-decoration:none;position:relative;background:none;border:none;font:inherit;cursor:pointer;padding:0;letter-spacing:inherit;text-transform:inherit}
+  .nav-links a.active{color:var(--accent)}
+  .nav-links a:hover::after,.nav-links a.active::after,.nav-links button:hover::after{content:'';position:absolute;left:0;right:0;bottom:-4px;height:2px;background:var(--accent)}
+
+  .page-header{padding:36px 32px 24px;border-bottom:1.5px solid var(--ink);display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:end}
+  .page-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:14px;display:flex;align-items:center;gap:12px}
+  .page-label::before{content:'';width:40px;height:2px;background:var(--accent)}
+  .page-title{font-family:'Archivo Black',sans-serif;font-size:clamp(32px,5.5vw,64px);line-height:0.85;letter-spacing:-0.04em;text-transform:uppercase}
+  .page-title .accent{color:var(--accent)}
+  .page-desc{font-size:14px;line-height:1.5;max-width:440px}
+  .panel-counter{margin-top:10px;font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase}
+  .panel-counter span{color:var(--accent)}
+
+  .plan-banner{display:none;padding:12px 32px;background:var(--accent);color:var(--ink);border-bottom:1.5px solid var(--ink);justify-content:space-between;align-items:center;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.1em}
+  .plan-banner.visible{display:flex}
+  .plan-banner button{background:var(--ink);color:var(--paper);border:none;padding:8px 14px;font-family:inherit;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;cursor:pointer;transition:all 0.2s}
+  .plan-banner button:hover{background:var(--paper);color:var(--ink)}
+
+  .size-section{padding:24px 32px;border-bottom:1.5px solid var(--ink)}
+  .subsection-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:16px}
+  .subsection-label::before{content:'◆';color:var(--accent);margin-right:8px}
+
+  .size-grid{display:grid;grid-template-columns:repeat(6,1fr);border:1.5px solid var(--ink)}
+  .size-card{padding:22px 14px;border-right:1.5px solid var(--ink);cursor:pointer;transition:all 0.25s;background:var(--paper);position:relative;overflow:hidden;display:flex;flex-direction:column;gap:12px;min-height:180px}
+  .size-card:last-child{border-right:none}
+  .size-card::before{content:'';position:absolute;inset:0;background:var(--ink);transform:translateY(100%);transition:transform 0.3s;z-index:0}
+  .size-card:hover::before,.size-card.selected::before{transform:translateY(0)}
+  .size-card > *{position:relative;z-index:1;transition:color 0.25s}
+  .size-card:hover > *,.size-card.selected > *{color:var(--paper)}
+  .size-card:hover .size-rect,.size-card.selected .size-rect{background:var(--accent)}
+  .size-card:hover .size-price,.size-card.selected .size-price{color:var(--accent)}
+  .size-visual{height:80px;display:flex;align-items:center;justify-content:center}
+  .size-rect{background:var(--ink);transition:background 0.25s}
+  .size-name{font-family:'Archivo Black',sans-serif;font-size:17px;letter-spacing:-0.01em}
+  .size-price{font-size:11px;font-weight:700;color:var(--mute);transition:color 0.25s}
+  .size-card.custom .size-visual svg{stroke:var(--ink);fill:none;stroke-width:1.5;transition:stroke 0.25s}
+  .size-card.custom:hover .size-visual svg,.size-card.custom.selected .size-visual svg{stroke:var(--paper)}
+
+  .designer{display:none;grid-template-columns:minmax(0,1fr) 280px;border-bottom:1.5px solid var(--ink)}
+  .designer.active{display:grid}
+  .preview-area{padding:20px 28px 24px;border-right:1.5px solid var(--ink);background:linear-gradient(to right,rgba(0,23,31,0.04) 1px,transparent 1px),linear-gradient(to bottom,rgba(0,23,31,0.04) 1px,transparent 1px);background-size:20px 20px;display:flex;flex-direction:column;gap:14px;min-width:0}
+
+  .preview-header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}
+  .preview-left{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+  .preview-badge{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;padding:6px 10px;border:1.5px solid var(--ink);background:var(--paper)}
+  .preview-dims{font-family:'Archivo Black',sans-serif;font-size:14px}
+  .mode-indicator{display:none;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:6px 10px;background:var(--paper);border:1.5px solid var(--ink);align-items:center;gap:6px}
+  .mode-indicator.visible{display:inline-flex}
+  .mode-indicator.image-mode{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  .mode-indicator::before{content:'';width:6px;height:6px;border-radius:50%;background:currentColor}
+
+  .orient-toggle{display:none;gap:0;border:1.5px solid var(--ink)}
+  .orient-toggle.visible{display:flex}
+  .orient-btn{padding:6px 10px;background:var(--paper);border:none;border-right:1.5px solid var(--ink);font-family:inherit;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;cursor:pointer;transition:all 0.2s;color:var(--ink);display:flex;align-items:center;gap:6px;min-height:32px}
+  .orient-btn:last-child{border-right:none}
+  .orient-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.5}
+  .orient-btn.active{background:var(--ink);color:var(--paper)}
+  .orient-btn:hover:not(.active){background:var(--ink);color:var(--paper)}
+
+  /* 3D */
+  .panel-3d-container{
+    perspective:1800px;perspective-origin:50% 45%;
+    display:flex;justify-content:center;align-items:center;
+    flex:1;width:100%;min-height:540px;
+    cursor:grab;position:relative;
+    user-select:none;-webkit-user-select:none;
+    touch-action:none;overflow:hidden;
+  }
+  .panel-3d-container.grabbing{cursor:grabbing}
+  .panel-3d-container.image-mode{cursor:default}
+
+  .scene-wrap{transform-style:preserve-3d;transition:transform 0.15s ease-out;position:relative}
+  .panel-3d{transform-style:preserve-3d;transition:transform 0.12s ease-out;position:relative;will-change:transform}
+
+  .panel-face,.panel-back{position:absolute;top:0;left:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+  .panel-side{position:absolute;top:0;left:0}
+
+  /* FRONT FACE: always edge-to-edge artwork when image present. No wrap-inset here. */
+  .panel-face{
+    background:#FAFAF8;border:1.5px solid var(--ink);
+    overflow:hidden;z-index:2;
+    transform:translateZ(0.01px);
+  }
+  .panel-face.has-image{background:transparent}
+
+  .panel-image-container{width:100%;height:100%;position:relative;overflow:hidden}
+
+  .upload-in-panel{
+    width:100%;height:100%;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;
+    background:#FAFAF8;cursor:pointer;transition:background 0.2s;padding:20px;
+  }
+  .upload-in-panel:hover{background:#F0EDE3}
+  .upload-in-panel.dragover{background:#FFE8D9}
+  .upload-in-panel svg{width:42px;height:42px;stroke:var(--ink);fill:none;stroke-width:1.5;opacity:0.5}
+  .upload-in-panel .u-text{font-family:'Archivo Black',sans-serif;font-size:14px;letter-spacing:-0.01em;text-transform:uppercase}
+  .upload-in-panel .u-hint{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--mute);text-align:center}
+
+  .replace-btn{position:absolute;top:14px;right:14px;background:var(--paper);color:var(--ink);border:1.5px solid var(--ink);padding:6px 10px;font-family:inherit;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;cursor:pointer;opacity:0;transition:all 0.2s;z-index:4}
+  .panel-face:hover .replace-btn,.panel-face.image-armed .replace-btn{opacity:1}
+  .replace-btn:hover{background:var(--ink);color:var(--paper)}
+  .panel-face.image-armed{outline:3px solid var(--accent);outline-offset:2px}
+
+  .panel-image{position:absolute;max-width:none;user-select:none;-webkit-user-drag:none;touch-action:none;cursor:move;pointer-events:auto;transform-origin:0 0}
+
+  /* SIDES: wood base + fabric overlay per wrap mode.
+     Gradient orientation matters: the lighter "edge" tone should sit where the wood meets the FRONT face. */
+  .panel-side{background:linear-gradient(to right,var(--wood-edge),var(--wood-mid) 60%,var(--wood));z-index:1}
+  /* LEFT: front edge is at left (x=0) — default gradient with edge at left is correct */
+  /* RIGHT: front edge is at right (x=DEPTH) — flip gradient */
+  .panel-side.right{background:linear-gradient(to left,var(--wood-edge),var(--wood-mid) 60%,var(--wood))}
+  .wood-dark-scene .panel-side{background:linear-gradient(to right,#0A0500,#1A0F08 60%,var(--wood-dark))}
+  .wood-dark-scene .panel-side.right{background:linear-gradient(to left,#0A0500,#1A0F08 60%,var(--wood-dark))}
+  /* TOP: front edge at top — gradient goes top (light) to bottom (dark) */
+  .panel-side.top{background:linear-gradient(to bottom,var(--wood-edge),var(--wood-mid) 60%,var(--wood))}
+  /* BOTTOM: front edge at bottom — gradient goes bottom (light) to top (dark) */
+  .panel-side.bottom{background:linear-gradient(to top,var(--wood-edge),var(--wood-mid) 60%,var(--wood))}
+  .wood-dark-scene .panel-side.top{background:linear-gradient(to bottom,#0A0500,#1A0F08 60%,var(--wood-dark))}
+  .wood-dark-scene .panel-side.bottom{background:linear-gradient(to top,#0A0500,#1A0F08 60%,var(--wood-dark))}
+
+  /* FABRIC WRAP on sides:
+     HALF-WRAP: black fabric covers the front-half of each side (the half closer to the front face)
+     FULL-WRAP: black fabric covers the entire side */
+  .panel-side::after{
+    content:'';position:absolute;
+    background:var(--wrap-black);
+    pointer-events:none;
+    display:none;
+  }
+  /* Half-wrap: black fabric covers the FRONT-FACING half of each side
+     (the half at z near 0, i.e. the half adjacent to the hinge). */
+  .wrap-half-scene .panel-side.left::after{display:block;left:0;top:0;bottom:0;width:50%}
+  .wrap-half-scene .panel-side.right::after{display:block;right:0;top:0;bottom:0;width:50%}
+  .wrap-half-scene .panel-side.top::after{display:block;left:0;right:0;top:0;height:50%}
+  .wrap-half-scene .panel-side.bottom::after{display:block;left:0;right:0;bottom:0;height:50%}
+
+  .wrap-full-scene .panel-side{background:var(--wrap-black) !important}
+  .wrap-full-scene .panel-side::after{display:none}
+
+  .panel-back{background:#1a1a1a;z-index:0;display:none}
+
+  .panel-shadow{position:absolute;bottom:-50px;left:5%;width:90%;height:40px;background:radial-gradient(ellipse,rgba(0,23,31,0.35),transparent 70%);transform:rotateX(90deg);transform-origin:center top;pointer-events:none}
+
+  .preview-controls{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-top:auto}
+  .ctrl-group{display:flex;border:1.5px solid var(--ink)}
+  .ctrl-btn{padding:10px 12px;background:var(--paper);border:none;border-right:1.5px solid var(--ink);font-family:inherit;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;cursor:pointer;transition:all 0.2s;color:var(--ink);display:flex;align-items:center;gap:6px;min-height:38px;min-width:38px;justify-content:center}
+  .ctrl-btn:last-child{border-right:none}
+  .ctrl-btn:hover{background:var(--ink);color:var(--paper)}
+  .ctrl-btn.active{background:var(--accent);color:var(--ink)}
+  .ctrl-btn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.5}
+  .ctrl-group.image-group{border-color:var(--accent);background:var(--accent)}
+  .ctrl-group.image-group .ctrl-btn{background:var(--accent);color:var(--ink);border-color:rgba(255,255,255,0.3);padding:10px 9px;min-width:36px}
+  .ctrl-group.image-group .ctrl-btn:hover{background:var(--ink);color:var(--paper)}
+  .ctrl-group-wrap{display:flex;gap:8px;flex-wrap:wrap}
+
+  .pan-hint{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute);display:flex;align-items:center;gap:6px}
+  .pan-hint svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.5}
+
+  .image-info-inline{display:none;padding:10px 14px;border:1.5px solid var(--ink);background:var(--paper);font-size:11px;gap:16px;justify-content:space-between;flex-wrap:wrap}
+  .image-info-inline.visible{display:flex}
+  .info-chip{display:flex;gap:6px;align-items:baseline}
+  .info-chip .key{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--mute)}
+  .info-chip .val{font-weight:700}
+
+  .sidebar{padding:22px 18px;display:flex;flex-direction:column;gap:16px;background:var(--paper);min-width:0}
+  .side-section{padding-bottom:16px;border-bottom:1.5px solid var(--ink)}
+  .side-section:last-of-type{border-bottom:none;padding-bottom:0}
+  .side-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:12px}
+  .side-title::before{content:'◆';color:var(--accent);margin-right:6px}
+
+  .artwork-line{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--mute);padding:6px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+  .artwork-line.loaded{color:var(--ink)}
+  .artwork-line .accent{color:var(--accent)}
+
+  .finish-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .finish-block{display:flex;flex-direction:column;gap:6px}
+  .finish-sub{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute)}
+  .finish-options{display:flex;gap:0;border:1.5px solid var(--ink)}
+  .fopt{flex:1;padding:9px 4px;text-align:center;cursor:pointer;transition:all 0.2s;border-right:1.5px solid var(--ink);background:var(--paper);font-family:inherit;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink);border-top:none;border-bottom:none;border-left:none;min-height:36px}
+  .fopt:last-child{border-right:none}
+  .fopt:hover{background:var(--ink);color:var(--paper)}
+  .fopt.active{background:var(--ink);color:var(--paper)}
+
+  .tips-list{list-style:none;font-size:10.5px;line-height:1.55;color:var(--mute)}
+  .tips-list li{padding-left:14px;position:relative;margin-bottom:5px}
+  .tips-list li::before{content:'→';position:absolute;left:0;color:var(--accent);font-weight:700}
+
+  .panel-actions{display:none;padding:14px 32px;border-bottom:1.5px solid var(--ink);gap:8px;flex-wrap:wrap;align-items:center}
+  .panel-actions.visible{display:flex}
+  .action-btn{flex:1 1 0;min-width:0;padding:10px 14px;font-family:inherit;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;text-align:center;text-decoration:none;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;transition:all 0.2s;min-height:38px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:center;gap:6px}
+  .action-btn:hover{background:var(--ink);color:var(--paper)}
+  .action-btn.primary{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  .action-btn.primary:hover{background:var(--ink);border-color:var(--ink)}
+  .action-btn.dup{background:var(--ink);color:var(--paper)}
+  .action-btn.dup:hover{background:var(--accent);border-color:var(--accent)}
+
+  .cart-section{display:none;padding:32px;border-bottom:1.5px solid var(--ink)}
+  .cart-section.visible{display:block}
+  .cart-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:20px;flex-wrap:wrap;gap:12px}
+  .cart-title{font-family:'Archivo Black',sans-serif;font-size:clamp(28px,4vw,44px);letter-spacing:-0.03em;text-transform:uppercase}
+  .cart-title .accent{color:var(--accent)}
+  .cart-reset{background:none;border:1.5px solid var(--ink);padding:8px 14px;font-family:inherit;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;cursor:pointer;transition:all 0.2s;color:var(--ink)}
+  .cart-reset:hover{background:#C03020;color:var(--paper);border-color:#C03020}
+
+  .cart-strip-wrap{margin:0 -32px 24px;border-top:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);background:linear-gradient(to right,rgba(0,23,31,0.04) 1px,transparent 1px),linear-gradient(to bottom,rgba(0,23,31,0.04) 1px,transparent 1px);background-size:20px 20px;position:relative}
+  .cart-strip{display:flex;gap:14px;padding:24px 32px;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch}
+  .cart-strip::-webkit-scrollbar{height:8px}
+  .cart-strip::-webkit-scrollbar-track{background:rgba(0,23,31,0.06)}
+  .cart-strip::-webkit-scrollbar-thumb{background:var(--ink)}
+
+  .cart-item{flex:0 0 220px;border:1.5px solid var(--ink);background:var(--paper);display:flex;flex-direction:column;position:relative;scroll-snap-align:start}
+  .cart-preview{width:100%;min-height:180px;padding:18px;display:flex;align-items:center;justify-content:center;perspective:800px;background:var(--paper);border-bottom:1.5px solid var(--ink);overflow:hidden}
+  .cart-3d{transform-style:preserve-3d;transform:rotateY(-14deg) rotateX(6deg);position:relative}
+  .cart-face{width:100%;height:100%;background:#FAFAF8;border:1.5px solid var(--ink);overflow:hidden;position:relative}
+  .cart-face.has-image{background:transparent}
+  .cart-face img{position:absolute;top:0;left:0;display:block}
+  .cart-info{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
+  .cart-size-row{display:flex;justify-content:space-between;align-items:baseline}
+  .cart-size{font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:-0.01em}
+  .cart-price{font-size:11px;font-weight:700;color:var(--accent)}
+  .cart-finish{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--mute)}
+  .cart-qty{display:flex;align-items:center;justify-content:space-between;border:1.5px solid var(--ink)}
+  .qty-btn{width:32px;height:30px;background:var(--paper);border:none;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s}
+  .qty-btn:hover{background:var(--ink);color:var(--paper)}
+  .qty-val{font-family:'Archivo Black',sans-serif;font-size:13px;padding:0 12px}
+  .cart-actions-row{display:flex;gap:0;border-top:1.5px solid var(--ink)}
+  .cart-mini-btn{flex:1;padding:10px;background:var(--paper);border:none;border-right:1.5px solid var(--ink);font-family:inherit;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;transition:all 0.2s;color:var(--ink);min-height:34px}
+  .cart-mini-btn:last-child{border-right:none}
+  .cart-mini-btn:hover{background:var(--ink);color:var(--paper)}
+  .cart-mini-btn.danger:hover{background:#C03020;color:var(--paper)}
+  .cart-remove{position:absolute;top:6px;right:6px;width:28px;height:28px;background:var(--paper);border:1.5px solid var(--ink);font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;z-index:2}
+  .cart-remove:hover{background:var(--ink);color:var(--paper)}
+
+  .cart-summary{border:1.5px solid var(--ink);padding:22px;background:var(--paper)}
+  .price-row{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--line)}
+  .price-row:last-child{border-bottom:none}
+  .price-row.total{padding-top:16px;margin-top:8px;border-top:1.5px solid var(--ink);border-bottom:none}
+  .price-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute)}
+  .price-val{font-family:'Archivo Black',sans-serif;font-size:14px;letter-spacing:-0.01em}
+  .price-row.total .price-label{color:var(--ink)}
+  .price-row.total .price-val{font-size:22px;color:var(--accent)}
+  .cart-actions{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .cart-actions .action-btn{flex:1;min-width:140px}
+
+  .float-total{position:fixed;bottom:20px;right:20px;padding:12px 18px;background:var(--ink);color:var(--paper);border:2px solid var(--accent);font-family:'Archivo Black',sans-serif;font-size:14px;letter-spacing:-0.01em;z-index:50;display:none;box-shadow:0 4px 16px rgba(0,23,31,0.3)}
+  .float-total.visible{display:flex;align-items:center;gap:10px;cursor:pointer}
+  .float-total .lbl{font-family:'Archivo',sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:0.1em;opacity:0.7;font-weight:500}
+
+  footer{padding:32px;display:flex;justify-content:space-between;font-size:11px;text-transform:uppercase;letter-spacing:0.1em}
+
+  input[type="file"]{display:none}
+
+  /* CONSULT MODAL */
+  .consult-modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  .consult-modal.open{display:flex}
+  .consult-backdrop{position:absolute;inset:0;background:rgba(0,23,31,0.7);backdrop-filter:blur(4px)}
+  .consult-panel{position:relative;background:var(--paper);border:2px solid var(--ink);max-width:560px;width:100%;max-height:92vh;overflow-y:auto;padding:32px}
+  .consult-close{position:absolute;top:14px;right:14px;width:36px;height:36px;background:var(--paper);border:1.5px solid var(--ink);font-family:inherit;font-size:18px;font-weight:700;cursor:pointer;transition:all 0.2s}
+  .consult-close:hover{background:var(--ink);color:var(--paper)}
+  .consult-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--accent);margin-bottom:10px}
+  .consult-panel h3{font-family:'Archivo Black',sans-serif;font-size:clamp(28px,4vw,40px);line-height:0.9;letter-spacing:-0.03em;text-transform:uppercase;margin-bottom:12px}
+  .consult-accent{color:var(--accent)}
+  .consult-desc{font-size:13px;line-height:1.5;color:var(--mute);margin-bottom:22px}
+  .consult-form{display:flex;flex-direction:column;gap:14px}
+  .consult-field{display:flex;flex-direction:column;gap:6px}
+  .consult-field label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute)}
+  .consult-field input,.consult-field select,.consult-field textarea{padding:10px 12px;border:1.5px solid var(--ink);background:var(--paper);font-family:inherit;font-size:14px;color:var(--ink);outline:none;transition:border-color 0.2s}
+  .consult-field input:focus,.consult-field select:focus,.consult-field textarea:focus{border-color:var(--accent)}
+  .consult-field textarea{resize:vertical;min-height:70px;font-family:inherit}
+  .consult-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .consult-actions{display:flex;gap:10px;margin-top:8px}
+  .consult-btn{flex:1;padding:14px 16px;font-family:inherit;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;border:1.5px solid var(--ink);cursor:pointer;transition:all 0.2s;min-height:44px}
+  .consult-btn.ghost{background:var(--paper);color:var(--ink)}
+  .consult-btn.ghost:hover{background:var(--ink);color:var(--paper)}
+  .consult-btn.primary{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  .consult-btn.primary:hover{background:var(--ink);border-color:var(--ink)}
+
+  @media (max-width:1100px){
+    .size-grid{grid-template-columns:repeat(3,1fr)}
+    .size-card{border-right:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink)}
+    .size-card:nth-child(3n){border-right:none}
+    .size-card:nth-last-child(-n+3){border-bottom:none}
+  }
+  @media (max-width:1000px){
+    .designer{grid-template-columns:1fr}
+    .designer.active{display:block}
+    .preview-area{border-right:none;border-bottom:1.5px solid var(--ink);min-height:520px}
+    .sidebar{padding:20px}
+    .finish-grid{grid-template-columns:1fr 1fr}
+  }
+  @media (max-width:900px){
+    nav{padding:14px 20px}
+    .nav-links{display:none}
+    .page-header{grid-template-columns:1fr;padding:24px 20px;gap:16px}
+    .plan-banner{padding:10px 20px;font-size:11px;flex-wrap:wrap;gap:10px}
+    .size-section{padding:20px}
+    .preview-area{padding:16px 20px 20px;min-height:460px}
+    .panel-3d-container{min-height:420px}
+    .panel-actions{padding:12px 20px;flex-wrap:wrap}
+    .panel-actions .action-btn{flex:1 1 calc(50% - 6px);font-size:10px;padding:9px 10px}
+    .cart-section{padding:24px 20px}
+    .cart-strip-wrap{margin:0 -20px 20px}
+    .cart-strip{padding:20px}
+    .cart-actions{flex-direction:column}
+    footer{padding:20px;flex-direction:column;gap:10px}
+    .finish-grid{grid-template-columns:1fr;gap:12px}
+    .consult-panel{padding:22px 20px;max-height:88vh}
+    .consult-row{grid-template-columns:1fr}
+  }
+  @media (max-width:560px){
+    .size-grid{grid-template-columns:repeat(2,1fr)}
+    .size-card{border-right:1.5px solid var(--ink) !important;border-bottom:1.5px solid var(--ink) !important}
+    .size-card:nth-child(2n){border-right:none !important}
+    .size-card:nth-last-child(-n+2){border-bottom:none !important}
+    .cart-item{flex:0 0 180px}
+  }
+
+  /* Site max-width container — content constrained on wide screens */
+  html{background:var(--paper)}body{max-width:1320px;margin:0 auto;background:var(--paper)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo" aria-label="Ahata — home"><svg fill="currentColor" class="brand-logo" preserveAspectRatio="xMidYMid" version="1.0" viewBox="0 0 1874.9 750" xmlns="http://www.w3.org/2000/svg" zoomAndPan="magnify"><defs><clipPath id="nav_u"><path d="m0 0.023438h1874.8v749.95h-1874.8z"/></clipPath><clipPath id="nav_n"><path d="m5 92h40v118h-40z"/></clipPath><clipPath id="nav_a"><path d="m20.301 89.734 34.594 5.1758-17.527 117.2-34.594-5.1758z"/></clipPath><clipPath id="nav_r"><path d="m44.215 100.44-4.168 92.508c-0.22266 4.9219-2.5195 9.5195-6.3242 12.652-3.8047 3.1289-8.7578 4.5-13.633 3.7734-4.8711-0.73047-9.207-3.4922-11.93-7.5977-2.7188-4.1055-3.5742-9.1758-2.3438-13.945l23.082-89.684c0.99219-3.8633 4.7461-6.3477 8.6914-5.7578 3.9414 0.58984 6.8047 4.0664 6.625 8.0508z"/></clipPath><clipPath id="nav_f"><path d="m0 0h39.551v118h-39.551z"/></clipPath><clipPath id="nav_z"><path d="m15.301-2.2656 34.594 5.1758-17.527 117.2-34.594-5.1758z"/></clipPath><clipPath id="nav_g"><path d="m39.215 8.4414-4.168 92.508c-0.22266 4.9219-2.5195 9.5195-6.3242 12.652-3.8047 3.1289-8.7578 4.5-13.633 3.7734-4.8711-0.73047-9.207-3.4922-11.93-7.5977-2.7188-4.1055-3.5742-9.1758-2.3438-13.945l23.082-89.684c0.99219-3.8633 4.7461-6.3477 8.6914-5.7578 3.9414 0.58984 6.8047 4.0664 6.625 8.0508z"/></clipPath><clipPath id="nav_ab"><rect width="40" height="118"/></clipPath><clipPath id="nav_x"><path d="m217 92h41v118h-41z"/></clipPath><clipPath id="nav_d"><path d="m207.04 95.094 34.547-5.4805 18.574 117.04-34.547 5.4805z"/></clipPath><clipPath id="nav_ag"><path d="m233.06 98.102 23.883 89.473c1.2695 4.7617 0.46094 9.8359-2.2226 13.969-2.6836 4.1289-6.9961 6.9297-11.863 7.7031-4.8633 0.76953-9.8281-0.55468-13.66-3.6523s-6.1719-7.6758-6.4375-12.594l-4.9961-92.469c-0.21484-3.9844 2.6133-7.4844 6.5547-8.1094 3.9375-0.625 7.7148 1.8281 8.7422 5.6797z"/></clipPath><clipPath id="nav_b"><path d="m0.33984 0h40.66v118h-40.66z"/></clipPath><clipPath id="nav_t"><path d="m-9.9648 3.0938 34.547-5.4805 18.574 117.04-34.547 5.4805z"/></clipPath><clipPath id="nav_ak"><path d="m16.062 6.1016 23.883 89.473c1.2695 4.7617 0.46094 9.8359-2.2227 13.969-2.6836 4.1289-6.9961 6.9297-11.863 7.7031-4.8633 0.76954-9.8281-0.55468-13.66-3.6523s-6.1719-7.6758-6.4375-12.594l-4.9961-92.469c-0.21484-3.9844 2.6133-7.4844 6.5547-8.1094 3.9375-0.625 7.7148 1.8281 8.7422 5.6797z"/></clipPath><clipPath id="nav_aa"><rect width="41" height="118"/></clipPath><clipPath id="nav_l"><path d="m72 2h36v147h-36z"/></clipPath><clipPath id="nav_ad"><path d="m96.863 150.46-35.457-2.957 12.191-146.19 35.457 2.9531z"/></clipPath><clipPath id="nav_v"><path d="m72.977 142.2-0.76172-121.71c-0.03125-4.9531 2.0195-9.6914 5.6562-13.055 3.6328-3.3672 8.5156-5.0508 13.453-4.6367 4.9375 0.41016 9.4727 2.8789 12.5 6.8008 3.0273 3.918 4.2656 8.9336 3.418 13.812l-20.91 119.9c-0.59766 3.4336-3.7148 5.8398-7.1875 5.5508-3.4688-0.28906-6.1445-3.1797-6.168-6.6641z"/></clipPath><clipPath id="nav_h"><path d="m0.14844 0.16797h35.852v146.83h-35.852z"/></clipPath><clipPath id="nav_j"><path d="m24.863 148.46-35.457-2.957 12.191-146.19 35.457 2.9531z"/></clipPath><clipPath id="nav_ai"><path d="m0.97656 140.2-0.76172-121.71c-0.03125-4.9531 2.0195-9.6914 5.6562-13.055 3.6328-3.3672 8.5156-5.0508 13.453-4.6367 4.9375 0.41016 9.4727 2.8789 12.5 6.8008 3.0273 3.918 4.2656 8.9336 3.418 13.812l-20.91 119.9c-0.59766 3.4336-3.7148 5.8398-7.1875 5.5508-3.4688-0.28906-6.1445-3.1797-6.168-6.6641z"/></clipPath><clipPath id="nav_ah"><rect width="36" height="147"/></clipPath><clipPath id="nav_k"><path d="m154 2h36v147h-36z"/></clipPath><clipPath id="nav_y"><path d="m200.78 147.47-35.453 3.0078-12.406-146.17 35.453-3.0078z"/></clipPath><clipPath id="nav_m"><path d="m175.85 143.32-21.086-119.87c-0.85937-4.8789 0.3711-9.8945 3.3945-13.82 3.0195-3.9219 7.5547-6.3984 12.488-6.8164 4.9375-0.41797 9.8203 1.2539 13.461 4.6172 3.6406 3.3594 5.6992 8.0938 5.6758 13.047l-0.58204 121.71c-0.0156 3.4805-2.6875 6.375-6.1602 6.668-3.4688 0.29688-6.5898-2.1055-7.1914-5.5352z"/></clipPath><clipPath id="nav_e"><path d="m0 0.16797h35.98v146.83h-35.98z"/></clipPath><clipPath id="nav_ac"><path d="m46.781 145.47-35.453 3.0078-12.406-146.17 35.453-3.0078z"/></clipPath><clipPath id="nav_q"><path d="m21.852 141.32-21.086-119.87c-0.85938-4.8789 0.37109-9.8945 3.3945-13.82 3.0195-3.9219 7.5547-6.3984 12.488-6.8164 4.9375-0.41797 9.8203 1.2539 13.461 4.6172 3.6406 3.3594 5.6992 8.0938 5.6758 13.047l-0.58203 121.71c-0.01563 3.4805-2.6875 6.375-6.1602 6.668-3.4688 0.29688-6.5898-2.1055-7.1914-5.5352z"/></clipPath><clipPath id="nav_i"><rect width="36" height="147"/></clipPath><clipPath id="nav_ae"><path d="m113.35 70.91h35.582v161.93h-35.582z"/></clipPath><clipPath id="nav_aj"><path d="m137.39 76.746 11.441 136.81c0.41407 4.9492-1.2617 9.8438-4.625 13.496-3.3594 3.6562-8.0976 5.7344-13.062 5.7344-4.9687 0-9.707-2.0781-13.066-5.7344-3.3633-3.6523-5.0391-8.5469-4.625-13.496l11.441-136.81c0.26953-3.25 2.9883-5.75 6.25-5.75 3.2578 0 5.9766 2.5 6.2461 5.75z"/></clipPath><clipPath id="nav_p"><path d="m0.34766 0.91016h35.582v161.88h-35.582z"/></clipPath><clipPath id="nav_c"><path d="m24.387 6.7461 11.441 136.81c0.41406 4.9492-1.2617 9.8438-4.625 13.496-3.3594 3.6562-8.0977 5.7344-13.062 5.7344-4.9688 0-9.707-2.0781-13.066-5.7344-3.3633-3.6523-5.0391-8.5469-4.625-13.496l11.441-136.81c0.26953-3.25 2.9883-5.75 6.25-5.75 3.2578 0 5.9766 2.5 6.2461 5.75z"/></clipPath><clipPath id="nav_o"><rect width="36" height="163"/></clipPath><clipPath id="nav_w"><rect width="263" height="234"/></clipPath><clipPath id="nav_af"><path d="m505 284h1369.8v180h-1369.8z"/></clipPath><clipPath id="nav_s"><rect width="1370" height="180"/></clipPath></defs><g clip-path="url(#nav_u)" fill="#fff"><path d="m0 0.023438h1874.9v749.95h-1874.9z"/><path d="m0 0.023438h1874.9v749.95h-1874.9z"/></g><g transform="translate(125.83 258)"><g clip-path="url(#nav_w)"><g clip-path="url(#nav_n)"><g clip-path="url(#nav_a)"><g clip-path="url(#nav_r)"><g transform="translate(5,92)"><g clip-path="url(#nav_ab)"><g clip-path="url(#nav_f)"><g clip-path="url(#nav_z)"><g clip-path="url(#nav_g)"><path d="m23.504-69.336 38.172 5.7109-27.543 184.15-38.172-5.707z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_x)"><g clip-path="url(#nav_d)"><g clip-path="url(#nav_ag)"><g transform="translate(217,92)"><g clip-path="url(#nav_aa)"><g clip-path="url(#nav_b)"><g clip-path="url(#nav_t)"><g clip-path="url(#nav_ak)"><path d="m-22.34-63.332 38.121-6.0469 29.188 183.89-38.121 6.0508z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_l)"><g clip-path="url(#nav_ad)"><g clip-path="url(#nav_v)"><g transform="translate(72,2)"><g clip-path="url(#nav_ah)"><g clip-path="url(#nav_h)"><g clip-path="url(#nav_j)"><g clip-path="url(#nav_ai)"><path d="m20.68 216.8-38.461-3.207 17.914-214.85 38.461 3.207z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_k)"><g clip-path="url(#nav_y)"><g clip-path="url(#nav_m)"><g transform="translate(154,2)"><g clip-path="url(#nav_i)"><g clip-path="url(#nav_e)"><g clip-path="url(#nav_ac)"><g clip-path="url(#nav_q)"><path d="m54.07 213.54-38.457 3.2656-18.23-214.82 38.457-3.2656z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_ae)"><g clip-path="url(#nav_aj)"><g transform="translate(113,70)"><g clip-path="url(#nav_o)"><g clip-path="url(#nav_p)"><g clip-path="url(#nav_c)"><rect x="-905.46" y="-601" width="3239.8" height="1296"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_af)"><g transform="translate(505,284)"><g clip-path="url(#nav_s)"><g><g transform="translate(1.338 158.39)"><path d="m9.75-136.41c0-13 6.4922-19.5 19.484-19.5h68.203c12.988 0 19.484 6.5 19.484 19.5v136.41h-19.484v-136.41h-68.203v136.41h-19.484zm38.969 97.438v-19.5h29.234v19.5z"/></g><g transform="translate(283.9 158.39)"><path d="m116.92-155.91v155.91h-19.484v-155.91zm-107.17 155.91v-155.91h19.484v155.91zm38.969-38.969v-19.5h29.234v19.5z"/></g><g transform="translate(566.47 158.39)"><path d="m9.75-136.41c0-13 6.4922-19.5 19.484-19.5h68.203c12.988 0 19.484 6.5 19.484 19.5v136.41h-19.484v-136.41h-68.203v136.41h-19.484zm38.969 97.438v-19.5h29.234v19.5z"/></g><g transform="translate(849.03 158.39)"><path d="m68.203-116.92v116.92h-19.484v-116.92zm-58.453-19.484v-19.5h97.438v19.5z"/></g><g transform="translate(1121.9 158.39)"><path d="m9.75-136.41c0-13 6.4922-19.5 19.484-19.5h68.203c12.988 0 19.484 6.5 19.484 19.5v136.41h-19.484v-136.41h-68.203v136.41h-19.484zm38.969 97.438v-19.5h29.234v19.5z"/></g></g></g></g></g></svg></a>
+  <div class="nav-links">
+    <a href="configurator.html" class="active">Design</a>
+    <a href="room-visualizer.html">Visualize</a>
+    <a href="how-it-works.html">How It Works</a>
+    <button data-open-consult>Consult</button>
+    <a href="about.html">About</a>
+  </div>
+</nav>
+
+<section class="page-header">
+  <div>
+    <div class="page-label">Step 02 · Design</div>
+    <h1 class="page-title">Design <span class="accent">your</span><br>panels.</h1>
+  </div>
+  <div>
+    <p class="page-desc">Pick a size. Upload artwork directly into the panel. Tap artwork to move, zoom, flip, or rotate it. Drag outside to rotate the preview.</p>
+    <div class="panel-counter">Designing panel <span id="currentPanelNumber">01</span></div>
+  </div>
+</section>
+
+<div class="plan-banner" id="planBanner">
+  <div>◆ Room plan loaded · <span id="planSummary">0 panels planned</span></div>
+  <button id="clearPlanBtn">Dismiss</button>
+</div>
+
+<section class="size-section">
+  <div class="subsection-label">Choose panel size</div>
+  <div class="size-grid">
+    <div class="size-card" data-size="1x1" data-w="1" data-h="1" data-price="2500">
+      <div class="size-visual"><div class="size-rect" style="width:34px;height:34px"></div></div>
+      <div class="size-name">1×1 ft</div>
+      <div class="size-price">₹2,500</div>
+    </div>
+    <div class="size-card" data-size="2x1" data-w="2" data-h="1" data-price="3500">
+      <div class="size-visual"><div class="size-rect" style="width:68px;height:34px"></div></div>
+      <div class="size-name">2×1 ft</div>
+      <div class="size-price">₹3,500</div>
+    </div>
+    <div class="size-card" data-size="2x2" data-w="2" data-h="2" data-price="4500">
+      <div class="size-visual"><div class="size-rect" style="width:56px;height:56px"></div></div>
+      <div class="size-name">2×2 ft</div>
+      <div class="size-price">₹4,500</div>
+    </div>
+    <div class="size-card" data-size="4x2" data-w="4" data-h="2" data-price="6500">
+      <div class="size-visual"><div class="size-rect" style="width:120px;height:60px"></div></div>
+      <div class="size-name">4×2 ft</div>
+      <div class="size-price">₹6,500</div>
+    </div>
+    <div class="size-card" data-size="1x4" data-w="1" data-h="4" data-price="5500">
+      <div class="size-visual"><div class="size-rect" style="width:22px;height:88px"></div></div>
+      <div class="size-name">1×4 ft</div>
+      <div class="size-price">₹5,500</div>
+    </div>
+    <div class="size-card custom" data-size="custom">
+      <div class="size-visual"><svg width="56" height="56" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
+      <div class="size-name">Custom</div>
+      <div class="size-price">Talk to us</div>
+    </div>
+  </div>
+</section>
+
+<section class="designer" id="designer">
+  <div class="preview-area">
+    <div class="preview-header">
+      <div class="preview-left">
+        <div class="preview-badge">Live Preview</div>
+        <div class="preview-dims" id="previewDims">—</div>
+        <div class="mode-indicator" id="modeIndicator">Panning view</div>
+      </div>
+      <div class="orient-toggle" id="orientToggle">
+        <button class="orient-btn active" data-orient="horizontal">
+          <svg viewBox="0 0 24 24"><rect x="3" y="8" width="18" height="8"/></svg>
+          Horizontal
+        </button>
+        <button class="orient-btn" data-orient="vertical">
+          <svg viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="18"/></svg>
+          Vertical
+        </button>
+      </div>
+    </div>
+
+    <div class="panel-3d-container" id="panelContainer">
+      <div class="scene-wrap" id="sceneWrap">
+        <div class="panel-3d" id="panel3d">
+          <div class="panel-back" id="panelBack"></div>
+          <div class="panel-side left" id="sideLeft"></div>
+          <div class="panel-side right" id="sideRight"></div>
+          <div class="panel-side top" id="sideTop"></div>
+          <div class="panel-side bottom" id="sideBottom"></div>
+          <div class="panel-face" id="panelFace">
+            <button class="replace-btn" id="replaceBtn" style="display:none">Replace</button>
+            <div class="panel-image-container" id="imageContainer">
+              <div class="upload-in-panel" id="uploadInPanel">
+                <svg viewBox="0 0 24 24">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                  <polyline points="17 8 12 3 7 8"/>
+                  <line x1="12" y1="3" x2="12" y2="15"/>
+                </svg>
+                <div class="u-text">Upload your art</div>
+                <div class="u-hint">Tap · drop · PNG or JPG · 10MB</div>
+              </div>
+              <img id="panelImage" class="panel-image" style="display:none" alt="Your artwork">
+            </div>
+          </div>
+          <div class="panel-shadow"></div>
+        </div>
+      </div>
+    </div>
+
+    <input type="file" id="fileInput" accept="image/*">
+
+    <div class="preview-controls">
+      <div class="pan-hint" id="panHint">
+        <svg viewBox="0 0 24 24"><path d="M5 9l-3 3 3 3M9 5l3-3 3 3M15 19l-3 3-3-3M19 9l3 3-3 3"/></svg>
+        <span id="panHintText">Drag to rotate · Tap artwork to edit</span>
+      </div>
+      <div class="ctrl-group-wrap">
+        <div class="ctrl-group" title="Reset 3D view">
+          <button class="ctrl-btn" id="resetViewBtn">
+            <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>
+            View
+          </button>
+        </div>
+        <div class="ctrl-group" title="Zoom the 3D preview">
+          <button class="ctrl-btn" id="sceneZoomOut">−</button>
+          <button class="ctrl-btn" id="sceneZoomFit">Fit</button>
+          <button class="ctrl-btn" id="sceneZoomIn">+</button>
+        </div>
+        <div class="ctrl-group image-group" id="imgCtrlGroup" style="display:none" title="Edit image">
+          <button class="ctrl-btn" id="imgZoomOut" title="Zoom out">−</button>
+          <button class="ctrl-btn" id="imgZoomIn" title="Zoom in">+</button>
+          <button class="ctrl-btn" id="imgFlipHBtn" title="Mirror horizontal">
+            <svg viewBox="0 0 24 24"><path d="M12 3v18"/><path d="M8 8l-4 4 4 4"/><path d="M16 8l4 4-4 4"/></svg>
+          </button>
+          <button class="ctrl-btn" id="imgFlipVBtn" title="Mirror vertical">
+            <svg viewBox="0 0 24 24"><path d="M3 12h18"/><path d="M8 8l4-4 4 4"/><path d="M8 16l4 4 4-4"/></svg>
+          </button>
+          <button class="ctrl-btn" id="imgRotateBtn" title="Rotate 90°">
+            <svg viewBox="0 0 24 24"><path d="M21 12A9 9 0 1 1 7 4.4"/><polyline points="21 3 21 9 15 9"/></svg>
+          </button>
+          <button class="ctrl-btn" id="imgResetCropBtn" title="Recenter (keep zoom)">◎</button>
+          <button class="ctrl-btn" id="imgFitBtn" title="Fit image (reset everything)">Fit</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="image-info-inline" id="imageInfo">
+      <div class="info-chip"><span class="key">File</span><span class="val" id="fileName">—</span></div>
+      <div class="info-chip"><span class="key">Dims</span><span class="val" id="imageDimensions">—</span></div>
+      <div class="info-chip"><span class="key">Size</span><span class="val" id="fileSize">—</span></div>
+      <div class="info-chip"><span class="key">DPI est.</span><span class="val" id="dpiEstimate">—</span></div>
+    </div>
+  </div>
+
+  <aside class="sidebar">
+    <div class="side-section" id="customSection" style="display:none">
+      <div class="side-title">Finish</div>
+      <div class="finish-grid">
+        <div class="finish-block">
+          <div class="finish-sub">Wood</div>
+          <div class="finish-options">
+            <button class="fopt active" data-option="wood" data-value="light">Light</button>
+            <button class="fopt" data-option="wood" data-value="dark">Dark</button>
+          </div>
+        </div>
+        <div class="finish-block">
+          <div class="finish-sub">Side Wrap</div>
+          <div class="finish-options">
+            <button class="fopt active" data-option="wrap" data-value="half">Half</button>
+            <button class="fopt" data-option="wrap" data-value="full">Full</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="side-section">
+      <div class="side-title">Print tips</div>
+      <ul class="tips-list">
+        <li>Art prints edge-to-edge on the front</li>
+        <li>Side wrap is black fabric — half shows wood below, full covers all sides</li>
+        <li>Tap artwork to edit · drag to reposition</li>
+        <li>High resolution prints best (300 DPI+)</li>
+      </ul>
+    </div>
+  </aside>
+</section>
+
+<div class="panel-actions" id="panelActions">
+  <button class="action-btn dup" id="duplicateBtn">◆ Duplicate &amp; Edit</button>
+  <button class="action-btn" id="addMoreBtn">+ Start Another</button>
+  <a href="room-visualizer.html" class="action-btn" id="visualizeBtn">◇ Visualize Space</a>
+  <button class="action-btn primary" id="doneBtn">✓ Done — Review Cart</button>
+</div>
+
+<section class="cart-section" id="cartSection">
+  <div class="cart-head">
+    <h2 class="cart-title">Your <span class="accent">panels.</span></h2>
+    <button class="cart-reset" id="cartResetBtn">Clear All & Reset</button>
+  </div>
+  <div class="cart-strip-wrap">
+    <div class="cart-strip" id="cartStrip"></div>
+  </div>
+
+  <div class="cart-summary">
+    <div class="price-row"><span class="price-label">Panels (<span id="panelCount">0</span>)</span><span class="price-val" id="subtotal">₹0</span></div>
+    <div class="price-row"><span class="price-label">Est. Shipping</span><span class="price-val">₹500</span></div>
+    <div class="price-row total"><span class="price-label">Total</span><span class="price-val" id="total">₹500</span></div>
+
+    <div class="cart-actions">
+      <button class="action-btn" id="addMoreFromCart">+ Add More Panels</button>
+      <a href="room-visualizer.html" class="action-btn dup">◆ Visualize Your Space →</a>
+      <button class="action-btn primary" id="requestQuote">Request Quote →</button>
+    </div>
+  </div>
+</section>
+
+<div class="float-total" id="floatTotal">
+  <span class="lbl">Total</span>
+  <span id="floatAmount">₹0</span>
+</div>
+
+<footer>
+  <span>© 2026 Ahata◆</span>
+  <span>Hand built · Mumbai · r5</span>
+</footer>
+
+<!-- CONSULT MODAL -->
+<div class="consult-modal" id="consultModal" aria-hidden="true">
+  <div class="consult-backdrop" data-close-consult></div>
+  <div class="consult-panel">
+    <button class="consult-close" data-close-consult>×</button>
+    <div class="consult-label">◆ Book a Consultation</div>
+    <h3>Let's talk about your <span class="consult-accent">room.</span></h3>
+    <p class="consult-desc">A paid 45-minute session — we map your room's acoustics, recommend panel count and placement, and give you a plan. ₹2,500 · credited toward your first order.</p>
+    <form class="consult-form" id="consultForm" novalidate>
+      <div class="consult-field"><label for="cfName">Your name</label><input type="text" id="cfName" name="name" autocomplete="name" required></div>
+      <div class="consult-row">
+        <div class="consult-field"><label for="cfEmail">Email</label><input type="email" id="cfEmail" name="email" autocomplete="email" required></div>
+        <div class="consult-field"><label for="cfPhone">Phone</label><input type="tel" id="cfPhone" name="phone" autocomplete="tel" required></div>
+      </div>
+      <div class="consult-row">
+        <div class="consult-field"><label for="cfRoom">Room type</label><select id="cfRoom" name="room"><option value="Home studio">Home studio</option><option value="Home theater">Home theater</option><option value="Living room">Living room</option><option value="Office / commercial">Office / commercial</option><option value="Other">Other</option></select></div>
+        <div class="consult-field"><label for="cfDate">Preferred date</label><input type="date" id="cfDate" name="date"></div>
+      </div>
+      <div class="consult-field"><label for="cfNotes">Tell us a bit about your space</label><textarea id="cfNotes" name="notes" rows="3" placeholder="Approx. size, what you're solving for, anything we should know..."></textarea></div>
+      <div class="consult-actions">
+        <button type="button" class="consult-btn ghost" data-close-consult>Cancel</button>
+        <button type="submit" class="consult-btn primary">Request Consultation →</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+// ============ CONSULT MODAL ============
+const consultModal = document.getElementById('consultModal');
+document.querySelectorAll('[data-open-consult]').forEach(el => el.addEventListener('click', e => { e.preventDefault(); consultModal.classList.add('open'); document.body.classList.add('modal-open'); }));
+document.querySelectorAll('[data-close-consult]').forEach(el => el.addEventListener('click', () => { consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }));
+document.addEventListener('keydown', e => { if(e.key==='Escape' && consultModal.classList.contains('open')){ consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }});
+document.getElementById('consultForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = `Name: ${fd.get('name')}\nEmail: ${fd.get('email')}\nPhone: ${fd.get('phone')}\nRoom type: ${fd.get('room')}\nPreferred date: ${fd.get('date')||'—'}\n\nNotes:\n${fd.get('notes')||'—'}`;
+  window.location.href = `mailto:hello@ahata.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
+});
+
+// ============ STATE ============
+let currentPanel = null;
+let cart = [];
+let imgZoom = 1;
+let imgPos = {x:0, y:0};
+let imgNaturalW = 0, imgNaturalH = 0;
+let imgFlipH = false, imgFlipV = false, imgRotate = 0; // 0, 90, 180, 270
+let sceneZoom = 0.82;
+let panYaw = -18, panPitch = 6;
+const MAX_YAW = 30, MAX_PITCH = 20;
+const DEPTH = 30;
+let imageMode = false;
+
+const PRICES = {'1x1':2500,'2x1':3500,'2x2':4500,'4x2':6500,'1x4':5500};
+
+const $ = id => document.getElementById(id);
+const sizeCards = document.querySelectorAll('.size-card:not(.custom)');
+const customCard = document.querySelector('.size-card.custom');
+const designer = $('designer');
+const fileInput = $('fileInput');
+const panelFace = $('panelFace');
+const panel3d = $('panel3d');
+const sceneWrap = $('sceneWrap');
+const panelContainer = $('panelContainer');
+const panelImage = $('panelImage');
+const uploadInPanel = $('uploadInPanel');
+const imageInfo = $('imageInfo');
+const customSection = $('customSection');
+const panelActions = $('panelActions');
+const cartSection = $('cartSection');
+const cartStrip = $('cartStrip');
+const currentPanelNum = $('currentPanelNumber');
+const planBanner = $('planBanner');
+const planSummary = $('planSummary');
+const floatTotal = $('floatTotal');
+const floatAmount = $('floatAmount');
+const orientToggle = $('orientToggle');
+const modeIndicator = $('modeIndicator');
+const panHintText = $('panHintText');
+const artworkLine = $('artworkLine') || {classList:{add:()=>{},remove:()=>{}},set innerHTML(v){},get innerHTML(){return ''}};
+const replaceBtn = $('replaceBtn');
+const imgCtrlGroup = $('imgCtrlGroup');
+const panelBack = $('panelBack');
+const sideLeft = $('sideLeft'), sideRight = $('sideRight'), sideTop = $('sideTop'), sideBottom = $('sideBottom');
+
+function freshPanel(){
+  return {
+    size:null, baseW:0, baseH:0,
+    orientation:'horizontal',
+    width:0, height:0,
+    image:null, imagePosition:{x:0,y:0}, imageScale:1,
+    imageNaturalWidth:0, imageNaturalHeight:0,
+    flipH:false, flipV:false, rotate:0,
+    fileName:'', fileSize:0,
+    woodVarnish:'light', fabricWrap:'half'
+  };
+}
+currentPanel = freshPanel();
+
+// ============ EFFECTIVE DIMS helper (used everywhere) ============
+// Returns the rendered {w,h} in feet given baseW, baseH, orientation.
+// Convention: "horizontal" = wider-than-tall; "vertical" = taller-than-wide.
+// Square panels ignore orientation.
+function effectiveDimsFt(baseW, baseH, orientation){
+  if(baseW === baseH) return {w: baseW, h: baseH};
+  if(orientation === 'horizontal'){
+    return {w: Math.max(baseW, baseH), h: Math.min(baseW, baseH)};
+  } else {
+    return {w: Math.min(baseW, baseH), h: Math.max(baseW, baseH)};
+  }
+}
+
+// ============ ROOM PLAN PICKUP ============
+try{
+  const plan = JSON.parse(localStorage.getItem('acousticRoomPlan'));
+  if(plan && plan.panels && plan.panels.length > 0){
+    planSummary.textContent = `${plan.panels.length} panels planned · ${plan.room.length}×${plan.room.width} ft room`;
+    planBanner.classList.add('visible');
+  }
+}catch(e){}
+
+$('clearPlanBtn').addEventListener('click',()=>{
+  planBanner.classList.remove('visible');
+  try{localStorage.removeItem('acousticRoomPlan')}catch(e){}
+});
+
+// ============ SIZE SELECTION ============
+sizeCards.forEach(card=>{
+  card.addEventListener('click',()=>{
+    sizeCards.forEach(c=>c.classList.remove('selected'));
+    customCard.classList.remove('selected');
+    card.classList.add('selected');
+    currentPanel.size = card.dataset.size;
+    currentPanel.baseW = parseFloat(card.dataset.w);
+    currentPanel.baseH = parseFloat(card.dataset.h);
+
+    if(currentPanel.baseW !== currentPanel.baseH){
+      orientToggle.classList.add('visible');
+      const defaultOrient = currentPanel.baseW >= currentPanel.baseH ? 'horizontal' : 'vertical';
+      currentPanel.orientation = defaultOrient;
+      document.querySelectorAll('.orient-btn').forEach(b=>b.classList.toggle('active', b.dataset.orient===defaultOrient));
+    } else {
+      orientToggle.classList.remove('visible');
+      currentPanel.orientation = 'horizontal';
+    }
+
+    sceneZoom = 0.82;
+    panYaw = -18; panPitch = 6;
+    updatePanelPreview();
+    showDesigner();
+    panelActions.classList.add('visible');
+  });
+});
+
+customCard.addEventListener('click',()=>{
+  alert('Custom sizes — please contact us for a consultation.\n\nhello@ahata.in');
+});
+
+function showDesigner(){
+  designer.classList.add('active');
+  setTimeout(()=>designer.scrollIntoView({behavior:'smooth',block:'start'}),100);
+}
+
+document.querySelectorAll('.orient-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.orient-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    currentPanel.orientation = btn.dataset.orient;
+    updatePanelPreview();
+    if(currentPanel.image) setTimeout(fitImageToPanel, 50);
+  });
+});
+
+// ============ SIZE-PROPORTIONAL PREVIEW ============
+// Scale by actual panel area so 1×1 visibly smaller than 2×2 smaller than 4×2 etc.
+// Target: largest panel (4x4 area = 4×2 @ 8sqft, or 2x4 at 8sqft) occupies ~72% of viewport.
+// Scale by sqrt(area) so linear sizes are proportional to sqrt(area).
+const MAX_PANEL_AREA = 8; // sq ft — the largest panel in the catalog
+const VIEWPORT_FILL_AT_MAX = 0.94; // fraction of viewport dim the max panel occupies
+
+function updatePanelPreview(){
+  const {w:fw, h:fh} = effectiveDimsFt(currentPanel.baseW, currentPanel.baseH, currentPanel.orientation);
+  const containerW = panelContainer.offsetWidth || 600;
+  const containerH = panelContainer.offsetHeight || 540;
+
+  // Scale factor: what fraction of MAX_PANEL_AREA does this panel have?
+  const panelArea = fw * fh;
+  const areaFraction = panelArea / MAX_PANEL_AREA; // 0..1
+  const linearFraction = Math.sqrt(areaFraction); // 0..1 — linear dims scale with sqrt of area
+
+  // The "max panel" linear reference = (viewport * VIEWPORT_FILL_AT_MAX)
+  // So this panel's reference linear = max * linearFraction
+  const refMaxLinear = Math.min(containerW, containerH) * VIEWPORT_FILL_AT_MAX;
+  const refThisLinear = refMaxLinear * linearFraction;
+
+  // Apply aspect ratio on top of linear reference
+  // The "reference" represents longest side of the panel
+  const longSide = Math.max(fw, fh);
+  const pxPerFt = refThisLinear / longSide;
+  const w = fw * pxPerFt;
+  const h = fh * pxPerFt;
+
+  currentPanel.width = w;
+  currentPanel.height = h;
+  panelFace.style.width = w + 'px';
+  panelFace.style.height = h + 'px';
+  panel3d.style.width = w + 'px';
+  panel3d.style.height = h + 'px';
+
+  panelBack.style.width = w + 'px';
+  panelBack.style.height = h + 'px';
+  panelBack.style.transform = `translateZ(-${DEPTH}px)`;
+
+  // SIDES: each is a flat rectangle hinged at the FRONT edge of the panel,
+  // rotating BACK into -z so the front face sits on top of the box, not at the bottom.
+  // LEFT side
+  sideLeft.style.width = DEPTH + 'px';
+  sideLeft.style.height = h + 'px';
+  sideLeft.style.left = '0'; sideLeft.style.top = '0';
+  sideLeft.style.transformOrigin = '0 0';
+  sideLeft.style.transform = `rotateY(90deg)`;
+
+  // RIGHT side
+  sideRight.style.width = DEPTH + 'px';
+  sideRight.style.height = h + 'px';
+  sideRight.style.left = (w - DEPTH) + 'px'; sideRight.style.top = '0';
+  sideRight.style.transformOrigin = '100% 0';
+  sideRight.style.transform = `rotateY(-90deg)`;
+
+  // TOP side
+  sideTop.style.width = w + 'px';
+  sideTop.style.height = DEPTH + 'px';
+  sideTop.style.left = '0'; sideTop.style.top = '0';
+  sideTop.style.transformOrigin = '0 0';
+  sideTop.style.transform = `rotateX(-90deg)`;
+
+  // BOTTOM side
+  sideBottom.style.width = w + 'px';
+  sideBottom.style.height = DEPTH + 'px';
+  sideBottom.style.left = '0'; sideBottom.style.top = (h - DEPTH) + 'px';
+  sideBottom.style.transformOrigin = '0 100%';
+  sideBottom.style.transform = `rotateX(90deg)`;
+
+  $('previewDims').textContent = `${fw}×${fh} ft`;
+  applyRotation();
+}
+
+function applyRotation(){
+  panel3d.style.transform = `rotateY(${panYaw}deg) rotateX(${panPitch}deg)`;
+  sceneWrap.style.transform = `scale(${sceneZoom})`;
+  // Backface culling — only show a side when the panel rotation reveals it.
+  // Empirically derived from on-screen behaviour: yaw>0 reveals the RIGHT side,
+  // pitch>0 reveals the BOTTOM side. (Both axes inverted vs. the math derivation
+  // — likely due to CSS rotateX/Y conventions combined with our perspective setup.)
+  // eps prevents flicker right at zero.
+  const eps = 0.5;
+  sideLeft.style.visibility   = (panYaw   >  eps) ? 'visible' : 'hidden';
+  sideRight.style.visibility  = (panYaw   < -eps) ? 'visible' : 'hidden';
+  sideBottom.style.visibility = (panPitch >  eps) ? 'visible' : 'hidden';
+  sideTop.style.visibility    = (panPitch < -eps) ? 'visible' : 'hidden';
+}
+
+// ============ UPLOAD ============
+uploadInPanel.addEventListener('click',()=>fileInput.click());
+uploadInPanel.addEventListener('dragover',e=>{e.preventDefault();uploadInPanel.classList.add('dragover')});
+uploadInPanel.addEventListener('dragleave',()=>uploadInPanel.classList.remove('dragover'));
+uploadInPanel.addEventListener('drop',e=>{
+  e.preventDefault();uploadInPanel.classList.remove('dragover');
+  const f = e.dataTransfer.files[0];
+  if(f && f.type.startsWith('image/')) handleImageUpload(f);
+});
+
+replaceBtn.addEventListener('pointerdown', e => { e.stopPropagation(); });
+replaceBtn.addEventListener('click', e => {
+  e.stopPropagation();
+  e.preventDefault();
+  // Clear value so re-selecting the same file still fires `change`
+  fileInput.value = '';
+  // Invoke synchronously — the file dialog must be opened during the user-gesture event.
+  // setTimeout / requestAnimationFrame break the gesture chain on iOS Safari and some
+  // Android browsers, causing the dialog to be silently suppressed.
+  fileInput.click();
+});
+fileInput.addEventListener('change',e=>{
+  const f = e.target.files[0];
+  if(f) handleImageUpload(f);
+  fileInput.value = '';
+});
+
+function handleImageUpload(file){
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => {
+      imgNaturalW = img.width;
+      imgNaturalH = img.height;
+      currentPanel.image = e.target.result;
+      currentPanel.imageNaturalWidth = img.width;
+      currentPanel.imageNaturalHeight = img.height;
+      currentPanel.fileName = file.name;
+      currentPanel.fileSize = file.size;
+      imgFlipH = false; imgFlipV = false; imgRotate = 0;
+      panelImage.src = e.target.result;
+      panelImage.style.display = 'block';
+      uploadInPanel.style.display = 'none';
+      replaceBtn.style.display = 'block';
+      panelFace.classList.add('has-image');
+      fitImageToPanel();
+
+      artworkLine.classList.add('loaded');
+      const shortName = file.name.length > 28 ? file.name.slice(0,25)+'...' : file.name;
+      artworkLine.innerHTML = `◆ ${shortName}`;
+
+      imageInfo.classList.add('visible');
+      $('fileName').textContent = file.name.length > 22 ? file.name.slice(0,19)+'...' : file.name;
+      $('imageDimensions').textContent = `${img.width}×${img.height}`;
+      $('fileSize').textContent = (file.size/1024/1024).toFixed(1) + 'MB';
+      const {w:fw} = effectiveDimsFt(currentPanel.baseW, currentPanel.baseH, currentPanel.orientation);
+      const dpi = Math.round(img.width / fw / 12);
+      $('dpiEstimate').innerHTML = dpi >= 300 ? `<span style="color:#2D8659">${dpi}</span>` : dpi >= 150 ? `<span style="color:#ecad49">${dpi}</span>` : `<span style="color:#C03020">${dpi} (low)</span>`;
+
+      customSection.style.display = 'block';
+      enablePanMode();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+// ============ IMAGE TRANSFORM ============
+// The image has transform: translate(x,y) scale(zoom) rotate(r) scaleX(flipH?-1:1) scaleY(flipV?-1:1)
+// transform-origin is 0 0 at the image's top-left natural corner.
+// This creates mathematical ambiguity with rotation+flip interacting with position clamping.
+// Solution: apply rotate/flip first via an INNER transform on the image, and then translate+scale outside.
+// We split into two CSS transforms by wrapping the transform: apply rotation/flip by recomputing an
+// "effective image" that's the rotated+flipped pixel content. Then treat translate+scale normally.
+//
+// Simple approach: use CSS transform with all operations. Order matters — translate applied outermost.
+// With transform-origin 0 0:
+//   transform = translate(tx, ty) scale(zoom) rotate(r°) scaleX(flipH) scaleY(flipV)
+// This evaluates right-to-left: first flip, then rotate, then scale, then translate.
+// For rotations of 90/270, the effective bounding box dimensions swap.
+//
+// We'll track: imgPos/imgZoom are the "post-rotate" offsets — i.e., they act on the rotated+flipped image
+// as if it were a new image. The effective natural dims become swapped for 90/270 rotations.
+
+function effectiveNaturalDims(){
+  if(imgRotate === 90 || imgRotate === 270){
+    return {w: imgNaturalH, h: imgNaturalW};
+  }
+  return {w: imgNaturalW, h: imgNaturalH};
+}
+
+function applyImageTransform(){
+  // Build transform string. Order: translate → scale → rotate → flip
+  // With transform-origin 0 0 at top-left.
+  // Because rotate/flip happen BEFORE translate/scale in effect (right-to-left evaluation),
+  // the rotated image occupies different pixel real estate.
+  // To make imgPos behave naturally (pixel offsets in the panel coord system), we need the
+  // rotation+flip to be self-contained — we pre-apply a correction offset so the bounding box
+  // of the rotated image starts at (0,0) in natural-size space.
+  let preTx = 0, preTy = 0;
+  // With transform-origin 0 0:
+  //   rotate(90deg)  sends (x,y) → (-y, x); the image occupies x ∈ [-H, 0], y ∈ [0, W]
+  //   rotate(180deg) sends (x,y) → (-x, -y); the image occupies x ∈ [-W, 0], y ∈ [-H, 0]
+  //   rotate(270deg) sends (x,y) → (y, -x); the image occupies x ∈ [0, H], y ∈ [-W, 0]
+  // Flips at origin:
+  //   scaleX(-1) sends (x,y) → (-x, y); occupies x ∈ [-W, 0]
+  //   scaleY(-1) sends (x,y) → (x, -y); occupies y ∈ [-H, 0]
+  // Apply corrections after the rotate+flip so bounding box is at origin:
+  const r = imgRotate, fh = imgFlipH, fv = imgFlipV;
+  if(r === 0){ preTx = fh ? imgNaturalW : 0; preTy = fv ? imgNaturalH : 0; }
+  else if(r === 90){
+    // After rotate: x ∈ [-H, 0], y ∈ [0, W]. Correction: +H on x.
+    // Then flipH swaps the effective x range: if flipH, the post-rotate x-axis is reversed, so...
+    // Actually simpler: after the full composite transform, compute where the bounding box sits and offset.
+    // Precompute via matrix math would be cleaner. Instead, use a simpler approach below.
+    // For now, set these and adjust empirically.
+  }
+
+  // Cleaner: build a matrix. We compute the combined transform manually.
+  // Final position in SCREEN = translate(imgPos) * scale(zoom) * rotate(r) * scaleX(fh?-1:1) * scaleY(fv?-1:1) * point
+  // For each corner (0,0), (W,0), (0,H), (W,H) of the natural image, compute final position.
+  // We want the MIN of final positions to be at (imgPos.x, imgPos.y) — so subtract that min.
+  const corners = [[0,0],[imgNaturalW,0],[0,imgNaturalH],[imgNaturalW,imgNaturalH]];
+  const rad = r * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const sx = fh ? -1 : 1, sy = fv ? -1 : 1;
+  const tx = [], ty = [];
+  corners.forEach(([x,y])=>{
+    // Apply flip first
+    let px = x * sx, py = y * sy;
+    // Then rotate
+    const rx = px * cos - py * sin;
+    const ry = px * sin + py * cos;
+    // Then scale
+    const szx = rx * imgZoom;
+    const szy = ry * imgZoom;
+    tx.push(szx); ty.push(szy);
+  });
+  const minX = Math.min(...tx), minY = Math.min(...ty);
+  const maxX = Math.max(...tx), maxY = Math.max(...ty);
+  // The transformed image's bounding box in screen space (before translate) is [minX, minY] to [maxX, maxY]
+  // We want the bounding box to be at imgPos.x, imgPos.y
+  // So the CSS translate should be: imgPos.x - minX, imgPos.y - minY
+  const cssTx = imgPos.x - minX;
+  const cssTy = imgPos.y - minY;
+
+  panelImage.style.transform = `translate(${cssTx}px, ${cssTy}px) scale(${imgZoom}) rotate(${r}deg) scaleX(${sx}) scaleY(${sy})`;
+
+  // Also update the "effective" dims info for clamping
+  panelImage._effectiveW = maxX - minX;
+  panelImage._effectiveH = maxY - minY;
+
+  currentPanel.imagePosition = {...imgPos};
+  currentPanel.imageScale = imgZoom;
+  currentPanel.flipH = imgFlipH;
+  currentPanel.flipV = imgFlipV;
+  currentPanel.rotate = imgRotate;
+}
+
+function computeEffectiveImageBox(){
+  // Returns the width/height the transformed image occupies in screen space (before translate)
+  const corners = [[0,0],[imgNaturalW,0],[0,imgNaturalH],[imgNaturalW,imgNaturalH]];
+  const rad = imgRotate * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const sx = imgFlipH ? -1 : 1, sy = imgFlipV ? -1 : 1;
+  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  corners.forEach(([x,y])=>{
+    let px = x * sx, py = y * sy;
+    const rx = px * cos - py * sin;
+    const ry = px * sin + py * cos;
+    const szx = rx * imgZoom;
+    const szy = ry * imgZoom;
+    if(szx < minX) minX = szx;
+    if(szy < minY) minY = szy;
+    if(szx > maxX) maxX = szx;
+    if(szy > maxY) maxY = szy;
+  });
+  return {w: maxX - minX, h: maxY - minY};
+}
+
+function fitImageToPanel(){
+  const pw = panelFace.offsetWidth;
+  const ph = panelFace.offsetHeight;
+  panelImage.style.width = imgNaturalW + 'px';
+  panelImage.style.height = imgNaturalH + 'px';
+  // Compute scale accounting for current rotation (natural W/H may need to swap)
+  const natW_eff = (imgRotate === 90 || imgRotate === 270) ? imgNaturalH : imgNaturalW;
+  const natH_eff = (imgRotate === 90 || imgRotate === 270) ? imgNaturalW : imgNaturalH;
+  // If the image and panel aspect ratios match within 1%, use contain (exact fit) — no cropping.
+  // Otherwise use cover (fill, crop the longer side). This handles the case where a user
+  // uploads an image that was specifically prepared for the panel's exact dimensions.
+  const panelAspect = pw / ph;
+  const imageAspect = natW_eff / natH_eff;
+  const aspectsMatch = Math.abs(panelAspect - imageAspect) / panelAspect < 0.01;
+  const fitScale = aspectsMatch
+    ? Math.min(pw / natW_eff, ph / natH_eff)  // contain — no clip
+    : Math.max(pw / natW_eff, ph / natH_eff); // cover — fill, may clip
+  imgZoom = fitScale;
+  // Center the effective bounding box
+  const box = computeEffectiveImageBox();
+  imgPos.x = (pw - box.w) / 2;
+  imgPos.y = (ph - box.h) / 2;
+  applyImageTransform();
+}
+
+function recenterImage(){
+  // Keep current zoom + rotate + flip; just re-center
+  const pw = panelFace.offsetWidth;
+  const ph = panelFace.offsetHeight;
+  const box = computeEffectiveImageBox();
+  imgPos.x = (pw - box.w) / 2;
+  imgPos.y = (ph - box.h) / 2;
+  applyImageTransform();
+}
+
+function clampImagePosition(){
+  const pw = panelFace.offsetWidth;
+  const ph = panelFace.offsetHeight;
+  const box = computeEffectiveImageBox();
+  if(box.w >= pw){
+    imgPos.x = Math.max(pw - box.w, Math.min(0, imgPos.x));
+  } else {
+    imgPos.x = (pw - box.w) / 2;
+  }
+  if(box.h >= ph){
+    imgPos.y = Math.max(ph - box.h, Math.min(0, imgPos.y));
+  } else {
+    imgPos.y = (ph - box.h) / 2;
+  }
+}
+
+// ============ MODE SWITCHING ============
+function enableImageMode(){
+  imageMode = true;
+  panelFace.classList.add('image-armed');
+  panelContainer.classList.add('image-mode');
+  modeIndicator.classList.add('visible','image-mode');
+  modeIndicator.textContent = '◆ Editing artwork';
+  panHintText.textContent = 'Drag to reposition · ± to zoom · ⇋ to flip · ⟳ rotate · Tap outside to exit';
+  imgCtrlGroup.style.display = 'flex';
+}
+function enablePanMode(){
+  imageMode = false;
+  panelFace.classList.remove('image-armed');
+  panelContainer.classList.remove('image-mode');
+  modeIndicator.classList.add('visible');
+  modeIndicator.classList.remove('image-mode');
+  modeIndicator.textContent = '◆ Panning view';
+  panHintText.textContent = 'Drag to rotate · Tap artwork to edit';
+  imgCtrlGroup.style.display = 'none';
+}
+
+// ============ POINTER HANDLING ============
+let activeDrag = null;
+const DRAG_THRESHOLD = 4;
+function isImageTarget(t){return t === panelImage}
+function isUIControlTarget(t){return t === replaceBtn || (t && t.closest && t.closest('.upload-in-panel'))}
+
+panelContainer.addEventListener('pointerdown', e => {
+  if(isUIControlTarget(e.target)) return;
+  if(isImageTarget(e.target) && currentPanel.image){
+    if(!imageMode) enableImageMode();
+    activeDrag = {type:'image', startX:e.clientX, startY:e.clientY, initX:imgPos.x, initY:imgPos.y, moved:false};
+    panelImage.style.cursor = 'grabbing';
+    try{panelContainer.setPointerCapture(e.pointerId)}catch(err){}
+    e.preventDefault();
+  } else {
+    if(imageMode) enablePanMode();
+    activeDrag = {type:'pan', startX:e.clientX, startY:e.clientY, initYaw:panYaw, initPitch:panPitch, moved:false};
+    panelContainer.classList.add('grabbing');
+    try{panelContainer.setPointerCapture(e.pointerId)}catch(err){}
+    e.preventDefault();
+  }
+});
+
+panelContainer.addEventListener('pointermove', e => {
+  if(!activeDrag) return;
+  const dx = e.clientX - activeDrag.startX;
+  const dy = e.clientY - activeDrag.startY;
+  if(!activeDrag.moved && (Math.abs(dx) > DRAG_THRESHOLD || Math.abs(dy) > DRAG_THRESHOLD)) activeDrag.moved = true;
+  if(!activeDrag.moved) return;
+
+  if(activeDrag.type === 'image'){
+    imgPos.x = activeDrag.initX + dx;
+    imgPos.y = activeDrag.initY + dy;
+    clampImagePosition();
+    applyImageTransform();
+  } else {
+    const yawDelta = (dx / panelContainer.offsetWidth) * 80;
+    const pitchDelta = -(dy / panelContainer.offsetHeight) * 55;
+    panYaw = Math.max(-MAX_YAW, Math.min(MAX_YAW, activeDrag.initYaw + yawDelta));
+    panPitch = Math.max(-MAX_PITCH, Math.min(MAX_PITCH, activeDrag.initPitch + pitchDelta));
+    applyRotation();
+  }
+});
+function endPointer(e){
+  if(!activeDrag) return;
+  if(activeDrag.type === 'image') panelImage.style.cursor = 'move';
+  else panelContainer.classList.remove('grabbing');
+  activeDrag = null;
+  try{if(e && e.pointerId) panelContainer.releasePointerCapture(e.pointerId)}catch(err){}
+}
+panelContainer.addEventListener('pointerup', endPointer);
+panelContainer.addEventListener('pointercancel', endPointer);
+panelContainer.addEventListener('touchmove', e => { if(activeDrag) e.preventDefault(); }, {passive:false});
+
+// ============ SCENE ZOOM ============
+$('sceneZoomIn').addEventListener('click',()=>{sceneZoom = Math.min(sceneZoom + 0.1, 1.8); applyRotation()});
+$('sceneZoomOut').addEventListener('click',()=>{sceneZoom = Math.max(sceneZoom - 0.1, 0.5); applyRotation()});
+$('sceneZoomFit').addEventListener('click',()=>{sceneZoom = 0.82; applyRotation()});
+$('resetViewBtn').addEventListener('click',()=>{panYaw = -18; panPitch = 6; sceneZoom = 0.82; applyRotation()});
+
+// ============ IMAGE CONTROLS ============
+$('imgZoomIn').addEventListener('click',e=>{e.stopPropagation();zoomImageBy(1.15)});
+$('imgZoomOut').addEventListener('click',e=>{e.stopPropagation();zoomImageBy(1/1.15)});
+$('imgFitBtn').addEventListener('click',e=>{
+  e.stopPropagation();
+  imgFlipH = false; imgFlipV = false; imgRotate = 0;
+  fitImageToPanel();
+});
+$('imgResetCropBtn').addEventListener('click',e=>{e.stopPropagation();recenterImage()});
+$('imgFlipHBtn').addEventListener('click',e=>{
+  e.stopPropagation();
+  imgFlipH = !imgFlipH;
+  clampImagePosition();
+  applyImageTransform();
+});
+$('imgFlipVBtn').addEventListener('click',e=>{
+  e.stopPropagation();
+  imgFlipV = !imgFlipV;
+  clampImagePosition();
+  applyImageTransform();
+});
+$('imgRotateBtn').addEventListener('click',e=>{
+  e.stopPropagation();
+  imgRotate = (imgRotate + 90) % 360;
+  // Rotation changes effective dims — recenter then clamp
+  recenterImage();
+});
+
+function zoomImageBy(factor){
+  const pw = panelFace.offsetWidth;
+  const ph = panelFace.offsetHeight;
+  // Zoom around center of panel
+  const box = computeEffectiveImageBox();
+  // Compute center point in "pre-translate" screen coords (which is just current imgPos + box/2)
+  // We want to keep the point that's currently at panel center fixed.
+  // Panel center in screen coords = (pw/2, ph/2).
+  // That corresponds to a point in the image box at (pw/2 - imgPos.x, ph/2 - imgPos.y) offset from box top-left.
+  const offsetXInBox = pw/2 - imgPos.x;
+  const offsetYInBox = ph/2 - imgPos.y;
+  const offsetFracX = offsetXInBox / box.w;
+  const offsetFracY = offsetYInBox / box.h;
+
+  // Compute min/max zoom
+  const natW_eff = (imgRotate === 90 || imgRotate === 270) ? imgNaturalH : imgNaturalW;
+  const natH_eff = (imgRotate === 90 || imgRotate === 270) ? imgNaturalW : imgNaturalH;
+  const coverScale = Math.max(pw / natW_eff, ph / natH_eff);
+  const minZoom = coverScale * 0.5;
+  const maxZoom = coverScale * 5;
+  const newZoom = Math.max(minZoom, Math.min(maxZoom, imgZoom * factor));
+  imgZoom = newZoom;
+  // After zoom, new box
+  const newBox = computeEffectiveImageBox();
+  // Place so that the same fractional point is at panel center
+  imgPos.x = pw/2 - offsetFracX * newBox.w;
+  imgPos.y = ph/2 - offsetFracY * newBox.h;
+  clampImagePosition();
+  applyImageTransform();
+}
+
+// ============ FINISH OPTIONS ============
+document.querySelectorAll('.fopt').forEach(opt=>{
+  opt.addEventListener('click',()=>{
+    const option = opt.dataset.option;
+    const value = opt.dataset.value;
+    document.querySelectorAll(`.fopt[data-option="${option}"]`).forEach(o=>o.classList.remove('active'));
+    opt.classList.add('active');
+    if(option === 'wood'){
+      currentPanel.woodVarnish = value;
+      panel3d.classList.toggle('wood-dark-scene', value === 'dark');
+    } else if(option === 'wrap'){
+      currentPanel.fabricWrap = value;
+      panel3d.classList.toggle('wrap-half-scene', value === 'half');
+      panel3d.classList.toggle('wrap-full-scene', value === 'full');
+    }
+  });
+});
+panel3d.classList.add('wrap-half-scene');
+
+// ============ ACTIONS ============
+$('duplicateBtn').addEventListener('click',()=>{
+  if(!currentPanel.image){alert('Upload an image first');return}
+  cart.push(panelToCartItem(currentPanel));
+  saveCart();
+  updateCart();
+  flashAction('Duplicated ✓ · Edit this copy');
+  currentPanelNum.textContent = String(getTotalPanelCount() + 1).padStart(2,'0');
+});
+
+$('addMoreBtn').addEventListener('click',()=>{
+  if(!currentPanel.image){alert('Upload an image first');return}
+  cart.push(panelToCartItem(currentPanel));
+  saveCart();
+  resetCurrentPanel();
+  updateCart();
+  currentPanelNum.textContent = String(getTotalPanelCount() + 1).padStart(2,'0');
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+$('doneBtn').addEventListener('click',()=>{
+  if(!currentPanel.image){alert('Upload an image first');return}
+  cart.push(panelToCartItem(currentPanel));
+  saveCart();
+  updateCart();
+  cartSection.classList.add('visible');
+  setTimeout(()=>{
+    cartSection.scrollIntoView({behavior:'smooth',block:'start'});
+    flashAction('Design saved ✓');
+  },100);
+});
+
+$('addMoreFromCart').addEventListener('click',()=>{
+  resetCurrentPanel();
+  cartSection.classList.remove('visible');
+  currentPanelNum.textContent = String(getTotalPanelCount() + 1).padStart(2,'0');
+  window.scrollTo({top:0,behavior:'smooth'});
+});
+
+$('requestQuote').addEventListener('click',()=>{
+  saveCart();
+  alert('Quote request captured! We\'ll contact you within 24 hours.\n\nFor now, reach us at hello@ahata.in');
+});
+
+$('cartResetBtn').addEventListener('click',()=>{
+  if(confirm('Clear all cart items and start fresh? This cannot be undone.')){
+    cart = [];
+    try{localStorage.removeItem('acousticCart')}catch(e){}
+    updateCart();
+    cartSection.classList.remove('visible');
+    resetCurrentPanel();
+    currentPanelNum.textContent = '01';
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+});
+
+floatTotal.addEventListener('click',()=>{ if(cart.length > 0) cartSection.scrollIntoView({behavior:'smooth'}); });
+
+function panelToCartItem(p){
+  // Store BOTH base dims AND effective dims, so downstream code (cart preview, visualizer) can read either
+  const eff = effectiveDimsFt(p.baseW, p.baseH, p.orientation);
+  return {
+    id: Date.now() + Math.random(),
+    size: p.size,
+    baseW: p.baseW, baseH: p.baseH,
+    orientation: p.orientation,
+    effectiveW: eff.w, effectiveH: eff.h,  // canonical rendered dimensions in feet
+    image: p.image,
+    imagePosition: {...p.imagePosition},
+    imageScale: p.imageScale,
+    imageNaturalWidth: p.imageNaturalWidth,
+    imageNaturalHeight: p.imageNaturalHeight,
+    flipH: p.flipH, flipV: p.flipV, rotate: p.rotate,
+    fileName: p.fileName, fileSize: p.fileSize,
+    woodVarnish: p.woodVarnish,
+    fabricWrap: p.fabricWrap,
+    quantity: 1,
+    // Also store the panel pixel size at save time so cart preview can reproduce the crop
+    savedPanelWidth: p.width,
+    savedPanelHeight: p.height
+  };
+}
+
+function getTotalPanelCount(){return cart.reduce((sum,p)=>sum + (p.quantity||1), 0)}
+
+function resetCurrentPanel(){
+  currentPanel = freshPanel();
+  imgZoom = 1; imgPos = {x:0, y:0}; imgNaturalW = 0; imgNaturalH = 0;
+  imgFlipH = false; imgFlipV = false; imgRotate = 0;
+  sizeCards.forEach(c=>c.classList.remove('selected'));
+  designer.classList.remove('active');
+  panelImage.style.display = 'none';
+  panelImage.src = '';
+  panelImage.style.transform = '';
+  uploadInPanel.style.display = 'flex';
+  replaceBtn.style.display = 'none';
+  panelFace.classList.remove('image-armed','has-image');
+  panel3d.classList.remove('wood-dark-scene','wrap-full-scene');
+  panel3d.classList.add('wrap-half-scene');
+  sceneZoom = 0.82; panYaw = -18; panPitch = 6;
+  imageMode = false;
+  modeIndicator.classList.remove('visible','image-mode');
+  imageInfo.classList.remove('visible');
+  customSection.style.display = 'none';
+  imgCtrlGroup.style.display = 'none';
+  panelActions.classList.remove('visible');
+  orientToggle.classList.remove('visible');
+  artworkLine.classList.remove('loaded');
+  artworkLine.innerHTML = 'No artwork yet · <span class="accent">upload in panel</span>';
+  document.querySelectorAll('.fopt').forEach(o=>o.classList.remove('active'));
+  document.querySelector('.fopt[data-value="light"]').classList.add('active');
+  document.querySelector('.fopt[data-value="half"]').classList.add('active');
+  fileInput.value = '';
+}
+
+// ============ CART RENDERING ============
+// Cart cards now use saved pixel dims to faithfully reproduce the crop
+function renderCartCardPreview(panel){
+  // Use effective dims for the card aspect ratio (PROPORTIONAL to other cards too — scale by sqrt area)
+  const effW = panel.effectiveW || panel.baseW;
+  const effH = panel.effectiveH || panel.baseH;
+
+  // Size card 3D render proportional to panel area (so 1x4 tall, 4x2 wide, 1x1 small)
+  const CARD_MAX_AREA = 8;
+  const cardArea = effW * effH;
+  const cardLinearFraction = Math.sqrt(cardArea / CARD_MAX_AREA);
+  const CARD_MAX_LINEAR = 160; // px for the max panel's long side in cart
+  const thisMaxLinear = CARD_MAX_LINEAR * cardLinearFraction;
+  const longSideFt = Math.max(effW, effH);
+  const pxPerFt = thisMaxLinear / longSideFt;
+  let w = effW * pxPerFt;
+  let h = effH * pxPerFt;
+  // Ensure minimum legibility
+  const MIN_DIM = 40;
+  if(Math.max(w, h) < MIN_DIM){
+    const scale = MIN_DIM / Math.max(w, h);
+    w *= scale; h *= scale;
+  }
+
+  // Image reconstruction: use savedPanelWidth/savedPanelHeight if present to rescale position
+  const savedW = panel.savedPanelWidth || w;
+  const savedH = panel.savedPanelHeight || h;
+  const scale = w / savedW; // uniform scaling from saved panel to cart panel
+  const cartImgX = panel.imagePosition.x * scale;
+  const cartImgY = panel.imagePosition.y * scale;
+  const cartImgZoom = panel.imageScale * scale;
+
+  // Compute effective image box for this zoom+rotate+flip
+  const corners = [[0,0],[panel.imageNaturalWidth,0],[0,panel.imageNaturalHeight],[panel.imageNaturalWidth,panel.imageNaturalHeight]];
+  const rad = (panel.rotate || 0) * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const sx = panel.flipH ? -1 : 1, sy = panel.flipV ? -1 : 1;
+  let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+  corners.forEach(([x,y])=>{
+    let px = x * sx, py = y * sy;
+    const rx = px * cos - py * sin;
+    const ry = px * sin + py * cos;
+    const szx = rx * cartImgZoom, szy = ry * cartImgZoom;
+    if(szx<minX) minX=szx; if(szy<minY) minY=szy;
+    if(szx>maxX) maxX=szx; if(szy>maxY) maxY=szy;
+  });
+  const cssTx = cartImgX - minX;
+  const cssTy = cartImgY - minY;
+
+  return {
+    w, h,
+    imgTransform: `translate(${cssTx}px, ${cssTy}px) scale(${cartImgZoom}) rotate(${panel.rotate||0}deg) scaleX(${sx}) scaleY(${sy})`,
+    imgW: panel.imageNaturalWidth,
+    imgH: panel.imageNaturalHeight,
+    effW, effH
+  };
+}
+
+function updateCart(){
+  if(cart.length === 0){
+    floatTotal.classList.remove('visible');
+    cartSection.classList.remove('visible');
+    try{localStorage.removeItem('acousticCart')}catch(e){}
+    return;
+  }
+  cartStrip.innerHTML = '';
+  let subtotal = 0;
+  cart.forEach((panel,i)=>{
+    const price = PRICES[panel.size] || 0;
+    const qty = panel.quantity || 1;
+    subtotal += price * qty;
+    const preview = renderCartCardPreview(panel);
+    const wrapClass = panel.fabricWrap === 'full' ? 'wrap-full' : 'wrap-half';
+    const woodClass = panel.woodVarnish === 'dark' ? 'wood-dark-scene' : '';
+    const finishLabel = `${panel.woodVarnish === 'dark' ? 'Dark' : 'Light'} · ${panel.fabricWrap === 'full' ? 'Full wrap' : 'Half wrap'}`;
+
+    const item = document.createElement('div');
+    item.className = 'cart-item';
+    item.innerHTML = `
+      <button class="cart-remove" data-idx="${i}" title="Remove">×</button>
+      <div class="cart-preview">
+        <div class="cart-3d ${woodClass} ${wrapClass}-scene" style="width:${preview.w}px;height:${preview.h}px">
+          <div class="cart-face has-image">
+            <img src="${panel.image}" alt="${panel.size}" style="width:${preview.imgW}px;height:${preview.imgH}px;transform-origin:0 0;transform:${preview.imgTransform}">
+          </div>
+        </div>
+      </div>
+      <div class="cart-info">
+        <div class="cart-size-row">
+          <span class="cart-size">${preview.effW}×${preview.effH} ft</span>
+          <span class="cart-price">₹${(price*qty).toLocaleString()}</span>
+        </div>
+        <div class="cart-finish">${finishLabel}</div>
+        <div class="cart-qty">
+          <button class="qty-btn" data-idx="${i}" data-action="dec">−</button>
+          <span class="qty-val">${qty}</span>
+          <button class="qty-btn" data-idx="${i}" data-action="inc">+</button>
+        </div>
+      </div>
+      <div class="cart-actions-row">
+        <button class="cart-mini-btn" data-idx="${i}" data-action="edit">Edit</button>
+        <button class="cart-mini-btn danger" data-idx="${i}" data-action="remove">Remove</button>
+      </div>
+    `;
+    cartStrip.appendChild(item);
+  });
+  cartStrip.querySelectorAll('.cart-remove, .qty-btn, .cart-mini-btn').forEach(btn=>{
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.idx);
+      const action = btn.dataset.action;
+      if(btn.classList.contains('cart-remove') || action === 'remove'){ cart.splice(idx,1); }
+      else if(action === 'inc'){ cart[idx].quantity = (cart[idx].quantity || 1) + 1; }
+      else if(action === 'dec'){ cart[idx].quantity = Math.max(1, (cart[idx].quantity || 1) - 1); }
+      else if(action === 'edit'){
+        loadPanelToEditor(cart[idx]);
+        cart.splice(idx,1);
+        cartSection.classList.remove('visible');
+        saveCart();
+        updateCart();
+        window.scrollTo({top:designer.offsetTop - 80, behavior:'smooth'});
+        return;
+      }
+      saveCart();
+      updateCart();
+    });
+  });
+  $('panelCount').textContent = getTotalPanelCount();
+  $('subtotal').textContent = '₹' + subtotal.toLocaleString();
+  const total = subtotal + 500;
+  $('total').textContent = '₹' + total.toLocaleString();
+  floatAmount.textContent = '₹' + total.toLocaleString();
+  floatTotal.classList.add('visible');
+  cartSection.classList.add('visible');
+}
+
+function loadPanelToEditor(panel){
+  currentPanel = {
+    size: panel.size, baseW: panel.baseW, baseH: panel.baseH,
+    orientation: panel.orientation,
+    width:0, height:0,
+    image: panel.image,
+    imagePosition: {...panel.imagePosition},
+    imageScale: panel.imageScale,
+    imageNaturalWidth: panel.imageNaturalWidth,
+    imageNaturalHeight: panel.imageNaturalHeight,
+    flipH: panel.flipH || false, flipV: panel.flipV || false, rotate: panel.rotate || 0,
+    fileName: panel.fileName, fileSize: panel.fileSize,
+    woodVarnish: panel.woodVarnish,
+    fabricWrap: panel.fabricWrap
+  };
+  imgNaturalW = panel.imageNaturalWidth;
+  imgNaturalH = panel.imageNaturalHeight;
+  imgFlipH = currentPanel.flipH; imgFlipV = currentPanel.flipV; imgRotate = currentPanel.rotate;
+  sizeCards.forEach(c=>c.classList.toggle('selected', c.dataset.size === panel.size));
+  if(panel.baseW !== panel.baseH){
+    orientToggle.classList.add('visible');
+    document.querySelectorAll('.orient-btn').forEach(b=>b.classList.toggle('active', b.dataset.orient===panel.orientation));
+  } else {
+    orientToggle.classList.remove('visible');
+  }
+  document.querySelectorAll('.fopt').forEach(o=>o.classList.remove('active'));
+  document.querySelector(`.fopt[data-option="wood"][data-value="${panel.woodVarnish}"]`).classList.add('active');
+  document.querySelector(`.fopt[data-option="wrap"][data-value="${panel.fabricWrap}"]`).classList.add('active');
+  panel3d.classList.toggle('wood-dark-scene', panel.woodVarnish==='dark');
+  panel3d.classList.toggle('wrap-full-scene', panel.fabricWrap==='full');
+  panel3d.classList.toggle('wrap-half-scene', panel.fabricWrap==='half');
+
+  sceneZoom = 0.82; panYaw = -18; panPitch = 6;
+  updatePanelPreview();
+  designer.classList.add('active');
+  panelActions.classList.add('visible');
+  customSection.style.display = 'block';
+
+  panelImage.src = panel.image;
+  panelImage.style.display = 'block';
+  panelFace.classList.add('has-image');
+  uploadInPanel.style.display = 'none';
+  replaceBtn.style.display = 'block';
+
+  setTimeout(()=>{
+    panelImage.style.width = imgNaturalW + 'px';
+    panelImage.style.height = imgNaturalH + 'px';
+    imgZoom = panel.imageScale || 1;
+    imgPos = {...panel.imagePosition};
+    clampImagePosition();
+    applyImageTransform();
+  },50);
+
+  artworkLine.classList.add('loaded');
+  const shortName = (panel.fileName || 'artwork').length > 28 ? panel.fileName.slice(0,25)+'...' : (panel.fileName || 'artwork');
+  artworkLine.innerHTML = `◆ ${shortName}`;
+  imageInfo.classList.add('visible');
+  $('fileName').textContent = panel.fileName ? (panel.fileName.length > 22 ? panel.fileName.slice(0,19)+'...' : panel.fileName) : 'artwork';
+  $('imageDimensions').textContent = `${panel.imageNaturalWidth}×${panel.imageNaturalHeight}`;
+  $('fileSize').textContent = panel.fileSize ? (panel.fileSize/1024/1024).toFixed(1) + 'MB' : '—';
+  const {w:fw} = effectiveDimsFt(currentPanel.baseW, currentPanel.baseH, currentPanel.orientation);
+  const dpi = Math.round(panel.imageNaturalWidth / fw / 12);
+  $('dpiEstimate').textContent = dpi;
+  enablePanMode();
+}
+
+function saveCart(){
+  try{localStorage.setItem('acousticCart', JSON.stringify(cart))}catch(e){}
+}
+function loadCart(){
+  try{
+    const saved = JSON.parse(localStorage.getItem('acousticCart'));
+    if(saved && Array.isArray(saved) && saved.length > 0){
+      cart = saved.map(p => ({
+        ...p,
+        quantity: p.quantity || 1,
+        // Backfill for carts saved before r5
+        effectiveW: p.effectiveW || (p.baseW === p.baseH ? p.baseW : (p.orientation === 'horizontal' ? Math.max(p.baseW,p.baseH) : Math.min(p.baseW,p.baseH))),
+        effectiveH: p.effectiveH || (p.baseW === p.baseH ? p.baseH : (p.orientation === 'horizontal' ? Math.min(p.baseW,p.baseH) : Math.max(p.baseW,p.baseH))),
+        flipH: p.flipH || false, flipV: p.flipV || false, rotate: p.rotate || 0
+      }));
+      updateCart();
+      currentPanelNum.textContent = String(getTotalPanelCount() + 1).padStart(2,'0');
+    }
+  }catch(e){}
+}
+
+function flashAction(msg){
+  const flash = document.createElement('div');
+  flash.textContent = msg;
+  flash.style.cssText = `position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--accent);color:var(--ink);padding:12px 24px;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;z-index:200;animation:flashIn 0.3s ease-out`;
+  document.body.appendChild(flash);
+  setTimeout(()=>flash.remove(), 1800);
+}
+const styleEl = document.createElement('style');
+styleEl.textContent = '@keyframes flashIn{from{opacity:0;transform:translate(-50%,20px)}to{opacity:1;transform:translate(-50%,0)}}';
+document.head.appendChild(styleEl);
+
+loadCart();
+window.addEventListener('resize',()=>{
+  if(currentPanel.size){
+    updatePanelPreview();
+    if(currentPanel.image) setTimeout(()=>{ clampImagePosition(); applyImageTransform(); }, 50);
+  }
+});
+</script>
+
+</body>
+</html>

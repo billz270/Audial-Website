@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ahata — Sound as Art</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#093d53;
+    --shadow:#00171f;
+    --paper:#f2f2f9;
+    --primary:#093d53;
+    --primary-light:#007da6;
+    --accent:#ecad49;
+    --line:rgba(9,61,83,0.18);
+    --mute:rgba(9,61,83,0.62);
+    --wood:#7A5F3A;
+    --wood-mid:#4A3622;
+    --wood-dark:#2A1C10;
+    --wood-edge:#1A0F08;
+    --wrap-black:#0F0904;
+  }
+  /* Inverted (dark) surfaces use the navy primary color, not ink */
+  .cta-strip,.marquee{background:var(--primary)}
+  *{margin:0;padding:0;box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{font-family:'Archivo',sans-serif;background:var(--paper);color:var(--ink);overflow-x:hidden;font-weight:400;-webkit-tap-highlight-color:transparent}
+  body.modal-open{overflow:hidden}
+
+  nav{position:sticky;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:18px 32px;border-bottom:1.5px solid var(--ink);background:var(--paper);z-index:100}
+  .logo{display:inline-flex;align-items:center;text-decoration:none;line-height:0;color:var(--ink)}
+  .logo .brand-logo{height:32px;width:auto;display:block;flex-shrink:0}
+  .nav-links{display:flex;gap:28px;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em}
+  .nav-links a,.nav-links button{color:var(--ink);text-decoration:none;position:relative;background:none;border:none;font:inherit;cursor:pointer;padding:0;letter-spacing:inherit;text-transform:inherit}
+  .nav-links a:hover::after,.nav-links a.active::after,.nav-links button:hover::after{content:'';position:absolute;left:0;right:0;bottom:-4px;height:2px;background:var(--accent)}
+
+  /* HERO — integrated banner with showcase */
+  .hero{padding:48px 40px 56px;border-bottom:1.5px solid var(--ink);display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;position:relative}
+  .hero-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:22px;display:flex;align-items:center;gap:12px;color:var(--mute)}
+  .hero-label::before{content:'';width:40px;height:2px;background:var(--accent)}
+  h1{font-family:'Archivo Black',sans-serif;font-size:clamp(56px,9vw,140px);line-height:0.85;letter-spacing:-0.04em;margin-bottom:24px;text-transform:uppercase}
+  h1 .word-sound{color:var(--primary)}
+  h1 .word-as{color:var(--primary-light)}
+  h1 .word-art{color:var(--accent)}
+  .hero-desc{font-size:16px;line-height:1.55;max-width:480px;margin-bottom:24px;color:var(--ink)}
+  .hero-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px}
+  .hero-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:5px 10px;border:1.5px solid var(--ink);background:var(--paper)}
+  .hero-tag .dot{color:var(--accent);margin-right:4px}
+  .cta-group{display:flex;gap:0;border:1.5px solid var(--ink);max-width:480px}
+  .cta{padding:16px 24px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;text-decoration:none;color:var(--ink);background:var(--paper);transition:all 0.2s;border-right:1.5px solid var(--ink);flex:1;text-align:center;font-family:inherit;border-top:none;border-bottom:none;border-left:none;cursor:pointer}
+  .cta:last-child{border-right:none}
+  .cta.primary{background:var(--ink);color:var(--paper)}
+  .cta:hover{background:var(--accent);color:var(--ink)}
+  .cta.primary:hover{background:var(--accent)}
+
+  /* SHOWCASE — 7×4 cell grid, each cell = 1ft. Panels occupy cells matching their real proportions.
+     Layout (1 cell = 1 ft):
+     Row 1-2 cols 1-4: 4×2 ft panel (wide horizontal)
+     Row 1-2 cols 5-6: 2×2 ft panel (square)
+     Row 1-4 col 7:    1×4 ft panel (tall vertical)
+     Row 3-4 cols 1-2: 2×2 ft panel (square)
+     Row 3   cols 3-4: 2×1 ft panel (wide)
+     Row 3   cols 5-6: 2×1 ft panel (wide)
+     Row 4   cols 3,4,5,6: 1×1 ft panels (×4)        */
+  .showcase{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(4,1fr);gap:8px;aspect-ratio:1.75;max-width:600px;margin-left:auto}
+  .panel-mock{position:relative;border:1.5px solid var(--ink);overflow:hidden;background:var(--paper);box-shadow:0 4px 14px rgba(0,23,31,0.12)}
+  .panel-mock::after{content:'';position:absolute;left:0;right:0;bottom:0;height:6%;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.18));pointer-events:none}
+  .panel-mock .label{position:absolute;left:7px;bottom:6px;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--paper);background:rgba(9,61,83,0.78);padding:2px 6px;z-index:2}
+  .panel-mock svg{display:block;width:100%;height:100%}
+  /* Cell placements */
+  .mock-4x2-a{grid-column:1/5;grid-row:1/3}    /* top-left wide 4×2 */
+  .mock-2x2-a{grid-column:5/7;grid-row:1/3}    /* top-mid 2×2 */
+  .mock-1x4-a{grid-column:7/8;grid-row:1/5}    /* right edge tall 1×4 */
+  .mock-2x2-b{grid-column:1/3;grid-row:3/5}    /* bottom-left 2×2 */
+  .mock-2x1-a{grid-column:3/5;grid-row:3/4}    /* mid 2×1 */
+  .mock-2x1-b{grid-column:5/7;grid-row:3/4}    /* mid-right 2×1 */
+  .mock-1x1-a{grid-column:3/4;grid-row:4/5}
+  .mock-1x1-b{grid-column:4/5;grid-row:4/5}
+  .mock-1x1-c{grid-column:5/6;grid-row:4/5}
+  .mock-1x1-d{grid-column:6/7;grid-row:4/5}
+
+  /* PROCESS — compact 4-step grid */
+  .process{padding:56px 40px;border-bottom:1.5px solid var(--ink)}
+  .process-header{display:grid;grid-template-columns:1fr 2fr;gap:48px;margin-bottom:32px;align-items:end}
+  .section-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;display:flex;align-items:center;gap:12px;color:var(--mute)}
+  .section-label::before{content:'';width:40px;height:2px;background:var(--accent)}
+  .process-title{font-family:'Archivo Black',sans-serif;font-size:clamp(26px,3.5vw,42px);line-height:0.95;letter-spacing:-0.03em;text-transform:uppercase}
+  .process-title .accent{color:var(--accent)}
+
+  .step-grid{display:grid;grid-template-columns:repeat(4,1fr);border:1.5px solid var(--ink)}
+  .step-card{padding:14px 14px 16px;border-right:1.5px solid var(--ink);min-height:110px;display:flex;flex-direction:column;justify-content:space-between;gap:12px;background:var(--paper);transition:all 0.3s ease;cursor:pointer;position:relative;overflow:hidden;text-decoration:none;color:var(--ink);font:inherit;text-align:left;border-top:none;border-bottom:none;border-left:none}
+  .step-card:last-child{border-right:none}
+  .step-card::before{content:'';position:absolute;inset:0;background:var(--ink);transform:translateY(100%);transition:transform 0.4s cubic-bezier(0.65,0,0.35,1);z-index:0}
+  .step-card:hover::before{transform:translateY(0)}
+  .step-card > *{position:relative;z-index:1;transition:color 0.3s ease}
+  .step-card:hover > *{color:var(--paper)}
+  .step-card:hover .step-number{color:var(--accent)}
+  .step-card:hover .step-icon{border-color:var(--paper)}
+  .step-card:hover .step-icon svg{stroke:var(--paper)}
+  .step-top{display:flex;justify-content:space-between;align-items:center}
+  .step-number{font-family:'Archivo Black',sans-serif;font-size:20px;line-height:1;letter-spacing:-0.03em;color:var(--accent)}
+  .step-icon{width:30px;height:30px;display:flex;align-items:center;justify-content:center;border:1.5px solid var(--ink);transition:border-color 0.3s}
+  .step-icon svg{width:16px;height:16px;stroke:var(--ink);fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;transition:stroke 0.3s}
+  .step-card h3{font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:-0.01em;text-transform:uppercase;margin-bottom:3px;line-height:1.1}
+  .step-card p{font-size:10.5px;line-height:1.4;opacity:0.7}
+
+  /* WHY STRIP — always horizontal */
+  .why-strip{padding:56px 40px;border-bottom:1.5px solid var(--ink)}
+  .why-header{margin-bottom:28px}
+  .why-title{font-family:'Archivo Black',sans-serif;font-size:clamp(26px,3.5vw,42px);line-height:0.95;letter-spacing:-0.03em;text-transform:uppercase;margin-top:12px;max-width:900px}
+  .why-title .accent{color:var(--accent)}
+  .why-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1.5px solid var(--ink)}
+  .why-card{padding:22px 18px;border-right:1.5px solid var(--ink);min-width:0}
+  .why-card:last-child{border-right:none}
+  .why-num{font-family:'Archivo Black',sans-serif;font-size:11px;letter-spacing:0.05em;color:var(--accent);margin-bottom:8px}
+  .why-card h4{font-family:'Archivo Black',sans-serif;font-size:14px;letter-spacing:-0.01em;text-transform:uppercase;margin-bottom:6px}
+  .why-card p{font-size:12.5px;line-height:1.5;opacity:0.75}
+
+  /* CTA STRIP */
+  .cta-strip{padding:80px 40px;text-align:center;background:var(--ink);color:var(--paper);border-bottom:1.5px solid var(--ink)}
+  .cta-strip h2{font-family:'Archivo Black',sans-serif;font-size:clamp(36px,6vw,80px);line-height:0.9;letter-spacing:-0.03em;text-transform:uppercase;margin-bottom:32px}
+  .cta-strip h2 .accent{color:var(--accent)}
+  .cta-big{display:inline-block;padding:18px 40px;background:var(--accent);color:var(--ink);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;text-decoration:none;border:1.5px solid var(--accent);transition:all 0.2s;margin:0 6px 10px;cursor:pointer;font-family:inherit}
+  .cta-big:hover{background:var(--paper);border-color:var(--paper)}
+  .cta-big.ghost{background:transparent;color:var(--paper);border-color:var(--paper)}
+  .cta-big.ghost:hover{background:var(--paper);color:var(--ink)}
+
+  /* FOOTER */
+  footer{padding:56px 40px 28px;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:56px}
+  .footer-brand h3{font-family:'Archivo Black',sans-serif;font-size:40px;letter-spacing:-0.03em;text-transform:uppercase;line-height:0.9;margin-bottom:14px}
+  .footer-brand p{font-size:13px;opacity:0.7;max-width:280px;line-height:1.5}
+  .footer-col h4{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:18px}
+  .footer-col a,.footer-col button{display:block;font-size:13px;color:var(--ink);text-decoration:none;margin-bottom:10px;transition:color 0.2s;background:none;border:none;font:inherit;cursor:pointer;padding:0;text-align:left}
+  .footer-col a:hover,.footer-col button:hover{color:var(--accent)}
+  .footer-bottom{grid-column:1/-1;padding-top:28px;margin-top:28px;border-top:1.5px solid var(--ink);display:flex;justify-content:space-between;font-size:11px;text-transform:uppercase;letter-spacing:0.1em}
+
+  .reveal{opacity:0;transform:translateY(30px);transition:all 0.8s cubic-bezier(0.65,0,0.35,1)}
+  .reveal.visible{opacity:1;transform:translateY(0)}
+
+  /* CONSULT MODAL */
+  .consult-modal{position:fixed;inset:0;background:rgba(0,23,31,0.6);z-index:200;display:none;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(4px)}
+  .consult-modal.open{display:flex}
+  .consult-box{background:var(--paper);border:1.5px solid var(--ink);max-width:560px;width:100%;max-height:90vh;overflow-y:auto;position:relative}
+  .consult-head{padding:24px 28px;border-bottom:1.5px solid var(--ink);display:flex;justify-content:space-between;align-items:center}
+  .consult-head h3{font-family:'Archivo Black',sans-serif;font-size:24px;letter-spacing:-0.02em;text-transform:uppercase}
+  .consult-head h3 .accent{color:var(--accent)}
+  .close-x{width:32px;height:32px;border:1.5px solid var(--ink);background:var(--paper);font-size:18px;font-weight:700;cursor:pointer;transition:all 0.2s}
+  .close-x:hover{background:var(--ink);color:var(--paper)}
+  .consult-body{padding:20px 28px}
+  .consult-body p.lead{font-size:13px;line-height:1.55;margin-bottom:18px;color:rgba(0,23,31,0.6)}
+  .fld{margin-bottom:12px;display:flex;flex-direction:column;gap:4px}
+  .fld label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(0,23,31,0.6)}
+  .fld input,.fld select,.fld textarea{font-family:inherit;font-size:13px;padding:10px 12px;border:1.5px solid var(--ink);background:var(--paper);outline:none;color:var(--ink)}
+  .fld textarea{min-height:72px;resize:vertical}
+  .consult-submit{width:100%;padding:14px;background:var(--accent);color:var(--ink);border:1.5px solid var(--accent);font-family:inherit;font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;cursor:pointer;margin-top:6px}
+  .consult-submit:hover{background:var(--ink);border-color:var(--ink)}
+
+  @media (max-width:1100px){
+    .step-card{padding:12px 10px;min-height:96px;gap:8px}
+    .step-number{font-size:18px}
+    .step-icon{width:26px;height:26px}
+    .step-icon svg{width:14px;height:14px}
+    .step-card h3{font-size:11px}
+    .step-card p{font-size:10px}
+    .why-card{padding:18px 14px}
+    .why-card h4{font-size:13px}
+    .why-card p{font-size:12px}
+  }
+  @media (max-width:900px){
+    nav{padding:14px 20px}
+    .nav-links{display:none}
+    .hero{grid-template-columns:1fr;padding:36px 20px 48px;gap:32px}
+    .showcase{max-width:100%;margin:0 auto}
+    .process,.why-strip{padding:48px 20px}
+    .process-header{grid-template-columns:1fr;gap:18px;margin-bottom:24px}
+    footer{grid-template-columns:1fr 1fr;padding:40px 20px 20px;gap:28px}
+    .footer-brand{grid-column:1/-1}
+    .cta-strip{padding:60px 20px}
+    .step-card{padding:10px 8px;min-height:88px;gap:6px}
+    .step-card h3{font-size:10.5px;line-height:1.05}
+    .step-card p{font-size:9.5px;line-height:1.35}
+    .step-number{font-size:16px}
+  }
+  @media (max-width:560px){
+    .hero h1{font-size:48px}
+    .step-grid{grid-template-columns:repeat(4,1fr)}
+    .step-card{padding:8px 5px;min-height:78px;gap:5px}
+    .step-card h3{font-size:9px;line-height:1.05}
+    .step-card p{display:none}
+    .step-icon{width:22px;height:22px}
+    .step-icon svg{width:12px;height:12px}
+    .step-number{font-size:13px}
+    .why-grid{grid-template-columns:repeat(3,1fr)}
+    .why-card{padding:12px 8px}
+    .why-card h4{font-size:10.5px;line-height:1.15}
+    .why-card p{font-size:9.5px;line-height:1.3}
+    .footer-bottom{flex-direction:column;gap:10px}
+    .cta-group{flex-direction:column}
+    .cta{border-right:none !important;border-bottom:1.5px solid var(--ink)}
+    .cta:last-child{border-bottom:none}
+  }
+
+  /* Site max-width container — content constrained on wide screens */
+  html{background:var(--paper)}body{max-width:1320px;margin:0 auto;background:var(--paper)}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo" aria-label="Ahata — home"><svg fill="currentColor" class="brand-logo" preserveAspectRatio="xMidYMid" version="1.0" viewBox="0 0 1874.9 750" xmlns="http://www.w3.org/2000/svg" zoomAndPan="magnify"><defs><clipPath id="nav_u"><path d="m0 0.023438h1874.8v749.95h-1874.8z"/></clipPath><clipPath id="nav_n"><path d="m5 92h40v118h-40z"/></clipPath><clipPath id="nav_a"><path d="m20.301 89.734 34.594 5.1758-17.527 117.2-34.594-5.1758z"/></clipPath><clipPath id="nav_r"><path d="m44.215 100.44-4.168 92.508c-0.22266 4.9219-2.5195 9.5195-6.3242 12.652-3.8047 3.1289-8.7578 4.5-13.633 3.7734-4.8711-0.73047-9.207-3.4922-11.93-7.5977-2.7188-4.1055-3.5742-9.1758-2.3438-13.945l23.082-89.684c0.99219-3.8633 4.7461-6.3477 8.6914-5.7578 3.9414 0.58984 6.8047 4.0664 6.625 8.0508z"/></clipPath><clipPath id="nav_f"><path d="m0 0h39.551v118h-39.551z"/></clipPath><clipPath id="nav_z"><path d="m15.301-2.2656 34.594 5.1758-17.527 117.2-34.594-5.1758z"/></clipPath><clipPath id="nav_g"><path d="m39.215 8.4414-4.168 92.508c-0.22266 4.9219-2.5195 9.5195-6.3242 12.652-3.8047 3.1289-8.7578 4.5-13.633 3.7734-4.8711-0.73047-9.207-3.4922-11.93-7.5977-2.7188-4.1055-3.5742-9.1758-2.3438-13.945l23.082-89.684c0.99219-3.8633 4.7461-6.3477 8.6914-5.7578 3.9414 0.58984 6.8047 4.0664 6.625 8.0508z"/></clipPath><clipPath id="nav_ab"><rect width="40" height="118"/></clipPath><clipPath id="nav_x"><path d="m217 92h41v118h-41z"/></clipPath><clipPath id="nav_d"><path d="m207.04 95.094 34.547-5.4805 18.574 117.04-34.547 5.4805z"/></clipPath><clipPath id="nav_ag"><path d="m233.06 98.102 23.883 89.473c1.2695 4.7617 0.46094 9.8359-2.2226 13.969-2.6836 4.1289-6.9961 6.9297-11.863 7.7031-4.8633 0.76953-9.8281-0.55468-13.66-3.6523s-6.1719-7.6758-6.4375-12.594l-4.9961-92.469c-0.21484-3.9844 2.6133-7.4844 6.5547-8.1094 3.9375-0.625 7.7148 1.8281 8.7422 5.6797z"/></clipPath><clipPath id="nav_b"><path d="m0.33984 0h40.66v118h-40.66z"/></clipPath><clipPath id="nav_t"><path d="m-9.9648 3.0938 34.547-5.4805 18.574 117.04-34.547 5.4805z"/></clipPath><clipPath id="nav_ak"><path d="m16.062 6.1016 23.883 89.473c1.2695 4.7617 0.46094 9.8359-2.2227 13.969-2.6836 4.1289-6.9961 6.9297-11.863 7.7031-4.8633 0.76954-9.8281-0.55468-13.66-3.6523s-6.1719-7.6758-6.4375-12.594l-4.9961-92.469c-0.21484-3.9844 2.6133-7.4844 6.5547-8.1094 3.9375-0.625 7.7148 1.8281 8.7422 5.6797z"/></clipPath><clipPath id="nav_aa"><rect width="41" height="118"/></clipPath><clipPath id="nav_l"><path d="m72 2h36v147h-36z"/></clipPath><clipPath id="nav_ad"><path d="m96.863 150.46-35.457-2.957 12.191-146.19 35.457 2.9531z"/></clipPath><clipPath id="nav_v"><path d="m72.977 142.2-0.76172-121.71c-0.03125-4.9531 2.0195-9.6914 5.6562-13.055 3.6328-3.3672 8.5156-5.0508 13.453-4.6367 4.9375 0.41016 9.4727 2.8789 12.5 6.8008 3.0273 3.918 4.2656 8.9336 3.418 13.812l-20.91 119.9c-0.59766 3.4336-3.7148 5.8398-7.1875 5.5508-3.4688-0.28906-6.1445-3.1797-6.168-6.6641z"/></clipPath><clipPath id="nav_h"><path d="m0.14844 0.16797h35.852v146.83h-35.852z"/></clipPath><clipPath id="nav_j"><path d="m24.863 148.46-35.457-2.957 12.191-146.19 35.457 2.9531z"/></clipPath><clipPath id="nav_ai"><path d="m0.97656 140.2-0.76172-121.71c-0.03125-4.9531 2.0195-9.6914 5.6562-13.055 3.6328-3.3672 8.5156-5.0508 13.453-4.6367 4.9375 0.41016 9.4727 2.8789 12.5 6.8008 3.0273 3.918 4.2656 8.9336 3.418 13.812l-20.91 119.9c-0.59766 3.4336-3.7148 5.8398-7.1875 5.5508-3.4688-0.28906-6.1445-3.1797-6.168-6.6641z"/></clipPath><clipPath id="nav_ah"><rect width="36" height="147"/></clipPath><clipPath id="nav_k"><path d="m154 2h36v147h-36z"/></clipPath><clipPath id="nav_y"><path d="m200.78 147.47-35.453 3.0078-12.406-146.17 35.453-3.0078z"/></clipPath><clipPath id="nav_m"><path d="m175.85 143.32-21.086-119.87c-0.85937-4.8789 0.3711-9.8945 3.3945-13.82 3.0195-3.9219 7.5547-6.3984 12.488-6.8164 4.9375-0.41797 9.8203 1.2539 13.461 4.6172 3.6406 3.3594 5.6992 8.0938 5.6758 13.047l-0.58204 121.71c-0.0156 3.4805-2.6875 6.375-6.1602 6.668-3.4688 0.29688-6.5898-2.1055-7.1914-5.5352z"/></clipPath><clipPath id="nav_e"><path d="m0 0.16797h35.98v146.83h-35.98z"/></clipPath><clipPath id="nav_ac"><path d="m46.781 145.47-35.453 3.0078-12.406-146.17 35.453-3.0078z"/></clipPath><clipPath id="nav_q"><path d="m21.852 141.32-21.086-119.87c-0.85938-4.8789 0.37109-9.8945 3.3945-13.82 3.0195-3.9219 7.5547-6.3984 12.488-6.8164 4.9375-0.41797 9.8203 1.2539 13.461 4.6172 3.6406 3.3594 5.6992 8.0938 5.6758 13.047l-0.58203 121.71c-0.01563 3.4805-2.6875 6.375-6.1602 6.668-3.4688 0.29688-6.5898-2.1055-7.1914-5.5352z"/></clipPath><clipPath id="nav_i"><rect width="36" height="147"/></clipPath><clipPath id="nav_ae"><path d="m113.35 70.91h35.582v161.93h-35.582z"/></clipPath><clipPath id="nav_aj"><path d="m137.39 76.746 11.441 136.81c0.41407 4.9492-1.2617 9.8438-4.625 13.496-3.3594 3.6562-8.0976 5.7344-13.062 5.7344-4.9687 0-9.707-2.0781-13.066-5.7344-3.3633-3.6523-5.0391-8.5469-4.625-13.496l11.441-136.81c0.26953-3.25 2.9883-5.75 6.25-5.75 3.2578 0 5.9766 2.5 6.2461 5.75z"/></clipPath><clipPath id="nav_p"><path d="m0.34766 0.91016h35.582v161.88h-35.582z"/></clipPath><clipPath id="nav_c"><path d="m24.387 6.7461 11.441 136.81c0.41406 4.9492-1.2617 9.8438-4.625 13.496-3.3594 3.6562-8.0977 5.7344-13.062 5.7344-4.9688 0-9.707-2.0781-13.066-5.7344-3.3633-3.6523-5.0391-8.5469-4.625-13.496l11.441-136.81c0.26953-3.25 2.9883-5.75 6.25-5.75 3.2578 0 5.9766 2.5 6.2461 5.75z"/></clipPath><clipPath id="nav_o"><rect width="36" height="163"/></clipPath><clipPath id="nav_w"><rect width="263" height="234"/></clipPath><clipPath id="nav_af"><path d="m505 284h1369.8v180h-1369.8z"/></clipPath><clipPath id="nav_s"><rect width="1370" height="180"/></clipPath></defs><g clip-path="url(#nav_u)" fill="#fff"><path d="m0 0.023438h1874.9v749.95h-1874.9z"/><path d="m0 0.023438h1874.9v749.95h-1874.9z"/></g><g transform="translate(125.83 258)"><g clip-path="url(#nav_w)"><g clip-path="url(#nav_n)"><g clip-path="url(#nav_a)"><g clip-path="url(#nav_r)"><g transform="translate(5,92)"><g clip-path="url(#nav_ab)"><g clip-path="url(#nav_f)"><g clip-path="url(#nav_z)"><g clip-path="url(#nav_g)"><path d="m23.504-69.336 38.172 5.7109-27.543 184.15-38.172-5.707z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_x)"><g clip-path="url(#nav_d)"><g clip-path="url(#nav_ag)"><g transform="translate(217,92)"><g clip-path="url(#nav_aa)"><g clip-path="url(#nav_b)"><g clip-path="url(#nav_t)"><g clip-path="url(#nav_ak)"><path d="m-22.34-63.332 38.121-6.0469 29.188 183.89-38.121 6.0508z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_l)"><g clip-path="url(#nav_ad)"><g clip-path="url(#nav_v)"><g transform="translate(72,2)"><g clip-path="url(#nav_ah)"><g clip-path="url(#nav_h)"><g clip-path="url(#nav_j)"><g clip-path="url(#nav_ai)"><path d="m20.68 216.8-38.461-3.207 17.914-214.85 38.461 3.207z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_k)"><g clip-path="url(#nav_y)"><g clip-path="url(#nav_m)"><g transform="translate(154,2)"><g clip-path="url(#nav_i)"><g clip-path="url(#nav_e)"><g clip-path="url(#nav_ac)"><g clip-path="url(#nav_q)"><path d="m54.07 213.54-38.457 3.2656-18.23-214.82 38.457-3.2656z"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_ae)"><g clip-path="url(#nav_aj)"><g transform="translate(113,70)"><g clip-path="url(#nav_o)"><g clip-path="url(#nav_p)"><g clip-path="url(#nav_c)"><rect x="-905.46" y="-601" width="3239.8" height="1296"/></g></g></g></g></g></g></g></g><g clip-path="url(#nav_af)"><g transform="translate(505,284)"><g clip-path="url(#nav_s)"><g><g transform="translate(1.338 158.39)"><path d="m9.75-136.41c0-13 6.4922-19.5 19.484-19.5h68.203c12.988 0 19.484 6.5 19.484 19.5v136.41h-19.484v-136.41h-68.203v136.41h-19.484zm38.969 97.438v-19.5h29.234v19.5z"/></g><g transform="translate(283.9 158.39)"><path d="m116.92-155.91v155.91h-19.484v-155.91zm-107.17 155.91v-155.91h19.484v155.91zm38.969-38.969v-19.5h29.234v19.5z"/></g><g transform="translate(566.47 158.39)"><path d="m9.75-136.41c0-13 6.4922-19.5 19.484-19.5h68.203c12.988 0 19.484 6.5 19.484 19.5v136.41h-19.484v-136.41h-68.203v136.41h-19.484zm38.969 97.438v-19.5h29.234v19.5z"/></g><g transform="translate(849.03 158.39)"><path d="m68.203-116.92v116.92h-19.484v-116.92zm-58.453-19.484v-19.5h97.438v19.5z"/></g><g transform="translate(1121.9 158.39)"><path d="m9.75-136.41c0-13 6.4922-19.5 19.484-19.5h68.203c12.988 0 19.484 6.5 19.484 19.5v136.41h-19.484v-136.41h-68.203v136.41h-19.484zm38.969 97.438v-19.5h29.234v19.5z"/></g></g></g></g></g></svg></a>
+  <div class="nav-links">
+    <a href="configurator.html">Design</a>
+    <a href="room-visualizer.html">Visualize</a>
+    <a href="how-it-works.html">How It Works</a>
+    <button type="button" data-open-consult>Consult</button>
+    <a href="about.html">About</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div>
+    <div class="hero-label">Listening spaces · Reimagined</div>
+    <h1><span class="word-sound">SOUND</span><br><span class="word-as">AS</span><br><span class="word-art">ART.</span></h1>
+    <p class="hero-desc">Hand-built acoustic panels that carry your artwork. For studios, theaters, and rooms that deserve better than foam.</p>
+    <div class="hero-tags">
+      <span class="hero-tag"><span class="dot">◆</span>Rockwool Density</span>
+      <span class="hero-tag"><span class="dot">◆</span>Pine Frame</span>
+      <span class="hero-tag"><span class="dot">◆</span>Custom Print</span>
+      <span class="hero-tag"><span class="dot">◆</span>7-Day Build</span>
+      <span class="hero-tag"><span class="dot">◆</span>Hand Made</span>
+    </div>
+    <div class="cta-group">
+      <a href="configurator.html" class="cta primary">Design Panels</a>
+      <a href="room-visualizer.html" class="cta">Visualize Space</a>
+    </div>
+  </div>
+
+  <div class="showcase" aria-label="Sample personalized panel arrangements">
+    <!-- 4×2 ft wide landscape (top-left, dominant) -->
+    <div class="panel-mock mock-4x2-a">
+      <svg viewBox="0 0 200 100" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g4x2a" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#ecad49"/>
+            <stop offset="50%" stop-color="#f2f2f9"/>
+            <stop offset="100%" stop-color="#007da6"/>
+          </linearGradient>
+        </defs>
+        <rect width="200" height="100" fill="url(#g4x2a)"/>
+        <path d="M0 65 L40 50 L70 60 L110 40 L150 55 L200 45 L200 100 L0 100 Z" fill="#093d53"/>
+        <path d="M0 78 L30 70 L65 75 L100 65 L140 72 L175 68 L200 70 L200 100 L0 100 Z" fill="#00171f"/>
+        <circle cx="155" cy="22" r="9" fill="#ecad49" opacity="0.85"/>
+      </svg>
+      <span class="label">4×2 ft</span>
+    </div>
+
+    <!-- 2×2 ft square (top-right) — abstract gradient with circles -->
+    <div class="panel-mock mock-2x2-a">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g2x2a" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#093d53"/>
+            <stop offset="55%" stop-color="#007da6"/>
+            <stop offset="100%" stop-color="#ecad49"/>
+          </linearGradient>
+        </defs>
+        <rect width="100" height="100" fill="url(#g2x2a)"/>
+        <circle cx="32" cy="38" r="22" fill="rgba(242,242,249,0.18)"/>
+        <circle cx="68" cy="62" r="14" fill="rgba(0,23,31,0.25)"/>
+        <path d="M0 78 Q25 60 50 72 T100 65 L100 100 L0 100 Z" fill="rgba(0,23,31,0.35)"/>
+      </svg>
+      <span class="label">2×2 ft</span>
+    </div>
+
+    <!-- 1×4 ft tall vertical (right edge, full height) — minimalist column with rhythmic accents -->
+    <div class="panel-mock mock-1x4-a">
+      <svg viewBox="0 0 50 200" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g1x4a" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="#00171f"/>
+            <stop offset="50%" stop-color="#093d53"/>
+            <stop offset="100%" stop-color="#007da6"/>
+          </linearGradient>
+        </defs>
+        <rect width="50" height="200" fill="url(#g1x4a)"/>
+        <line x1="25" y1="14" x2="25" y2="186" stroke="#ecad49" stroke-width="0.6" opacity="0.5"/>
+        <circle cx="25" cy="34" r="9" fill="none" stroke="#ecad49" stroke-width="1.5"/>
+        <circle cx="25" cy="34" r="3" fill="#ecad49"/>
+        <path d="M14 78 Q25 68 36 78 Q25 88 14 78Z" fill="#ecad49" opacity="0.6"/>
+        <path d="M16 122 Q25 114 34 122 Q25 130 16 122Z" fill="#f2f2f9" opacity="0.4"/>
+        <path d="M14 166 Q25 158 36 166 Q25 174 14 166Z" fill="#ecad49" opacity="0.55"/>
+      </svg>
+      <span class="label">1×4 ft</span>
+    </div>
+
+    <!-- 2×2 ft square (bottom-left) — geometric pattern -->
+    <div class="panel-mock mock-2x2-b">
+      <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="100" fill="#00171f"/>
+        <g stroke="#007da6" stroke-width="1.2" fill="none" opacity="0.85">
+          <circle cx="50" cy="50" r="40"/>
+          <circle cx="50" cy="50" r="28"/>
+          <circle cx="50" cy="50" r="16"/>
+        </g>
+        <circle cx="50" cy="50" r="6" fill="#ecad49"/>
+        <g stroke="#ecad49" stroke-width="0.8" opacity="0.4">
+          <line x1="50" y1="10" x2="50" y2="90"/>
+          <line x1="10" y1="50" x2="90" y2="50"/>
+        </g>
+      </svg>
+      <span class="label">2×2 ft</span>
+    </div>
+
+    <!-- 2×1 ft horizontal rectangle (mid-row, middle) — wave pattern -->
+    <div class="panel-mock mock-2x1-a">
+      <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="g2x1a" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0%" stop-color="#ecad49"/>
+            <stop offset="100%" stop-color="#093d53"/>
+          </linearGradient>
+        </defs>
+        <rect width="100" height="50" fill="url(#g2x1a)"/>
+        <g stroke="#f2f2f9" stroke-width="0.6" fill="none" opacity="0.6">
+          <path d="M0 25 Q15 15 30 25 T60 25 T90 25 T120 25"/>
+          <path d="M0 32 Q15 22 30 32 T60 32 T90 32 T120 32" opacity="0.5"/>
+          <path d="M0 18 Q15 8 30 18 T60 18 T90 18 T120 18" opacity="0.7"/>
+        </g>
+      </svg>
+      <span class="label">2×1 ft</span>
+    </div>
+
+    <!-- 2×1 ft horizontal rectangle (bottom row, middle) — bold landscape silhouette -->
+    <div class="panel-mock mock-2x1-b">
+      <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <rect width="100" height="50" fill="#093d53"/>
+        <circle cx="78" cy="14" r="6" fill="#ecad49" opacity="0.9"/>
+        <path d="M0 35 L18 25 L32 32 L48 22 L66 28 L82 18 L100 26 L100 50 L0 50 Z" fill="#00171f"/>
+        <path d="M0 42 L20 36 L38 40 L60 34 L80 38 L100 36 L100 50 L0 50 Z" fill="#007da6" opacity="0.4"/>
+      </svg>
+      <span class="label">2×1 ft</span>
+    </div>
+
+    <!-- 1×1 panels (×4) — distinctive small squares in the right column -->
+    <div class="panel-mock mock-1x1-a">
+      <svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <rect width="50" height="50" fill="#093d53"/>
+        <circle cx="25" cy="25" r="12" fill="none" stroke="#ecad49" stroke-width="2"/>
+        <circle cx="25" cy="25" r="3" fill="#ecad49"/>
+      </svg>
+      <span class="label">1×1</span>
+    </div>
+    <div class="panel-mock mock-1x1-b">
+      <svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <rect width="50" height="50" fill="#ecad49"/>
+        <path d="M0 0 L50 50 M50 0 L0 50" stroke="#093d53" stroke-width="2"/>
+      </svg>
+      <span class="label">1×1</span>
+    </div>
+    <div class="panel-mock mock-1x1-c">
+      <svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <rect width="50" height="50" fill="#007da6"/>
+        <rect x="10" y="10" width="30" height="30" fill="none" stroke="#f2f2f9" stroke-width="1.5"/>
+        <rect x="18" y="18" width="14" height="14" fill="#ecad49"/>
+      </svg>
+      <span class="label">1×1</span>
+    </div>
+    <div class="panel-mock mock-1x1-d">
+      <svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <rect width="50" height="50" fill="#00171f"/>
+        <g stroke="#007da6" stroke-width="1.2" fill="none">
+          <path d="M5 25 Q15 15 25 25 T45 25"/>
+          <path d="M5 32 Q15 22 25 32 T45 32" opacity="0.6"/>
+          <path d="M5 18 Q15 8 25 18 T45 18" opacity="0.4"/>
+        </g>
+      </svg>
+      <span class="label">1×1</span>
+    </div>
+  </div>
+</section>
+
+<section class="process">
+  <div class="process-header">
+    <div class="section-label reveal">Four steps · One better room</div>
+    <h2 class="process-title reveal">Start anywhere.<br>End with <span class="accent">better sound.</span></h2>
+  </div>
+
+  <div class="step-grid">
+    <a href="room-visualizer.html" class="step-card reveal">
+      <div class="step-top">
+        <div class="step-number">01</div>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></div>
+      </div>
+      <div>
+        <h3>Visualize Space</h3>
+        <p>Map your room. Plan panels before you design.</p>
+      </div>
+    </a>
+
+    <a href="configurator.html" class="step-card reveal">
+      <div class="step-top">
+        <div class="step-number">02</div>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></div>
+      </div>
+      <div>
+        <h3>Design Panels</h3>
+        <p>Pick a size. Upload your art. Preview live.</p>
+      </div>
+    </a>
+
+    <a href="how-it-works.html" class="step-card reveal">
+      <div class="step-top">
+        <div class="step-number">03</div>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></div>
+      </div>
+      <div>
+        <h3>How It Works</h3>
+        <p>What panels actually do. And don't.</p>
+      </div>
+    </a>
+
+    <a href="about.html" class="step-card reveal">
+      <div class="step-top">
+        <div class="step-number">04</div>
+        <div class="step-icon"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+      </div>
+      <div>
+        <h3>About Us</h3>
+        <p>Built by hand. Small workshop. Mumbai.</p>
+      </div>
+    </a>
+  </div>
+</section>
+
+<section class="why-strip">
+  <div class="why-header">
+    <div class="section-label reveal">What you're buying</div>
+    <h2 class="why-title reveal">Not foam pyramids.<br>Not office cubicle <span class="accent">panels.</span></h2>
+  </div>
+  <div class="why-grid">
+    <div class="why-card reveal">
+      <div class="why-num">◆ 01</div>
+      <h4>Dense mineral wool</h4>
+      <p>The density that actually absorbs mid and low frequencies — not the soft foam you've seen stuck to studio walls.</p>
+    </div>
+    <div class="why-card reveal">
+      <div class="why-num">◆ 02</div>
+      <h4>Your artwork, printed</h4>
+      <p>Every panel carries whatever image you want — photos, illustrations, album art. Treatment that looks like you.</p>
+    </div>
+    <div class="why-card reveal">
+      <div class="why-num">◆ 03</div>
+      <h4>Hand built in 7 days</h4>
+      <p>No warehouse. No mass production. Each panel measured, wrapped, and inspected by a human before it ships.</p>
+    </div>
+  </div>
+</section>
+
+<section class="cta-strip">
+  <h2>READY TO<br><span class="accent">HEAR DIFFERENTLY?</span></h2>
+  <a href="room-visualizer.html" class="cta-big">Start with your room →</a>
+  <button type="button" class="cta-big ghost" data-open-consult>Talk to us first</button>
+</section>
+
+<footer>
+  <div class="footer-brand">
+    <h3>Ahata◆</h3>
+    <p>Custom acoustic treatment. Hand-built. Human-scaled. For rooms that deserve better.</p>
+  </div>
+  <div class="footer-col">
+    <h4>Product</h4>
+    <a href="configurator.html">Design</a>
+    <a href="room-visualizer.html">Visualize</a>
+    <a href="how-it-works.html">How It Works</a>
+  </div>
+  <div class="footer-col">
+    <h4>Company</h4>
+    <a href="about.html">About</a>
+    <button type="button" data-open-consult>Consult</button>
+    <a href="#">Gallery</a>
+  </div>
+  <div class="footer-col">
+    <h4>Connect</h4>
+    <a href="mailto:hello@ahata.in">Email</a>
+    <a href="#">Instagram</a>
+    <a href="tel:+919000000000">Phone</a>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Ahata · Round 05</span>
+    <span>Hand built · Mumbai</span>
+  </div>
+</footer>
+
+<!-- CONSULT MODAL -->
+<div class="consult-modal" id="consultModal">
+  <div class="consult-box">
+    <div class="consult-head">
+      <h3>Book a <span class="accent">Consultation</span></h3>
+      <button class="close-x" data-close-consult aria-label="Close">×</button>
+    </div>
+    <div class="consult-body">
+      <p class="lead">A 45-minute paid session. We'll review your room's dimensions, sound goals, and recommend exactly which panels (and where).</p>
+      <form id="consultForm">
+        <div class="fld">
+          <label for="mName">Name</label>
+          <input type="text" id="mName" name="name" required>
+        </div>
+        <div class="fld">
+          <label for="mEmail">Email</label>
+          <input type="email" id="mEmail" name="email" required>
+        </div>
+        <div class="fld">
+          <label for="mPhone">Phone</label>
+          <input type="tel" id="mPhone" name="phone">
+        </div>
+        <div class="fld">
+          <label for="mRoom">Room type</label>
+          <select id="mRoom" name="room">
+            <option>Home studio</option>
+            <option>Home theater</option>
+            <option>Living room</option>
+            <option>Office / Podcast</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label for="mDate">Preferred date</label>
+          <input type="date" id="mDate" name="date">
+        </div>
+        <div class="fld">
+          <label for="mNotes">Anything we should know?</label>
+          <textarea id="mNotes" name="notes" placeholder="Room size, current issues, goals…"></textarea>
+        </div>
+        <button type="submit" class="consult-submit">Request Consultation →</button>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script>
+// Reveal on scroll
+const observer = new IntersectionObserver(entries=>{
+  entries.forEach(e=>{ if(e.isIntersecting) e.target.classList.add('visible'); });
+},{threshold:0.15});
+document.querySelectorAll('.reveal').forEach(el=>observer.observe(el));
+
+// Consult modal
+const consultModal = document.getElementById('consultModal');
+document.querySelectorAll('[data-open-consult]').forEach(el => el.addEventListener('click', e => { e.preventDefault(); consultModal.classList.add('open'); document.body.classList.add('modal-open'); }));
+document.querySelectorAll('[data-close-consult]').forEach(el => el.addEventListener('click', () => { consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }));
+document.addEventListener('keydown', e => { if(e.key==='Escape' && consultModal.classList.contains('open')){ consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }});
+consultModal.addEventListener('click', e => { if(e.target === consultModal){ consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }});
+
+document.getElementById('consultForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const fd = new FormData(e.target);
+  const body = `Name: ${fd.get('name')}\nEmail: ${fd.get('email')}\nPhone: ${fd.get('phone')}\nRoom type: ${fd.get('room')}\nPreferred date: ${fd.get('date')||'—'}\n\nNotes:\n${fd.get('notes')||'—'}`;
+  window.location.href = `mailto:hello@ahata.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
+});
+</script>
+
+</body>
+</html>
