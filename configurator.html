@@ -881,15 +881,29 @@ function handleImageUpload(file){
   reader.onload = e => {
     const img = new Image();
     img.onload = () => {
-      imgNaturalW = img.width;
-      imgNaturalH = img.height;
-      currentPanel.image = e.target.result;
-      currentPanel.imageNaturalWidth = img.width;
-      currentPanel.imageNaturalHeight = img.height;
+      const MAX = 1200;
+      let w = img.width, h = img.height;
+      if (w > MAX || h > MAX) {
+        if (w >= h) { h = Math.round(h * MAX / w); w = MAX; }
+        else { w = Math.round(w * MAX / h); h = MAX; }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(img, 0, 0, w, h);
+      const dataURL = canvas.toDataURL('image/jpeg', 0.82);
+
+      imgNaturalW = w;
+      imgNaturalH = h;
+      currentPanel.image = dataURL;
+      currentPanel.imageNaturalWidth = w;
+      currentPanel.imageNaturalHeight = h;
       currentPanel.fileName = file.name;
       currentPanel.fileSize = file.size;
       imgFlipH = false; imgFlipV = false; imgRotate = 0;
-      panelImage.src = e.target.result;
+      panelImage.src = dataURL;
       panelImage.style.display = 'block';
       uploadInPanel.style.display = 'none';
       replaceBtn.style.display = 'block';
@@ -1557,7 +1571,7 @@ function loadPanelToEditor(panel){
 }
 
 function saveCart(){
-  try{localStorage.setItem('acousticCart', JSON.stringify(cart))}catch(e){}
+  try{localStorage.setItem('acousticCart', JSON.stringify(cart))}catch(e){alert('Could not save — browser storage is full. Try removing some panels.');}
 }
 function loadCart(){
   try{
