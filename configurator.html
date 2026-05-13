@@ -247,7 +247,7 @@
   .cart-strip::-webkit-scrollbar-thumb{background:var(--ink)}
 
   .cart-item{flex:0 0 220px;border:1.5px solid var(--ink);background:var(--paper);display:flex;flex-direction:column;position:relative;scroll-snap-align:start}
-  .cart-preview{width:100%;min-height:180px;padding:18px;display:flex;align-items:center;justify-content:center;perspective:800px;background:var(--paper);border-bottom:1.5px solid var(--ink);overflow:hidden;cursor:pointer;transition:opacity 0.15s}
+  .cart-preview{width:100%;height:196px;padding:18px;display:flex;align-items:center;justify-content:center;perspective:800px;background:var(--paper);border-bottom:1.5px solid var(--ink);overflow:hidden;cursor:pointer;transition:opacity 0.15s}
   .cart-preview:hover{opacity:0.82}
   .cart-3d{transform-style:preserve-3d;transform:rotateY(-14deg) rotateX(6deg);position:relative}
   .cart-face{width:100%;height:100%;background:#FAFAF8;border:1.5px solid var(--ink);overflow:hidden;position:relative}
@@ -258,11 +258,7 @@
   .cart-size{font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:-0.01em}
   .cart-price{font-size:11px;font-weight:700;color:var(--accent)}
   .cart-finish{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--mute)}
-  .cart-qty{display:flex;align-items:center;justify-content:space-between;border:1.5px solid var(--ink)}
-  .qty-btn{width:32px;height:30px;background:var(--paper);border:none;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s}
-  .qty-btn:hover{background:var(--ink);color:var(--paper)}
-  .qty-val{font-family:'Archivo Black',sans-serif;font-size:13px;padding:0 12px}
-  .cart-actions-row{display:flex;gap:0;border-top:1.5px solid var(--ink)}
+  .cart-actions-row{display:flex;gap:0;border-top:1.5px solid var(--ink);margin-top:auto}
   .cart-mini-btn{flex:1;padding:10px;background:var(--paper);border:none;border-right:1.5px solid var(--ink);font-family:inherit;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;transition:all 0.2s;color:var(--ink);min-height:34px}
   .cart-mini-btn:last-child{border-right:none}
   .cart-mini-btn:hover{background:var(--ink);color:var(--paper)}
@@ -1473,11 +1469,6 @@ function updateCart(){
           <span class="cart-price">₹${(price*qty).toLocaleString()}</span>
         </div>
         <div class="cart-finish">${finishLabel}</div>
-        <div class="cart-qty">
-          <button class="qty-btn" data-idx="${i}" data-action="dec">−</button>
-          <span class="qty-val">${qty}</span>
-          <button class="qty-btn" data-idx="${i}" data-action="inc">+</button>
-        </div>
       </div>
       <div class="cart-actions-row">
         <button class="cart-mini-btn" data-idx="${i}" data-action="edit">Edit</button>
@@ -1486,14 +1477,12 @@ function updateCart(){
     `;
     cartStrip.appendChild(item);
   });
-  cartStrip.querySelectorAll('.cart-remove, .qty-btn, .cart-mini-btn').forEach(btn=>{
+  cartStrip.querySelectorAll('.cart-remove, .cart-mini-btn').forEach(btn=>{
     btn.addEventListener('click', e => {
       e.stopPropagation();
       const idx = parseInt(btn.dataset.idx);
       const action = btn.dataset.action;
       if(btn.classList.contains('cart-remove') || action === 'remove'){ cart.splice(idx,1); }
-      else if(action === 'inc'){ cart[idx].quantity = (cart[idx].quantity || 1) + 1; }
-      else if(action === 'dec'){ cart[idx].quantity = Math.max(1, (cart[idx].quantity || 1) - 1); }
       else if(action === 'edit'){
         loadPanelToEditor(cart[idx]);
         cart.splice(idx,1);
