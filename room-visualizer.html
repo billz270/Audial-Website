@@ -1473,6 +1473,81 @@ function placePanelAt(clientX, clientY){
   updateArmedState();
 }
 
+// ============ DESIGN POPUP ============
+let _pendingPanelId = null;
+
+function openDesignPopup(panel){
+  if(document.getElementById('designPopupOverlay')) return;
+  _pendingPanelId = String(panel.id);
+  const sizeLabel = panel.size.replace('x','×');
+  const needsOrient = panel.w !== panel.h;
+  const orientLabel = needsOrient ? ' · ' + (panel.orientation === 'vertical' ? 'Vertical' : 'Horizontal') : '';
+  const title = 'Add Design — ' + sizeLabel + orientLabel;
+  const orientation = panel.orientation || 'horizontal';
+  const src = `configurator.html?modal=true&size=${panel.size}&orientation=${orientation}&panelId=${panel.id}`;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'designPopupOverlay';
+  overlay.className = 'design-popup-overlay';
+  overlay.innerHTML = `
+    <div class="design-popup-card">
+      <div class="design-popup-header">
+        <span class="design-popup-title">${title}</span>
+        <div class="design-popup-dirty" id="designPopupDirty">
+          <button class="dp-save">Save</button>
+          <button class="dp-continue">Continue Editing</button>
+          <button class="dp-discard">Discard</button>
+        </div>
+        <button class="design-popup-close" id="designPopupClose" aria-label="Close">×</button>
+      </div>
+      <iframe class="design-popup-iframe" id="designPopupIframe" src="${src}"></iframe>
+    </div>`;
+  document.body.appendChild(overlay);
+
+  overlay.addEventListener('pointerdown', e => { if(e.target === overlay) attemptClosePopup(); });
+  document.getElementById('designPopupClose').addEventListener('click', attemptClosePopup);
+  document.getElementById('designPopupDirty').querySelector('.dp-save').addEventListener('click', () => {
+    const iframe = document.getElementById('designPopupIframe');
+    if(iframe) iframe.contentWindow.postMessage({ type: 'trigger-save' }, '*');
+  });
+  document.getElementById('designPopupDirty').querySelector('.dp-continue').addEventListener('click', () => {
+    document.getElementById('designPopupDirty').classList.remove('visible');
+    document.querySelector('.design-popup-title').style.display = '';
+  });
+  document.getElementById('designPopupDirty').querySelector('.dp-discard').addEventListener('click', closeDesignPopup);
+  document.addEventListener('keydown', _handlePopupEsc);
+}
+
+function closeDesignPopup(){
+  const overlay = document.getElementById('designPopupOverlay');
+  if(overlay) overlay.remove();
+  document.removeEventListener('keydown', _handlePopupEsc);
+  _pendingPanelId = null;
+}
+
+function _handlePopupEsc(e){ if(e.key === 'Escape') attemptClosePopup(); }
+
+function attemptClosePopup(){
+  const iframe = document.getElementById('designPopupIframe');
+  if(!iframe){ closeDesignPopup(); return; }
+
+  let _dirtyTimer = setTimeout(closeDesignPopup, 400);
+
+  const _onDirty = e => {
+    if(!e.data || e.data.type !== 'dirty-state') return;
+    clearTimeout(_dirtyTimer);
+    window.removeEventListener('message', _onDirty);
+    if(e.data.isDirty){
+      document.querySelector('.design-popup-title').style.display = 'none';
+      document.getElementById('designPopupDirty').classList.add('visible');
+    } else {
+      closeDesignPopup();
+    }
+  };
+  window.addEventListener('message', _onDirty);
+  iframe.contentWindow.postMessage({ type: 'check-dirty' }, '*');
+}
+
 function renderActivePanels(){
   activeWallSurface.querySelectorAll('.placed-panel').forEach(p=>p.remove());
   const rect = activeWallSurface.getBoundingClientRect();
@@ -1618,9 +1693,11 @@ $('clearBtn').addEventListener('click',()=>{
   }
 });
 
-$('designBtn').addEventListener('click',()=>{
+function saveRoomPlan(){
   try{localStorage.setItem('acousticRoomPlan', JSON.stringify({room:{length:state.roomLength, width:state.roomWidth, height:state.roomHeight}, panels: state.panels}))}catch(err){}
-});
+}
+
+$('designBtn').addEventListener('click', saveRoomPlan);
 
 window.addEventListener('resize',()=>{setTimeout(()=>{sizeWallSurface();renderActivePanels();renderThumbnails()}, 50)});
 
