@@ -1617,6 +1617,35 @@ window.addEventListener('resize',()=>{
     if(currentPanel.image) setTimeout(()=>{ clampImagePosition(); applyImageTransform(); }, 50);
   }
 });
+
+// ============ MODAL MODE ============
+const _urlParams = new URLSearchParams(window.location.search);
+const _isModal = _urlParams.get('modal') === 'true';
+const _modalPanelId = _urlParams.get('panelId');
+const _modalSize = _urlParams.get('size');
+const _modalOrientation = _urlParams.get('orientation') || 'horizontal';
+
+if(_isModal){
+  document.querySelector('nav').style.display = 'none';
+  document.querySelector('.page-header').style.display = 'none';
+  $('doneBtn').innerHTML = '✓ Save Design';
+
+  const _modalSizeCard = document.querySelector(`.size-card[data-size="${_modalSize}"]`);
+  if(_modalSizeCard) _modalSizeCard.click();
+
+  const _modalOrientBtn = document.querySelector(`.orient-btn[data-orient="${_modalOrientation}"]`);
+  if(_modalOrientBtn && !_modalOrientBtn.classList.contains('active')) _modalOrientBtn.click();
+
+  window.addEventListener('message', e => {
+    if(!e.data) return;
+    if(e.data.type === 'check-dirty'){
+      window.parent.postMessage({ type: 'dirty-state', isDirty: !!currentPanel.image }, '*');
+    }
+    if(e.data.type === 'trigger-save'){
+      if(currentPanel.image) $('doneBtn').click();
+    }
+  });
+}
 </script>
 
 </body>
