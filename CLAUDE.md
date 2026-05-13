@@ -154,6 +154,8 @@ _(none)_
 
 - **"Start Another" scroll position** ✓ — Two compounding issues: (1) `updateCart()` expanding the cart section caused a layout reflow after `scrollTo({top:0})` fired, drifting the page down — fixed by wrapping the scroll in `requestAnimationFrame`; (2) sticky nav (56px) overlapped the designer section's top, hiding the orientation toggle — fixed by adding `scroll-margin-top:64px` to `.designer`. (`configurator.html`)
 
+- **"Start Another" hides panel preview** ✓ — `resetCurrentPanel()` removed `active` from `.designer`, collapsing the live preview. Fix: save the current size before reset, then re-click the same size card to reactivate the designer. A `_skipDesignerScroll` flag suppresses `showDesigner()`'s built-in scroll so the page instead lands on `.size-section` (with `scroll-margin-top:64px` for nav clearance). (`configurator.html`)
+
 - **Horizontal logo sizing and background blending** ✓ — Three compounding issues: (1) CSS `height: 32px` too small; (2) `viewBox="0 0 1874.9 750"` had ~258 units of blank margin top/bottom so the actual content (y≈258–492) rendered at only ~10px; (3) Inkscape baked a `<g fill="#fff">` background rect into the SVG which appeared as a white rectangle in the nav (the `style="fill:#f2f2f9"` override was stripped when inlining). Fix: trimmed viewBox to `"0 258 1874.9 234"` (exact content bounds), set nav `padding: 0 32px`, set `height: 56px`, and removed the background rect group and its clipPath def. Applied to all 5 HTML files and the asset SVG.
 
 ---
