@@ -1282,8 +1282,13 @@ $('addMoreBtn').addEventListener('click',()=>{
 
 $('doneBtn').addEventListener('click',()=>{
   if(!currentPanel.image){alert('Upload an image first');return}
-  cart.push(panelToCartItem(currentPanel));
+  const cartItem = panelToCartItem(currentPanel);
+  cart.push(cartItem);
   saveCart();
+  if(_isModal){
+    window.parent.postMessage({ type: 'design-saved', panelId: _modalPanelId, cartItem }, '*');
+    return;
+  }
   updateCart();
   cartSection.classList.add('visible');
   setTimeout(()=>{
