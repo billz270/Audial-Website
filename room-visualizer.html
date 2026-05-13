@@ -219,35 +219,34 @@
   .size-name{font-family:'Archivo Black',sans-serif;font-size:12px;letter-spacing:-0.01em}
   .size-price{font-size:10px;font-weight:700;letter-spacing:0.05em;color:var(--mute);transition:color 0.2s}
 
-  /* DESIGNED STRIP — horizontal scrollable cards below big wall */
-  .designed-strip-wrap{margin-top:18px;border:1.5px solid var(--ink);background:var(--paper)}
-  .designed-strip-header{padding:10px 14px;border-bottom:1.5px solid var(--ink);display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap}
-  .designed-strip-hint{font-size:9.5px;font-weight:500;color:var(--mute);text-transform:uppercase;letter-spacing:0.08em}
-  .designed-strip{display:flex;gap:0;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
-  .designed-strip::-webkit-scrollbar{height:6px}
-  .designed-strip::-webkit-scrollbar-track{background:rgba(9,61,83,0.08)}
-  .designed-strip::-webkit-scrollbar-thumb{background:var(--ink)}
-  .designed-card{flex:0 0 auto;width:170px;border-right:1.5px solid var(--ink);background:var(--paper);cursor:pointer;display:flex;flex-direction:column;font-family:inherit;text-align:left;position:relative;scroll-snap-align:start;transition:background 0.2s;padding:0;color:var(--ink)}
-  .designed-card:last-child{border-right:none}
+  /* DESIGNED GRID — 2×2 paged grid in sidebar */
+  .designs-grid-outer{overflow-x:auto;overflow-y:hidden;display:flex;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;border:1.5px solid var(--ink)}
+  .designs-grid-outer::-webkit-scrollbar{height:4px}
+  .designs-grid-outer::-webkit-scrollbar-track{background:rgba(9,61,83,0.08)}
+  .designs-grid-outer::-webkit-scrollbar-thumb{background:var(--ink)}
+  .designs-page{display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,auto);gap:1.5px;background:var(--ink);width:100%;flex-shrink:0;scroll-snap-align:start}
+  .designed-card{background:var(--paper);cursor:pointer;display:flex;flex-direction:column;font-family:inherit;text-align:left;position:relative;transition:background 0.2s;padding:0;color:var(--ink);border:none}
   .designed-card:hover{background:#EAEAF1}
   .designed-card.active{background:var(--ink);color:var(--paper)}
   .designed-card.depleted{opacity:0.4;pointer-events:none}
-  .designed-card-preview{position:relative;aspect-ratio:1.2;background:#F8F8FA;border-bottom:1.5px solid var(--ink);overflow:hidden;display:flex;align-items:center;justify-content:center;padding:10px}
+  .designed-card-preview{position:relative;aspect-ratio:1.2;background:#F8F8FA;border-bottom:1.5px solid var(--ink);overflow:hidden;display:flex;align-items:center;justify-content:center;padding:8px}
   .designed-card.active .designed-card-preview{background:#0d4a63;border-bottom-color:var(--ink)}
-  .designed-card-thumb{position:relative;overflow:hidden;border:1px solid rgba(9,61,83,0.4);box-shadow:0 4px 10px rgba(0,23,31,0.2)}
+  .designed-card-thumb{position:relative;overflow:hidden;border:1px solid rgba(9,61,83,0.4);box-shadow:0 2px 8px rgba(0,23,31,0.2)}
   .designed-card.active .designed-card-thumb{border-color:rgba(255,255,255,0.3)}
   .designed-card-thumb img{display:block}
-  .designed-card-remaining{position:absolute;top:6px;right:6px;background:var(--accent);color:var(--ink);font-family:'Archivo Black',sans-serif;font-size:11px;padding:2px 7px;letter-spacing:-0.01em;z-index:2;border:1px solid var(--ink);min-width:22px;text-align:center}
-  .designed-card-info{padding:9px 10px 11px;display:flex;flex-direction:column;gap:3px}
-  .designed-card-size{font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:-0.01em}
-  .designed-card-qty{font-size:9.5px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;opacity:0.65}
+  .designed-card-remaining{position:absolute;top:4px;right:4px;background:var(--accent);color:var(--ink);font-family:'Archivo Black',sans-serif;font-size:9px;padding:1px 4px;letter-spacing:-0.01em;z-index:2;border:1px solid var(--ink);min-width:16px;text-align:center}
+  .designed-card-info{padding:6px 7px 8px;display:flex;flex-direction:column;gap:2px}
+  .designed-card-size{font-family:'Archivo Black',sans-serif;font-size:10px;letter-spacing:-0.01em}
+  .designed-card-qty{font-size:8px;font-weight:600;text-transform:uppercase;letter-spacing:0.05em;opacity:0.65}
   .designed-card.active .designed-card-qty{opacity:0.85}
-  .designed-card-finish{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
-  .designed-card-tag{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:2px 6px;border:1px solid currentColor;opacity:0.75}
-  .designed-empty{padding:24px 18px;text-align:center;display:flex;flex-direction:column;gap:10px;align-items:center;width:100%}
-  .designed-empty p{font-size:11.5px;color:var(--mute);font-weight:500}
-  .designed-empty-cta{display:inline-block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink);text-decoration:none;padding:8px 16px;border:1.5px solid var(--ink);background:var(--paper);transition:all 0.2s}
-  .designed-empty-cta:hover{background:var(--ink);color:var(--paper)}
+  .designed-card-finish{display:flex;gap:3px;flex-wrap:wrap;margin-top:2px}
+  .designed-card-tag{font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;padding:1px 4px;border:1px solid currentColor;opacity:0.75}
+  .designs-add-btn{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;background:var(--paper);color:var(--ink);text-decoration:none;cursor:pointer;transition:background 0.2s;min-height:60px;font-family:inherit;border:none;padding:0}
+  .designs-add-btn.full-page{min-height:100px;grid-column:span 2;grid-row:span 2}
+  .designs-add-btn:hover{background:#EAEAF1}
+  .designs-add-icon{font-family:'Archivo Black',sans-serif;font-size:20px;line-height:1}
+  .designs-add-label{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;opacity:0.6}
+  .designs-filler{background:var(--paper)}
 
   .stats{display:flex;flex-direction:column;gap:8px}
   .stat-row{display:flex;justify-content:space-between;align-items:baseline;padding-bottom:7px;border-bottom:1px solid var(--line)}
@@ -441,15 +440,6 @@
       </div>
     </div>
 
-    <!-- DESIGNED PANELS HORIZONTAL STRIP -->
-    <div class="designed-strip-wrap" id="designedStripWrap">
-      <div class="designed-strip-header">
-        <div class="subsection-label" style="margin-bottom:0">Your Designs</div>
-        <div class="designed-strip-hint" id="designedStripHint">Tap a card, then click anywhere on the wall to place</div>
-      </div>
-      <div class="designed-strip" id="designedPanels"></div>
-    </div>
-
     <div class="wall-thumbs" id="wallThumbs"></div>
   </div>
 
@@ -478,6 +468,14 @@
         <button class="size-chip" data-size="4x2" data-w="4" data-h="2" data-price="6500"><span class="size-name">4×2 ft</span><span class="size-price">₹6,500</span></button>
         <button class="size-chip" data-size="1x4" data-w="1" data-h="4" data-price="5500"><span class="size-name">1×4 ft</span><span class="size-price">₹5,500</span></button>
       </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-title">
+        <span>Your Designs</span>
+        <span class="deselect-hint">tap to arm · click wall to place</span>
+      </div>
+      <div class="designs-grid-outer" id="designedPanels"></div>
     </div>
 
     <div class="sidebar-section">
@@ -718,11 +716,17 @@ document.querySelectorAll('.orient-btn').forEach(btn=>{
 function renderDesignedPanels(){
   const container = $('designedPanels');
   container.innerHTML = '';
-  if(state.designedCart.length === 0){
-    container.innerHTML = `<div class="designed-empty"><p>No custom panels designed yet</p><a href="configurator.html" class="designed-empty-cta">Design your first panel →</a></div>`;
-    return;
+  const items = state.designedCart;
+
+  function buildAddBtn(){
+    const btn = document.createElement('a');
+    btn.href = 'configurator.html';
+    btn.className = 'designs-add-btn';
+    btn.innerHTML = `<span class="designs-add-icon">+</span><span class="designs-add-label">Design panel</span>`;
+    return btn;
   }
-  state.designedCart.forEach(panel=>{
+
+  function buildCard(panel){
     const placed = state.panels.filter(p=>p.designedId===panel.id).length;
     const remaining = panel.quantity - placed;
     const card = document.createElement('button');
@@ -730,28 +734,21 @@ function renderDesignedPanels(){
     card.type = 'button';
     if(remaining <= 0) card.classList.add('depleted');
     if(state.selectedDesignedId === panel.id) card.classList.add('active');
-    // Compute display dims: prefer effectiveW/effectiveH if present, else derive
     let dispW, dispH;
     if(typeof panel.effectiveW === 'number' && typeof panel.effectiveH === 'number'){
-      dispW = panel.effectiveW;
-      dispH = panel.effectiveH;
+      dispW = panel.effectiveW; dispH = panel.effectiveH;
     } else if(panel.orientation === 'vertical' && panel.baseW !== panel.baseH){
-      dispW = Math.min(panel.baseW, panel.baseH);
-      dispH = Math.max(panel.baseW, panel.baseH);
+      dispW = Math.min(panel.baseW, panel.baseH); dispH = Math.max(panel.baseW, panel.baseH);
     } else {
-      dispW = Math.max(panel.baseW, panel.baseH);
-      dispH = Math.min(panel.baseW, panel.baseH);
+      dispW = Math.max(panel.baseW, panel.baseH); dispH = Math.min(panel.baseW, panel.baseH);
     }
-    // Thumb sized to fit a ~110px wide × 90px tall preview area, preserving aspect
-    const PREVIEW_MAX_W = 130, PREVIEW_MAX_H = 105;
+    const PREVIEW_MAX_W = 88, PREVIEW_MAX_H = 72;
     const aspect = dispW / dispH;
     let thumbPxW, thumbPxH;
     if(PREVIEW_MAX_W / PREVIEW_MAX_H > aspect){
-      thumbPxH = PREVIEW_MAX_H;
-      thumbPxW = thumbPxH * aspect;
+      thumbPxH = PREVIEW_MAX_H; thumbPxW = thumbPxH * aspect;
     } else {
-      thumbPxW = PREVIEW_MAX_W;
-      thumbPxH = thumbPxW / aspect;
+      thumbPxW = PREVIEW_MAX_W; thumbPxH = thumbPxW / aspect;
     }
     const t = computeArtTransform(panel, thumbPxW, thumbPxH);
     let imgHtml;
@@ -789,8 +786,32 @@ function renderDesignedPanels(){
       renderDesignedPanels();
       updateArmedState();
     });
-    container.appendChild(card);
-  });
+    return card;
+  }
+
+  const addBtn = buildAddBtn();
+  const cardEls = items.map(buildCard);
+  const allEls = [...cardEls, addBtn];
+
+  for(let i = 0; i < allEls.length; i += 4){
+    const pageEls = allEls.slice(i, i + 4);
+    const page = document.createElement('div');
+    page.className = 'designs-page';
+
+    // Add btn alone on this page → span full 2×2
+    if(pageEls.length === 1 && pageEls[0] === addBtn){
+      addBtn.classList.add('full-page');
+    } else {
+      // Fill remaining slots with paper-coloured fillers
+      while(pageEls.length < 4){
+        const f = document.createElement('div');
+        f.className = 'designs-filler';
+        pageEls.push(f);
+      }
+    }
+    pageEls.forEach(el => page.appendChild(el));
+    container.appendChild(page);
+  }
 }
 
 function updateArmedState(){

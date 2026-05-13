@@ -129,8 +129,7 @@ The configurator's `renderCartCardPreview` and the visualizer's `computeArtTrans
 _(none)_
 
 ### Medium Priority
-1. **"Your Designs" positioning (test)** — Explore moving section to right side with default sizes above/below.
-2. **"Your Designs" right border** — Tiles don't have right-hand border; looks incomplete.
+1. **"Your Designs" right border** — Tiles don't have right-hand border; looks incomplete.
 
 ### Design/Brand (future)
 1. **Logo refresh** — Waiting for new logo from designer friend. Current horizontal logo will be replaced.
@@ -141,6 +140,8 @@ _(none)_
 1. **Panel preview sizes** — 1×1 and 2×1 load relatively small by default. Consider enlarging.
 
 ## Resolved bugs
+
+- **"Your Designs" repositioned to sidebar** ✓ — Moved from horizontal scrollable strip below the wall canvas to a 2×2 paged grid in the right sidebar, between "Panel sizes" and "Your plan". Cards fill row-by-row in pages of 4; scrolling snaps one page (2 columns) at a time. Empty state shows a full-page `+` button linking to the configurator. (`room-visualizer.html`, `renderDesignedPanels` + CSS/HTML restructure)
 
 - **Designed panels missing in visualizer** ✓ — Root cause: raw base64 images (4–8 MB each) silently exceeded localStorage's 5 MB cap; `saveCart()` swallowed the `QuotaExceededError` with an empty catch. Fix: compress images to max 1200px / JPEG 0.82 on upload (~200 KB each), and surface the error to the user if quota is ever hit again. (`configurator.html`, `handleImageUpload` + `saveCart`)
 
