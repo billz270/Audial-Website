@@ -141,6 +141,8 @@ _(none)_
 
 ## Resolved bugs
 
+- **"Add Design" on default wall panels** ✓ — Hovering a default panel reveals an "Add Design" button. Clicking opens a floating configurator popup (blurred backdrop, no dimming) with the panel's size and orientation pre-selected. On Save, the artwork is merged directly onto the wall panel and the design is added to "Your Designs". Closing without saving prompts Save / Continue Editing / Discard if an image was uploaded. Also fixed: default panels placed from size chips were missing an `orientation` field, causing the popup to always default to horizontal. (`room-visualizer.html` + `configurator.html`)
+
 - **"Your Designs" repositioned to sidebar** ✓ — Moved from horizontal scrollable strip below the wall canvas to a 2×2 paged grid in the right sidebar, between "Panel sizes" and "Your plan". Cards fill row-by-row in pages of 4; scrolling snaps one page (2 columns) at a time. Empty state shows a full-page `+` button linking to the configurator. (`room-visualizer.html`, `renderDesignedPanels` + CSS/HTML restructure)
 
 - **Designed panels missing in visualizer** ✓ — Root cause: raw base64 images (4–8 MB each) silently exceeded localStorage's 5 MB cap; `saveCart()` swallowed the `QuotaExceededError` with an empty catch. Fix: compress images to max 1200px / JPEG 0.82 on upload (~200 KB each), and surface the error to the user if quota is ever hit again. (`configurator.html`, `handleImageUpload` + `saveCart`)
