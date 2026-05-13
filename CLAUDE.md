@@ -129,9 +129,8 @@ The configurator's `renderCartCardPreview` and the visualizer's `computeArtTrans
 _(none)_
 
 ### Medium Priority
-1. **"Your Panels" tile sizing glitch** — 4×2 vertical cards have proper buttons, smaller ones have empty space underneath.
-2. **"Your Designs" positioning (test)** — Explore moving section to right side with default sizes above/below.
-4. **"Your Designs" right border** — Tiles don't have right-hand border; looks incomplete.
+1. **"Your Designs" positioning (test)** — Explore moving section to right side with default sizes above/below.
+2. **"Your Designs" right border** — Tiles don't have right-hand border; looks incomplete.
 
 ### Design/Brand (future)
 1. **Logo refresh** — Waiting for new logo from designer friend. Current horizontal logo will be replaced.
@@ -154,6 +153,8 @@ _(none)_
 - **"Start Another" scroll position** ✓ — Two compounding issues: (1) `updateCart()` expanding the cart section caused a layout reflow after `scrollTo({top:0})` fired, drifting the page down — fixed by wrapping the scroll in `requestAnimationFrame`; (2) sticky nav (56px) overlapped the designer section's top, hiding the orientation toggle — fixed by adding `scroll-margin-top:64px` to `.designer`. (`configurator.html`)
 
 - **"Start Another" hides panel preview** ✓ — `resetCurrentPanel()` removed `active` from `.designer`, collapsing the live preview. Fix: save the current size before reset, then re-click the same size card to reactivate the designer. A `_skipDesignerScroll` flag suppresses `showDesigner()`'s built-in scroll so the page instead lands on `.size-section` (with `scroll-margin-top:64px` for nav clearance). (`configurator.html`)
+
+- **"Your Panels" tile sizing glitch** ✓ — Root cause: `min-height: 180px` on `.cart-preview` let the 4×2 vertical tile (160px 3D content + 36px padding = 196px) grow taller than all other tiles (clamped at 180px), causing the flex row to stretch shorter cards 16px extra with no mechanism to pin the buttons to the bottom. Fix: replaced `min-height: 180px` with fixed `height: 196px` so all tiles share the same dividing border; added `margin-top: auto` to `.cart-actions-row` to pin Edit/Remove to the card bottom; removed the quantity +/− bar entirely. (`configurator.html`, `.cart-preview`, `.cart-actions-row`)
 
 - **"Your Panels" tile click to preview** ✓ — Clicking the image preview area of a saved tile now loads it into the live 3D viewer without removing it from "Your Panels", so designs can be browsed freely. The panel stays in the cart; only the Edit button removes and opens for editing. (`configurator.html`, `updateCart` click handler on `.cart-preview`)
 
