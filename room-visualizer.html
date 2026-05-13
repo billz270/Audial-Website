@@ -176,6 +176,25 @@
   .placed-panel .remove-btn{position:absolute;top:-8px;right:-8px;width:22px;height:22px;background:var(--paper);color:var(--ink);border:1.5px solid var(--ink);font-size:12px;font-weight:700;cursor:pointer;display:none;align-items:center;justify-content:center;z-index:2;border-radius:50%}
   .placed-panel:hover .remove-btn,.placed-panel.selected .remove-btn{display:flex}
   .placed-panel .remove-btn:hover{background:#C03020;color:var(--paper);border-color:#C03020}
+  .placed-panel .add-design-btn{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);padding:4px 10px;background:var(--ink);color:var(--paper);border:1.5px solid var(--paper);font-family:'Archivo Black',sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:0.08em;cursor:pointer;white-space:nowrap;opacity:0;transition:opacity 0.15s;pointer-events:none;z-index:2}
+  .placed-panel:hover .add-design-btn{opacity:1;pointer-events:auto}
+
+  /* Design popup */
+  .design-popup-overlay{position:fixed;inset:0;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);z-index:1000;display:flex;align-items:center;justify-content:center}
+  .design-popup-card{width:min(900px,95vw);height:min(650px,95vh);background:var(--paper);border:1.5px solid var(--ink);box-shadow:0 8px 40px rgba(0,23,31,0.35);display:flex;flex-direction:column;overflow:hidden}
+  .design-popup-header{display:flex;align-items:center;justify-content:space-between;padding:0 16px;height:44px;border-bottom:1.5px solid var(--ink);flex-shrink:0;gap:12px}
+  .design-popup-title{font-family:'Archivo Black',sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .design-popup-close{width:32px;height:32px;background:none;border:1.5px solid var(--ink);color:var(--ink);font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .design-popup-close:hover{background:var(--ink);color:var(--paper)}
+  .design-popup-iframe{flex:1;border:none;min-height:0}
+  .design-popup-dirty{display:none;align-items:center;gap:6px;flex-shrink:0}
+  .design-popup-dirty.visible{display:flex}
+  .design-popup-dirty button{padding:4px 10px;font-family:inherit;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;border:1.5px solid var(--ink);cursor:pointer;background:var(--paper);color:var(--ink)}
+  .design-popup-dirty .dp-save{background:var(--ink);color:var(--paper)}
+  .design-popup-dirty .dp-save:hover{background:var(--accent);border-color:var(--accent);color:var(--ink)}
+  .design-popup-dirty .dp-continue:hover{background:var(--ink);color:var(--paper)}
+  .design-popup-dirty .dp-discard{color:#C03020;border-color:#C03020}
+  .design-popup-dirty .dp-discard:hover{background:#C03020;color:var(--paper)}
 
   /* Marquee selection box */
   .marquee-box{position:absolute;border:1.5px dashed var(--ink);background:rgba(9,61,83,0.10);pointer-events:none;z-index:30}
