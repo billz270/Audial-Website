@@ -899,6 +899,14 @@ function getWallPxPerFt(){
 }
 
 activeWallSurface.addEventListener('pointerdown', e => {
+  const addDesignBtn = e.target.closest('[data-add-design]');
+  if(addDesignBtn){
+    const panelId = addDesignBtn.dataset.addDesign;
+    const panel = state.panels.find(p => String(p.id) === String(panelId));
+    if(panel) openDesignPopup(panel);
+    return;
+  }
+
   if(e.target.dataset.remove){
     const id = e.target.dataset.remove;
     state.panels = state.panels.filter(p=>String(p.id) !== id);
@@ -1498,7 +1506,7 @@ function renderActivePanels(){
         el.innerHTML = `<img src="${panel.image}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover"><button class="remove-btn" data-remove="${panel.id}">×</button><span class="panel-label">${panel.size}</span>`;
       }
     } else {
-      el.innerHTML = `${panel.size}<button class="remove-btn" data-remove="${panel.id}">×</button>`;
+      el.innerHTML = `${panel.size}<button class="remove-btn" data-remove="${panel.id}">×</button><button class="add-design-btn" data-add-design="${panel.id}">+ Add Design</button>`;
     }
     activeWallSurface.appendChild(el);
   });
