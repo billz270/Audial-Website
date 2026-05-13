@@ -247,7 +247,8 @@
   .cart-strip::-webkit-scrollbar-thumb{background:var(--ink)}
 
   .cart-item{flex:0 0 220px;border:1.5px solid var(--ink);background:var(--paper);display:flex;flex-direction:column;position:relative;scroll-snap-align:start}
-  .cart-preview{width:100%;min-height:180px;padding:18px;display:flex;align-items:center;justify-content:center;perspective:800px;background:var(--paper);border-bottom:1.5px solid var(--ink);overflow:hidden}
+  .cart-preview{width:100%;min-height:180px;padding:18px;display:flex;align-items:center;justify-content:center;perspective:800px;background:var(--paper);border-bottom:1.5px solid var(--ink);overflow:hidden;cursor:pointer;transition:opacity 0.15s}
+  .cart-preview:hover{opacity:0.82}
   .cart-3d{transform-style:preserve-3d;transform:rotateY(-14deg) rotateX(6deg);position:relative}
   .cart-face{width:100%;height:100%;background:#FAFAF8;border:1.5px solid var(--ink);overflow:hidden;position:relative}
   .cart-face.has-image{background:transparent}
