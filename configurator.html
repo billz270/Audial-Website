@@ -615,6 +615,19 @@
   </div>
 </div>
 
+<div class="consult-modal" id="wipModal" aria-hidden="true">
+  <div class="consult-backdrop" id="wipBackdrop"></div>
+  <div class="consult-panel" style="max-width:400px">
+    <div class="consult-label">◆ Unsaved design</div>
+    <h3>Save before <span class="consult-accent">switching?</span></h3>
+    <p class="consult-desc">You have a design in progress. Save it to your panels first, or discard it and load the selected one.</p>
+    <div class="consult-actions">
+      <button type="button" class="consult-btn ghost" id="wipDiscard">Discard</button>
+      <button type="button" class="consult-btn primary" id="wipSave">Save &amp; switch →</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============ CONSULT MODAL ============
 const consultModal = document.getElementById('consultModal');
