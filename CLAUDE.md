@@ -129,9 +129,8 @@ The configurator's `renderCartCardPreview` and the visualizer's `computeArtTrans
 _(none)_
 
 ### Medium Priority
-1. **"Your Panels" interaction** — Can't click tiles to view in preview; must click Edit to see again.
-2. **"Your Panels" tile sizing glitch** — 4×2 vertical cards have proper buttons, smaller ones have empty space underneath.
-3. **"Your Designs" positioning (test)** — Explore moving section to right side with default sizes above/below.
+1. **"Your Panels" tile sizing glitch** — 4×2 vertical cards have proper buttons, smaller ones have empty space underneath.
+2. **"Your Designs" positioning (test)** — Explore moving section to right side with default sizes above/below.
 4. **"Your Designs" right border** — Tiles don't have right-hand border; looks incomplete.
 
 ### Design/Brand (future)
@@ -155,6 +154,8 @@ _(none)_
 - **"Start Another" scroll position** ✓ — Two compounding issues: (1) `updateCart()` expanding the cart section caused a layout reflow after `scrollTo({top:0})` fired, drifting the page down — fixed by wrapping the scroll in `requestAnimationFrame`; (2) sticky nav (56px) overlapped the designer section's top, hiding the orientation toggle — fixed by adding `scroll-margin-top:64px` to `.designer`. (`configurator.html`)
 
 - **"Start Another" hides panel preview** ✓ — `resetCurrentPanel()` removed `active` from `.designer`, collapsing the live preview. Fix: save the current size before reset, then re-click the same size card to reactivate the designer. A `_skipDesignerScroll` flag suppresses `showDesigner()`'s built-in scroll so the page instead lands on `.size-section` (with `scroll-margin-top:64px` for nav clearance). (`configurator.html`)
+
+- **"Your Panels" tile click to preview** ✓ — Clicking the image preview area of a saved tile now loads it into the live 3D viewer without removing it from "Your Panels", so designs can be browsed freely. The panel stays in the cart; only the Edit button removes and opens for editing. (`configurator.html`, `updateCart` click handler on `.cart-preview`)
 
 - **Horizontal logo sizing and background blending** ✓ — Three compounding issues: (1) CSS `height: 32px` too small; (2) `viewBox="0 0 1874.9 750"` had ~258 units of blank margin top/bottom so the actual content (y≈258–492) rendered at only ~10px; (3) Inkscape baked a `<g fill="#fff">` background rect into the SVG which appeared as a white rectangle in the nav (the `style="fill:#f2f2f9"` override was stripped when inlining). Fix: trimmed viewBox to `"0 258 1874.9 234"` (exact content bounds), set nav `padding: 0 32px`, set `height: 56px`, and removed the background rect group and its clipPath def. Applied to all 5 HTML files and the asset SVG.
 
