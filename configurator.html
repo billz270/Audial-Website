@@ -633,7 +633,12 @@
 const consultModal = document.getElementById('consultModal');
 document.querySelectorAll('[data-open-consult]').forEach(el => el.addEventListener('click', e => { e.preventDefault(); consultModal.classList.add('open'); document.body.classList.add('modal-open'); }));
 document.querySelectorAll('[data-close-consult]').forEach(el => el.addEventListener('click', () => { consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }));
-document.addEventListener('keydown', e => { if(e.key==='Escape' && consultModal.classList.contains('open')){ consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }});
+document.addEventListener('keydown', e => {
+  if(e.key==='Escape'){
+    if(consultModal.classList.contains('open')){ consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }
+    if(wipModal.classList.contains('open')){ closeWipModal(); }
+  }
+});
 document.getElementById('consultForm').addEventListener('submit', e => {
   e.preventDefault();
   const fd = new FormData(e.target);
@@ -1593,6 +1598,59 @@ function loadPanelToEditor(panel){
   $('dpiEstimate').textContent = dpi;
   enablePanMode();
 }
+
+// ============ TILE PREVIEW CLICK ============
+const wipModal = document.getElementById('wipModal');
+const wipBackdrop = document.getElementById('wipBackdrop');
+let _wipTargetIdx = null;
+
+function openWipModal(idx){
+  _wipTargetIdx = idx;
+  wipModal.classList.add('open');
+  wipModal.setAttribute('aria-hidden','false');
+  document.body.classList.add('modal-open');
+}
+
+function closeWipModal(){
+  wipModal.classList.remove('open');
+  wipModal.setAttribute('aria-hidden','true');
+  document.body.classList.remove('modal-open');
+  _wipTargetIdx = null;
+}
+
+function execPanelSwitch(idx){
+  const panel = cart[idx];
+  loadPanelToEditor(panel);
+  cart.splice(idx,1);
+  cartSection.classList.remove('visible');
+  saveCart();
+  updateCart();
+  requestAnimationFrame(()=>designer.scrollIntoView({behavior:'smooth',block:'start'}));
+}
+
+function triggerPanelSwitch(idx){
+  if(currentPanel.image){
+    openWipModal(idx);
+  } else {
+    execPanelSwitch(idx);
+  }
+}
+
+wipBackdrop.addEventListener('click', closeWipModal);
+
+document.getElementById('wipDiscard').addEventListener('click', ()=>{
+  const idx = _wipTargetIdx;
+  closeWipModal();
+  execPanelSwitch(idx);
+});
+
+document.getElementById('wipSave').addEventListener('click', ()=>{
+  const targetPanel = cart[_wipTargetIdx];
+  cart.push(panelToCartItem(currentPanel));
+  const newIdx = cart.indexOf(targetPanel);
+  closeWipModal();
+  execPanelSwitch(newIdx);
+});
 
 function saveCart(){
   try{localStorage.setItem('acousticCart', JSON.stringify(cart))}catch(e){alert('Could not save — browser storage is full. Try removing some panels.');}
