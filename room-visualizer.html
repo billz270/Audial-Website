@@ -410,17 +410,17 @@
       <div class="dim-row">
         <div class="dim-field">
           <div class="dim-label">Length</div>
-          <div class="dim-input"><input type="number" id="lengthInput" value="14" min="6" max="40"><span class="dim-unit">ft</span></div>
+          <div class="dim-input"><input type="number" id="lengthInput" value="14" min="6" max="40" step="0.1"><span class="dim-unit">ft</span></div>
         </div>
         <div class="dim-field">
           <div class="dim-label">Width</div>
-          <div class="dim-input"><input type="number" id="widthInput" value="12" min="6" max="40"><span class="dim-unit">ft</span></div>
+          <div class="dim-input"><input type="number" id="widthInput" value="12" min="6" max="40" step="0.1"><span class="dim-unit">ft</span></div>
         </div>
       </div>
       <div class="dim-row">
         <div class="dim-field">
           <div class="dim-label">Wall Height</div>
-          <div class="dim-input"><input type="number" id="heightInput" value="10" min="7" max="14"><span class="dim-unit">ft</span></div>
+          <div class="dim-input"><input type="number" id="heightInput" value="10" min="7" max="14" step="0.1"><span class="dim-unit">ft</span></div>
         </div>
         <div class="dim-field">
           <div class="dim-label">Total Wall Area</div>
@@ -650,10 +650,10 @@ function getWallDimensionsFt(wall){
 }
 
 function updateDimensions(){
-  state.roomLength = Math.max(6, parseInt(lengthInput.value)||14);
-  state.roomWidth = Math.max(6, parseInt(widthInput.value)||12);
-  state.roomHeight = Math.max(7, parseInt(heightInput.value)||10);
-  const area = 2*(state.roomLength + state.roomWidth)*state.roomHeight;
+  state.roomLength = Math.max(6, Math.round((parseFloat(lengthInput.value)||14)*10)/10);
+  state.roomWidth = Math.max(6, Math.round((parseFloat(widthInput.value)||12)*10)/10);
+  state.roomHeight = Math.max(7, Math.round((parseFloat(heightInput.value)||10)*10)/10);
+  const area = Math.round(2*(state.roomLength + state.roomWidth)*state.roomHeight * 10) / 10;
   totalAreaEl.textContent = area;
   refreshActiveWall();
   renderThumbnails();

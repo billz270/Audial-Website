@@ -129,7 +129,7 @@ The configurator's `renderCartCardPreview` and the visualizer's `computeArtTrans
 _(none)_
 
 ### Medium Priority
-1. **Room Visualizer Dimensions** - -	Allow the user to enter decimal numbers, upto single decimals.
+_(none)_
 
 ### Design/Brand (future)
 1. **Logo refresh** — Waiting for new logo from designer friend. Current horizontal logo will be replaced.
@@ -138,6 +138,8 @@ _(none)_
 
 
 ## Resolved bugs
+
+- **Room visualizer decimal dimensions** ✓ — "Enter Exact Dimensions" inputs now accept one decimal place (e.g. 8.7 ft). Added `step="0.1"` to all three inputs; switched `parseInt` → `parseFloat` + `Math.round(...*10)/10` in `updateDimensions` so typed decimals are preserved. Total wall area also rounds to 1 decimal. (`room-visualizer.html`)
 
 - **"Add Design" on default wall panels** ✓ — Hovering a default panel reveals an "Add Design" button. Clicking opens a floating configurator popup (blurred backdrop, no dimming) with the panel's size and orientation pre-selected. On Save, the artwork is merged directly onto the wall panel and the design is added to "Your Designs". Closing without saving prompts Save / Continue Editing / Discard if an image was uploaded. Also fixed: default panels placed from size chips were missing an `orientation` field, causing the popup to always default to horizontal. (`room-visualizer.html` + `configurator.html`)
 
