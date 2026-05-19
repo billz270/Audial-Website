@@ -139,6 +139,8 @@ _(none)_
 
 ## Resolved bugs
 
+- **Mouse-driven wall resize** ✓ — Hovering near any of the 4 edges of the active wall surface shows a directional resize cursor (`ns-resize` top/bottom, `ew-resize` left/right) and a floating readout (e.g. `10.0 ft`). Dragging adjusts the room dimension in 0.1 ft steps (Shift = 0.5 ft), syncs the "Enter Exact Dimensions" input fields live, and respects min/max limits (width/length 6–40 ft, height 7–14 ft). Implementation: 4 invisible `.resize-handle` overlay divs straddling each wall edge, repositioned by `updateResizeHandles()` after every `sizeWallSurface()` call; drag math anchored to start px/ft ratio so precision stays linear. (`room-visualizer.html`, `createResizeHandles`, `updateResizeHandles`, `bigWallScene` pointer events)
+
 - **"Your Designs" persistent add tile** ✓ — Empty state now shows 1 "+" tile in the first slot of the 2×2 grid (3 filler cells alongside it) instead of a full-grid spanning block. The add button and fillers use the same two-section structure (`.designed-card-preview` + `.designed-card-info`) as real design cards so all tiles are the same height. (`room-visualizer.html`, `renderDesignedPanels`, `.designs-add-btn`, `.designs-filler`)
 
 - **Room visualizer decimal dimensions** ✓ — "Enter Exact Dimensions" inputs now accept one decimal place (e.g. 8.7 ft). Added `step="0.1"` to all three inputs; switched `parseInt` → `parseFloat` + `Math.round(...*10)/10` in `updateDimensions` so typed decimals are preserved. Total wall area also rounds to 1 decimal. (`room-visualizer.html`)
