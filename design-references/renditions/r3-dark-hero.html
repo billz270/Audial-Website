@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ahata — R3: Dark Hero</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+@font-face{font-family:'Bicubik';src:url('../fonts/bicubik-font/Bicubik-71qR.otf') format('opentype')}
+:root{--ink:#1c1c1d;--accent:#434c56;--paper:#f8f8f8;--mute:rgba(28,28,29,0.42);--line:rgba(28,28,29,0.1);--dim:#5e6874}
+*{margin:0;padding:0;box-sizing:border-box}
+html{background:#f8f8f8}
+body{font-family:'Archivo',sans-serif;background:#f8f8f8;color:#1c1c1d;max-width:1320px;margin:0 auto;overflow-x:hidden}
+
+/* ── NAV — white, floats above dark hero ── */
+nav{position:sticky;top:0;display:flex;justify-content:space-between;align-items:center;padding:0 32px;height:56px;border-bottom:1px solid #1c1c1d;background:#f8f8f8;z-index:100}
+.logo{font-family:'Archivo Black',sans-serif;font-size:20px;letter-spacing:-0.03em;text-transform:uppercase;text-decoration:none;color:#1c1c1d;display:flex;align-items:center;gap:4px}
+.logo span{color:var(--accent);font-size:9px}
+.nav-links{display:flex;gap:28px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em}
+.nav-links a{color:#1c1c1d;text-decoration:none;opacity:.7;transition:opacity .2s}
+.nav-links a:hover{opacity:1}
+
+/* ── HERO — full dark section with tile + text-protecting gradient ── */
+.hero{
+  display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;
+  padding:56px 40px 72px;border-bottom:1px solid rgba(255,255,255,0.08);
+  background:#1c1c1d;position:relative;overflow:hidden;color:#fff;
+}
+.hero-tile{position:absolute;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+/* Gradient: opaque dark on text side, fades to transparent toward showcase */
+.hero-fade{
+  position:absolute;inset:0;z-index:1;pointer-events:none;
+  background:linear-gradient(to right, rgba(28,28,29,1) 0%, rgba(28,28,29,0.92) 38%, rgba(28,28,29,0.55) 58%, transparent 100%);
+}
+.hero-left{position:relative;z-index:2}
+.hero-right{position:relative;z-index:2}
+
+.eyebrow{font-family:'Bicubik','Archivo',sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:0.22em;color:rgba(255,255,255,0.36);margin-bottom:20px;display:flex;align-items:center;gap:10px}
+.eyebrow::before{content:'';width:28px;height:1px;background:var(--accent)}
+h1{font-family:'Archivo Black',sans-serif;font-size:clamp(50px,8.5vw,128px);line-height:0.86;letter-spacing:-0.04em;text-transform:uppercase;margin-bottom:22px}
+.hero-desc{font-size:15px;line-height:1.6;max-width:460px;margin-bottom:22px;color:rgba(255,255,255,0.62)}
+.hero-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:26px}
+.tag{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;padding:4px 8px;border:1px solid rgba(255,255,255,0.14);color:rgba(255,255,255,0.4)}
+.cta-row{display:flex;border:1px solid rgba(255,255,255,0.22);max-width:420px}
+.btn{padding:14px 20px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;text-decoration:none;flex:1;text-align:center;border-right:1px solid rgba(255,255,255,0.22);transition:background .2s,color .2s;font-family:inherit;cursor:pointer;border-top:none;border-bottom:none;border-left:none}
+.btn:last-child{border-right:none}
+.btn.primary{background:#f8f8f8;color:#1c1c1d}
+.btn.primary:hover{background:var(--accent);color:#fff}
+.btn.sec{background:transparent;color:rgba(255,255,255,0.7)}
+.btn.sec:hover{background:rgba(255,255,255,0.07);color:#fff}
+
+/* ── HERO SHOWCASE — pencil borders on ghosted panels ── */
+.showcase-wrap{position:relative}
+.showcase{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(4,1fr);gap:4px;aspect-ratio:1.75;max-width:560px;margin-left:auto}
+.pm{position:relative;overflow:hidden;background:rgba(255,255,255,0.03)}
+.pm svg{display:block;width:100%;height:100%}
+.pm .lbl{position:absolute;left:6px;bottom:5px;font-size:6.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.07em;color:rgba(255,255,255,0.28);z-index:2}
+.pm-4x2{grid-column:1/5;grid-row:1/3}.pm-2x2a{grid-column:5/7;grid-row:1/3}
+.pm-1x4{grid-column:7/8;grid-row:1/5}.pm-2x2b{grid-column:1/3;grid-row:3/5}
+.pm-2x1a{grid-column:3/5;grid-row:3/4}.pm-2x1b{grid-column:5/7;grid-row:3/4}
+.pm-1x1a{grid-column:3/4;grid-row:4/5}.pm-1x1b{grid-column:4/5;grid-row:4/5}
+.pm-1x1c{grid-column:5/6;grid-row:4/5}.pm-1x1d{grid-column:6/7;grid-row:4/5}
+
+/* Blueprint annotations on showcase */
+.annot-h{display:flex;align-items:center;margin-top:8px;width:calc(100% * 4/7 - 3px)}
+.al{flex:1;height:1px;background:var(--dim);position:relative}
+.al::before,.al::after{content:'';position:absolute;top:-4px;width:1px;height:9px;background:var(--dim)}
+.al::before{left:0}.al::after{right:0}
+.albl{font-family:'Bicubik','Archivo',monospace;font-size:7.5px;letter-spacing:0.1em;color:var(--dim);padding:0 8px;text-transform:uppercase;white-space:nowrap}
+
+/* ── PROCESS — white section ── */
+.process{padding:56px 40px;border-bottom:1px solid #1c1c1d}
+.sec-hdr{display:grid;grid-template-columns:1fr 2fr;gap:40px;margin-bottom:26px;align-items:end}
+.sec-eye{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;color:var(--mute);display:flex;align-items:center;gap:10px}
+.sec-eye::before{content:'';width:28px;height:1px;background:var(--accent)}
+.sec-title{font-family:'Archivo Black',sans-serif;font-size:clamp(22px,3vw,38px);line-height:0.95;letter-spacing:-0.03em;text-transform:uppercase}
+.step-grid{display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #1c1c1d;overflow:hidden}
+.step-card{position:relative;overflow:hidden;border-right:1px solid #1c1c1d;text-decoration:none;color:#1c1c1d;font:inherit;cursor:pointer;border-top:none;border-bottom:none;border-left:none;padding:0;display:block}
+.step-card:last-child{border-right:none}
+.step-card::before{content:'';position:absolute;inset:0;background:#1c1c1d;transform:translateY(101%);transition:transform 0.42s cubic-bezier(0.65,0,0.35,1);z-index:0}
+.step-card:hover::before{transform:translateY(0)}
+.card-body{position:relative;z-index:1;padding:16px 14px 18px;display:flex;flex-direction:column;justify-content:space-between;gap:14px;min-height:110px}
+.step-top{display:flex;justify-content:space-between;align-items:center}
+.step-n{font-family:'Archivo Black',sans-serif;font-size:17px;color:var(--accent);transition:color .3s}
+.step-card:hover .step-n{color:rgba(255,255,255,0.4)}
+.step-ico{width:26px;height:26px;border:1px solid #1c1c1d;display:flex;align-items:center;justify-content:center;transition:border-color .3s}
+.step-card:hover .step-ico{border-color:rgba(255,255,255,0.3)}
+.step-ico svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+.step-card h3{font-family:'Archivo Black',sans-serif;font-size:11px;text-transform:uppercase;letter-spacing:-0.01em;margin-bottom:3px;transition:color .3s}
+.step-card p{font-size:10px;line-height:1.45;opacity:.6;transition:opacity .3s}
+.step-card:hover h3,.step-card:hover p{color:#f8f8f8}
+.step-card:hover p{opacity:.7}
+
+/* ── WHY ── */
+.why{padding:56px 40px;border-bottom:1px solid #1c1c1d}
+.why-title{font-family:'Archivo Black',sans-serif;font-size:clamp(22px,3vw,38px);line-height:0.95;letter-spacing:-0.03em;text-transform:uppercase;margin-top:12px;max-width:820px}
+.why-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1px solid #1c1c1d;margin-top:28px}
+.why-card{padding:24px 20px;border-right:1px solid #1c1c1d}
+.why-card:last-child{border-right:none}
+.why-n{font-size:9px;font-weight:700;letter-spacing:0.12em;color:var(--accent);margin-bottom:10px;text-transform:uppercase}
+.why-card h4{font-family:'Archivo Black',sans-serif;font-size:13px;text-transform:uppercase;letter-spacing:-0.01em;margin-bottom:8px}
+.why-card p{font-size:11.5px;line-height:1.58;opacity:.68}
+
+/* ── CTA + FOOTER — dark bookend matches hero ── */
+.cta-strip{position:relative;padding:80px 40px;text-align:center;overflow:hidden;min-height:220px;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#1c1c1d;color:#fff;border-bottom:1px solid rgba(255,255,255,0.08)}
+.tile-bg{position:absolute;inset:0;z-index:0;overflow:hidden}
+.cta-inner{position:relative;z-index:2}
+.cta-strip h2{font-family:'Archivo Black',sans-serif;font-size:clamp(30px,5vw,68px);line-height:0.9;letter-spacing:-0.03em;text-transform:uppercase;margin-bottom:26px}
+.cta-strip h2 .dim{color:rgba(255,255,255,0.35)}
+.big-btn{display:inline-block;padding:14px 32px;background:#f8f8f8;color:#1c1c1d;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;text-decoration:none;border:1px solid #f8f8f8;transition:all .2s;margin:0 5px 8px;font-family:inherit;cursor:pointer}
+.big-btn:hover{background:transparent;color:#f8f8f8}
+.big-btn.ghost{background:transparent;color:rgba(255,255,255,0.68);border-color:rgba(255,255,255,0.24)}
+.big-btn.ghost:hover{background:#f8f8f8;color:#1c1c1d;border-color:#f8f8f8}
+
+footer{padding:52px 40px 26px;display:grid;grid-template-columns:2fr 1fr 1fr 1fr;gap:44px;background:#1c1c1d;border-top:1px solid rgba(255,255,255,0.08)}
+.fb-name{font-family:'Archivo Black',sans-serif;font-size:32px;letter-spacing:-0.03em;text-transform:uppercase;margin-bottom:10px;color:#fff}
+.fb-name em{color:var(--accent);font-style:normal}
+.fb p{font-size:11.5px;color:rgba(255,255,255,0.38);max-width:250px;line-height:1.6}
+.fc h4{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.14em;margin-bottom:14px;color:rgba(255,255,255,0.22)}
+.fc a{display:block;font-size:12px;color:rgba(255,255,255,0.42);text-decoration:none;margin-bottom:8px;transition:color .2s}
+.fc a:hover{color:#fff}
+.foot-btm{grid-column:1/-1;padding-top:22px;margin-top:22px;border-top:1px solid rgba(255,255,255,0.08);display:flex;justify-content:space-between;font-size:9.5px;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.2)}
+</style>
+</head>
+<body>
+
+<svg style="position:absolute;width:0;height:0;overflow:hidden" aria-hidden="true">
+<defs>
+<filter id="pe" x="-10%" y="-10%" width="120%" height="120%">
+  <feTurbulence type="fractalNoise" baseFrequency="0.065 0.055" numOctaves="3" seed="12" result="noise"/>
+  <feDisplacementMap in="SourceGraphic" in2="noise" scale="2.5" xChannelSelector="R" yChannelSelector="G"/>
+</filter>
+</defs>
+</svg>
+
+<nav>
+  <a href="#" class="logo">Ahata <span>◆</span></a>
+  <div class="nav-links">
+    <a href="#">Design</a><a href="#">Visualize</a><a href="#">How It Works</a>
+    <a href="#">Consult</a><a href="#">About</a>
+  </div>
+</nav>
+
+<!-- Full dark hero with tile texture + text-side gradient -->
+<section class="hero">
+  <div class="hero-tile" id="heroTile"></div>
+  <div class="hero-fade"></div>
+
+  <div class="hero-left">
+    <div class="eyebrow">Listening spaces · Reimagined</div>
+    <h1>SOUND<br>AS<br>ART.</h1>
+    <p class="hero-desc">Hand-built acoustic panels that carry your artwork. For studios, theaters, and rooms that deserve better than foam.</p>
+    <div class="hero-tags">
+      <span class="tag">Rockwool Density</span><span class="tag">Pine Frame</span>
+      <span class="tag">Custom Print</span><span class="tag">7-Day Build</span><span class="tag">Hand Made</span>
+    </div>
+    <div class="cta-row">
+      <a href="#" class="btn primary">Design Panels</a>
+      <a href="#" class="btn sec">Visualize Space</a>
+    </div>
+  </div>
+
+  <div class="hero-right">
+    <div class="showcase-wrap">
+      <div class="showcase">
+        <!-- Ghost panels with pencil borders — tile pattern visible behind them -->
+        <div class="pm pm-4x2">
+          <svg viewBox="0 0 200 100" preserveAspectRatio="xMidYMid slice">
+            <rect width="200" height="100" fill="rgba(255,255,255,0.04)"/>
+            <rect x="0.5" y="0.5" width="199" height="99" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.4" filter="url(#pe)"/>
+          </svg>
+          <span class="lbl">4×2 ft</span>
+        </div>
+        <div class="pm pm-2x2a">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+            <rect width="100" height="100" fill="rgba(255,255,255,0.03)"/>
+            <rect x="0.5" y="0.5" width="99" height="99" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.4" filter="url(#pe)"/>
+          </svg>
+          <span class="lbl">2×2 ft</span>
+        </div>
+        <div class="pm pm-1x4">
+          <svg viewBox="0 0 50 200" preserveAspectRatio="xMidYMid slice">
+            <rect width="50" height="200" fill="rgba(255,255,255,0.03)"/>
+            <rect x="0.5" y="0.5" width="49" height="199" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.4" filter="url(#pe)"/>
+          </svg>
+          <span class="lbl">1×4 ft</span>
+        </div>
+        <div class="pm pm-2x2b">
+          <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice">
+            <rect width="100" height="100" fill="rgba(255,255,255,0.03)"/>
+            <rect x="0.5" y="0.5" width="99" height="99" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.4" filter="url(#pe)"/>
+          </svg>
+          <span class="lbl">2×2 ft</span>
+        </div>
+        <div class="pm pm-2x1a">
+          <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid slice">
+            <rect width="100" height="50" fill="rgba(255,255,255,0.03)"/>
+            <rect x="0.5" y="0.5" width="99" height="49" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.4" filter="url(#pe)"/>
+          </svg>
+          <span class="lbl">2×1 ft</span>
+        </div>
+        <div class="pm pm-2x1b">
+          <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid slice">
+            <rect width="100" height="50" fill="rgba(255,255,255,0.03)"/>
+            <rect x="0.5" y="0.5" width="99" height="49" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.4" filter="url(#pe)"/>
+          </svg>
+          <span class="lbl">2×1 ft</span>
+        </div>
+        <div class="pm pm-1x1a"><svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice"><rect width="50" height="50" fill="rgba(255,255,255,0.03)"/><rect x="0.5" y="0.5" width="49" height="49" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.4" filter="url(#pe)"/></svg></div>
+        <div class="pm pm-1x1b"><svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice"><rect width="50" height="50" fill="rgba(255,255,255,0.03)"/><rect x="0.5" y="0.5" width="49" height="49" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.4" filter="url(#pe)"/></svg></div>
+        <div class="pm pm-1x1c"><svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice"><rect width="50" height="50" fill="rgba(255,255,255,0.03)"/><rect x="0.5" y="0.5" width="49" height="49" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.4" filter="url(#pe)"/></svg></div>
+        <div class="pm pm-1x1d"><svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice"><rect width="50" height="50" fill="rgba(255,255,255,0.03)"/><rect x="0.5" y="0.5" width="49" height="49" fill="none" stroke="rgba(255,255,255,0.5)" stroke-width="1.4" filter="url(#pe)"/></svg></div>
+      </div>
+      <div class="annot-h">
+        <div class="al"></div>
+        <span class="albl">4.0 FT</span>
+        <div class="al"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="process">
+  <div class="sec-hdr">
+    <div class="sec-eye">Four steps · One better room</div>
+    <h2 class="sec-title">Start anywhere.<br>End with better sound.</h2>
+  </div>
+  <div class="step-grid">
+    <a href="#" class="step-card"><div class="card-body"><div class="step-top"><span class="step-n">01</span><span class="step-ico"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg></span></div><div><h3>Visualize Space</h3><p>Map your room. Plan panels before you design.</p></div></div></a>
+    <a href="#" class="step-card"><div class="card-body"><div class="step-top"><span class="step-n">02</span><span class="step-ico"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></svg></span></div><div><h3>Design Panels</h3><p>Pick a size. Upload your art. Preview live.</p></div></div></a>
+    <a href="#" class="step-card"><div class="card-body"><div class="step-top"><span class="step-n">03</span><span class="step-ico"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg></span></div><div><h3>How It Works</h3><p>What panels actually do. And don't.</p></div></div></a>
+    <a href="#" class="step-card"><div class="card-body"><div class="step-top"><span class="step-n">04</span><span class="step-ico"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span></div><div><h3>About Us</h3><p>Built by hand. Small workshop. Mumbai.</p></div></div></a>
+  </div>
+</section>
+
+<section class="why">
+  <div class="sec-eye">What you're buying</div>
+  <h2 class="why-title">Not foam pyramids.<br>Not office cubicle panels.</h2>
+  <div class="why-grid">
+    <div class="why-card"><div class="why-n">— 01</div><h4>Dense mineral wool</h4><p>The density that actually absorbs mid and low frequencies — not the soft foam you've seen stuck to studio walls.</p></div>
+    <div class="why-card"><div class="why-n">— 02</div><h4>Your artwork, printed</h4><p>Every panel carries whatever image you want — photos, illustrations, album art. Treatment that looks like you.</p></div>
+    <div class="why-card"><div class="why-n">— 03</div><h4>Hand built in 7 days</h4><p>No warehouse. No mass production. Each panel measured, wrapped, and inspected by a human before it ships.</p></div>
+  </div>
+</section>
+
+<!-- Dark CTA + footer bookend the hero -->
+<section class="cta-strip">
+  <div class="tile-bg" id="ctaTile"></div>
+  <div class="cta-inner">
+    <h2>READY TO<br><span class="dim">HEAR DIFFERENTLY?</span></h2>
+    <a href="#" class="big-btn">Start with your room →</a>
+    <button class="big-btn ghost">Talk to us first</button>
+  </div>
+</section>
+
+<footer>
+  <div class="fb"><div class="fb-name">Ahata<em>◆</em></div><p>Custom acoustic treatment. Hand-built. Human-scaled. For rooms that deserve better.</p></div>
+  <div class="fc"><h4>Product</h4><a href="#">Design</a><a href="#">Visualize</a><a href="#">How It Works</a></div>
+  <div class="fc"><h4>Company</h4><a href="#">About</a><a href="#">Consult</a><a href="#">Gallery</a></div>
+  <div class="fc"><h4>Connect</h4><a href="#">hello@ahata.in</a><a href="#">Instagram</a><a href="#">+91 —</a></div>
+  <div class="foot-btm"><span>© 2026 Ahata</span><span>Hand built · Mumbai</span></div>
+</footer>
+
+<script>
+function makeTiles(el, opacity) {
+  const C = ['#1c1c1d','#434c56'], gap = 3;
+  el.style.opacity = opacity;
+  Object.assign(el.style, {display:'flex', flexDirection:'column', gap:gap+'px', position:'absolute', inset:'0', overflow:'hidden'});
+  for (let r = 0; r < 3; r++) {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;gap:' + gap + 'px;flex:1;';
+    let used = 0;
+    while (used < 180) {
+      const w = 3 + Math.floor(Math.random() * 11);
+      const t = document.createElement('div');
+      t.style.cssText = 'flex:' + w + ';background:' + C[+(Math.random() > .5)] + ';';
+      row.appendChild(t);
+      used += w;
+    }
+    el.appendChild(row);
+  }
+}
+makeTiles(document.getElementById('heroTile'), '0.26');
+makeTiles(document.getElementById('ctaTile'), '0.20');
+</script>
+</body>
+</html>
