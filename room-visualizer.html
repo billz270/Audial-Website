@@ -128,6 +128,8 @@
   .walls-title{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px}
   .walls-hint{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--mute);padding:6px 10px;border:1.5px solid var(--ink)}
   .walls-hint.active{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  .clear-canvas-btn{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--mute);padding:6px 10px;border:1.5px solid var(--ink);background:none;cursor:pointer;font-family:inherit;display:block;width:100%;text-align:left;margin-top:6px}
+  .clear-canvas-btn:hover{background:var(--ink);color:var(--paper)}
 
   .big-wall-wrap{display:flex;flex-direction:column;gap:8px}
   .big-wall-header{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px}
@@ -442,6 +444,7 @@
       <div class="subsection-label" style="margin-bottom:0">Place panels on walls</div>
       <div class="walls-hint" id="wallsHint">Select a panel size first</div>
     </div>
+    <button class="clear-canvas-btn" id="clearBtn">Clear All Panels</button>
 
     <div class="big-wall-wrap">
       <div class="big-wall-header">
@@ -515,7 +518,7 @@
       <div class="action-btns">
         <a href="configurator.html" class="action-btn primary" id="designBtn">Design These Panels →</a>
         <button class="action-btn" data-open-consult>Book Consultation</button>
-        <button class="action-btn danger" id="clearBtn">Clear All Panels</button>
+        <button class="action-btn primary" data-open-checkout>Checkout →</button>
       </div>
     </div>
   </aside>
