@@ -94,9 +94,9 @@ Add a "Start Over" button in the live preview window that clears the current des
 ---
 
 ## Task #DEV-3: Checkout Button in Room Visualizer
-- **Status:** DONE (committed `b822382`)
+- **Status:** DONE (committed `f47559a`)
 - **Priority:** HIGH
-- **File:** room-visualizer.html
+- **File:** room-visualizer.html, configurator.html
 
 ### Goal
 Add a "Checkout" button in the room visualizer page that allows users to review their cart and proceed to order. Button should be prominent and accessible.
@@ -121,11 +121,19 @@ Add a "Checkout" button in the room visualizer page that allows users to review 
 ### Acceptance Criteria
 ✅ "Checkout" button visible at bottom of sidebar
 ✅ Button is full-width sidebar width
-✅ Clicking opens checkout flow (modal or page — TBD)
+✅ Clicking opens checkout flow (two-step modal)
 ✅ Cart contents are passed correctly to checkout
 ✅ Button disabled if no designs in cart
 ✅ Style matches existing CTA button patterns (yellow fill, navy text)
 ✅ User can return to visualizer from checkout
+
+### Subtask: Relocate "Clear All Panels" button
+- **Status:** DONE (committed `f47559a`)
+The "Clear All Panels" button was removed from the sidebar "Next step" section (replaced by "Checkout →") and relocated to the main canvas area, directly below the "Select a panel size first" hint. Styled as `.clear-canvas-btn` — same typographic treatment as the hint (uppercase, 10px, `--ink` border), content-width, right-aligned to sit flush under the hint. Clears all placed wall panels on click with a confirm prompt.
+
+### Subtask: Restore placed panels on page return
+- **Status:** DONE (committed `f47559a`)
+Placed wall panels were lost whenever the user navigated away to the configurator (via the "+" add design button) and returned via a fresh page load. Added `loadRoomPlan()` which reads `acousticRoomPlan` from localStorage and restores `state.panels` plus room dimensions on every page load. Also wired `saveRoomPlan()` to the "+" button click so the plan is always persisted before navigation.
 
 ---
 
