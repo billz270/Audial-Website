@@ -1185,6 +1185,34 @@ $('sceneZoomIn').addEventListener('click',()=>{sceneZoom = Math.min(sceneZoom + 
 $('sceneZoomOut').addEventListener('click',()=>{sceneZoom = Math.max(sceneZoom - 0.1, 0.5); applyRotation()});
 $('sceneZoomFit').addEventListener('click',()=>{sceneZoom = 0.82; applyRotation()});
 $('resetViewBtn').addEventListener('click',()=>{panYaw = -18; panPitch = 6; sceneZoom = 0.82; applyRotation()});
+$('clearArtBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  currentPanel.image = null;
+  currentPanel.imagePosition = {x:0, y:0};
+  currentPanel.imageScale = 1;
+  currentPanel.imageNaturalWidth = 0;
+  currentPanel.imageNaturalHeight = 0;
+  currentPanel.fileName = '';
+  currentPanel.fileSize = 0;
+  imgZoom = 1; imgPos = {x:0,y:0}; imgNaturalW = 0; imgNaturalH = 0;
+  imgFlipH = false; imgFlipV = false; imgRotate = 0;
+  panelImage.style.display = 'none';
+  panelImage.src = '';
+  panelImage.style.transform = '';
+  uploadInPanel.style.display = 'flex';
+  replaceBtn.style.display = 'none';
+  panelFace.classList.remove('has-image');
+  imgCtrlGroup.style.display = 'none';
+  clearArtGroup.style.display = 'none';
+  imageInfo.classList.remove('visible');
+  artworkLine.classList.remove('loaded');
+  artworkLine.innerHTML = 'No artwork yet · <span class="accent">upload in panel</span>';
+  imageMode = false;
+  panelFace.classList.remove('image-armed');
+  panelContainer.classList.remove('image-mode');
+  modeIndicator.classList.remove('visible', 'image-mode');
+  fileInput.value = '';
+});
 
 // ============ IMAGE CONTROLS ============
 $('imgZoomIn').addEventListener('click',e=>{e.stopPropagation();zoomImageBy(1.15)});
