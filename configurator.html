@@ -672,6 +672,7 @@ const modeIndicator = $('modeIndicator');
 const panHintText = $('panHintText');
 const artworkLine = $('artworkLine') || {classList:{add:()=>{},remove:()=>{}},set innerHTML(v){},get innerHTML(){return ''}};
 const replaceBtn = $('replaceBtn');
+const clearArtGroup = $('clearArtGroup');
 const imgCtrlGroup = $('imgCtrlGroup');
 const panelBack = $('panelBack');
 const sideLeft = $('sideLeft'), sideRight = $('sideRight'), sideTop = $('sideTop'), sideBottom = $('sideBottom');
@@ -916,6 +917,7 @@ function handleImageUpload(file){
       panelImage.style.display = 'block';
       uploadInPanel.style.display = 'none';
       replaceBtn.style.display = 'block';
+      clearArtGroup.style.display = 'flex';
       panelFace.classList.add('has-image');
       fitImageToPanel();
 
@@ -1380,6 +1382,7 @@ function resetCurrentPanel(){
   imageInfo.classList.remove('visible');
   customSection.style.display = 'none';
   imgCtrlGroup.style.display = 'none';
+  clearArtGroup.style.display = 'none';
   panelActions.classList.remove('visible');
   orientToggle.classList.remove('visible');
   artworkLine.classList.remove('loaded');
@@ -1570,6 +1573,7 @@ function loadPanelToEditor(panel){
   panelFace.classList.add('has-image');
   uploadInPanel.style.display = 'none';
   replaceBtn.style.display = 'block';
+  clearArtGroup.style.display = 'flex';
 
   setTimeout(()=>{
     panelImage.style.width = imgNaturalW + 'px';
