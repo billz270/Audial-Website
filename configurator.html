@@ -352,6 +352,51 @@
 
   /* Site max-width container — content constrained on wide screens */
   html{background:var(--paper)}body{max-width:1320px;margin:0 auto;background:var(--paper)}
+
+  /* ===== CHECKOUT MODAL ===== */
+  .checkout-modal{position:fixed;inset:0;z-index:200;display:none;align-items:center;justify-content:center;padding:20px}
+  .checkout-modal.open{display:flex}
+  .checkout-backdrop{position:absolute;inset:0;background:rgba(9,61,83,0.3);backdrop-filter:blur(4px)}
+  .checkout-panel{position:relative;background:var(--paper);border:1.5px solid var(--ink);width:100%;max-width:560px;max-height:90vh;overflow-y:auto;z-index:1;display:flex;flex-direction:column}
+  .checkout-header{padding:16px 22px;border-bottom:1.5px solid var(--ink);display:flex;justify-content:space-between;align-items:center;position:sticky;top:0;background:var(--paper);z-index:2}
+  .checkout-header-left{display:flex;flex-direction:column;gap:2px}
+  .checkout-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--accent)}
+  .checkout-step-indicator{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute)}
+  .checkout-close{background:none;border:none;font-size:22px;cursor:pointer;color:var(--ink);line-height:1;padding:0 4px;flex-shrink:0}
+  .checkout-body{padding:22px;flex:1}
+  .checkout-item{display:flex;gap:14px;padding:14px 0;border-bottom:1.5px solid var(--ink);align-items:flex-start}
+  .checkout-item:first-child{padding-top:0}
+  .checkout-thumb{width:56px;height:56px;background:var(--ink);flex-shrink:0;overflow:hidden}
+  .checkout-thumb img{width:100%;height:100%;object-fit:cover}
+  .checkout-thumb-empty{width:100%;height:100%;background:rgba(9,61,83,0.12)}
+  .checkout-item-info{flex:1;min-width:0}
+  .checkout-item-name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em}
+  .checkout-item-meta{font-size:10px;color:var(--mute);margin-top:3px;text-transform:capitalize}
+  .checkout-item-right{font-size:11px;font-weight:700;text-align:right;flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+  .checkout-subtotal{display:flex;justify-content:space-between;padding:14px 0 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;border-top:1.5px solid var(--ink)}
+  .checkout-empty{text-align:center;padding:40px 0;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute)}
+  .checkout-empty a{color:var(--ink)}
+  .checkout-footer{padding:16px 22px;border-top:1.5px solid var(--ink);display:flex;gap:10px;justify-content:flex-end;position:sticky;bottom:0;background:var(--paper);z-index:2}
+  .checkout-btn{padding:11px 20px;font-family:inherit;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;border:1.5px solid var(--ink);cursor:pointer;transition:all 0.2s;background:var(--paper);color:var(--ink)}
+  .checkout-btn:hover{background:var(--ink);color:var(--paper)}
+  .checkout-btn.primary{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  .checkout-btn.primary:hover{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+  .checkout-btn:disabled{opacity:0.4;cursor:not-allowed}
+  .checkout-btn:disabled:hover{background:var(--accent);color:var(--ink);border-color:var(--accent)}
+  .checkout-field{display:flex;flex-direction:column;gap:6px;margin-bottom:14px}
+  .checkout-field label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em}
+  .checkout-field input,.checkout-field textarea{font-family:inherit;font-size:12px;padding:10px 12px;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);width:100%;box-sizing:border-box;outline:none}
+  .checkout-field input:focus,.checkout-field textarea:focus{border-color:var(--primary-light)}
+  .checkout-field .field-error{font-size:10px;color:#C03020;font-weight:600;display:none}
+  .checkout-field.invalid .field-error{display:block}
+  .checkout-field.invalid input,.checkout-field.invalid textarea{border-color:#C03020}
+  .checkout-row{display:flex;gap:12px}
+  .checkout-row .checkout-field{flex:1;min-width:0}
+  .checkout-submit-error{font-size:10px;color:#C03020;font-weight:600;margin-top:8px;display:none}
+  .checkout-success{text-align:center;padding:48px 22px 40px}
+  .checkout-success .success-mark{font-size:32px;color:var(--accent);display:block;margin-bottom:20px}
+  .checkout-success h3{font-family:'Archivo Black',sans-serif;font-size:20px;text-transform:uppercase;letter-spacing:-0.02em;margin-bottom:12px}
+  .checkout-success p{font-size:12px;color:var(--mute);line-height:1.7;margin-bottom:28px}
 </style>
 </head>
 <body>
@@ -1689,6 +1734,227 @@ if(_isModal){
     }
   });
 }
+</script>
+
+<!-- CHECKOUT MODAL -->
+<div class="checkout-modal" id="checkoutModal" aria-hidden="true">
+  <div class="checkout-backdrop" id="checkoutBackdrop"></div>
+  <div class="checkout-panel">
+    <div class="checkout-header">
+      <div class="checkout-header-left">
+        <span class="checkout-label" id="checkoutHeaderLabel">◆ Your Order</span>
+        <span class="checkout-step-indicator" id="checkoutStepIndicator">Step 1 of 2</span>
+      </div>
+      <button class="checkout-close" id="checkoutClose" aria-label="Close">×</button>
+    </div>
+
+    <!-- Step 1: Cart Review -->
+    <div class="checkout-body" id="checkoutStep1">
+      <div id="checkoutCartItems"></div>
+    </div>
+    <div class="checkout-footer" id="checkoutFooter1">
+      <button class="checkout-btn" id="checkoutCancelBtn">Cancel</button>
+      <button class="checkout-btn primary" id="checkoutContinueBtn">Continue to Details →</button>
+    </div>
+
+    <!-- Step 2: Order Form -->
+    <div class="checkout-body" id="checkoutStep2" style="display:none">
+      <form id="checkoutForm" novalidate>
+        <div class="checkout-field" id="field-name">
+          <label for="coName">Full name</label>
+          <input type="text" id="coName" name="name" autocomplete="name" placeholder="Rohan Sharma">
+          <span class="field-error">Name is required</span>
+        </div>
+        <div class="checkout-row">
+          <div class="checkout-field" id="field-email">
+            <label for="coEmail">Email</label>
+            <input type="email" id="coEmail" name="email" autocomplete="email" placeholder="you@example.com">
+            <span class="field-error">Valid email is required</span>
+          </div>
+          <div class="checkout-field" id="field-phone">
+            <label for="coPhone">Phone</label>
+            <input type="tel" id="coPhone" name="phone" autocomplete="tel" placeholder="+91 98765 43210">
+            <span class="field-error">Phone is required</span>
+          </div>
+        </div>
+        <div class="checkout-field" id="field-address">
+          <label for="coAddress">Delivery address</label>
+          <input type="text" id="coAddress" name="address" autocomplete="street-address" placeholder="Flat 4B, Shanti Niwas, SV Road">
+          <span class="field-error">Address is required</span>
+        </div>
+        <div class="checkout-row">
+          <div class="checkout-field" id="field-pincode">
+            <label for="coPincode">Pincode</label>
+            <input type="text" id="coPincode" name="pincode" autocomplete="postal-code" placeholder="400050">
+            <span class="field-error">Pincode is required</span>
+          </div>
+          <div class="checkout-field" id="field-city">
+            <label for="coCity">City</label>
+            <input type="text" id="coCity" name="city" autocomplete="address-level2" placeholder="Mumbai">
+            <span class="field-error">City is required</span>
+          </div>
+        </div>
+        <div class="checkout-field">
+          <label for="coNotes">Notes <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+          <textarea id="coNotes" name="notes" rows="3" placeholder="Anything we should know about your space or order..."></textarea>
+        </div>
+        <div class="checkout-submit-error" id="checkoutSubmitError">Something went wrong. Please try again.</div>
+      </form>
+    </div>
+    <div class="checkout-footer" id="checkoutFooter2" style="display:none">
+      <button class="checkout-btn" id="checkoutBackBtn">← Back</button>
+      <button class="checkout-btn primary" id="checkoutSubmitBtn">Place Order →</button>
+    </div>
+
+    <!-- Success state -->
+    <div class="checkout-success" id="checkoutSuccess" style="display:none">
+      <span class="success-mark">◆</span>
+      <h3>Order Received.</h3>
+      <p id="checkoutSuccessMsg">We'll be in touch at your email within 1–2 business days to confirm your order and arrange delivery.</p>
+      <button class="checkout-btn primary" id="checkoutDoneBtn">Back to Configurator</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== CHECKOUT MODAL =====
+const PANEL_PRICES = {'1x1':2500,'2x1':3500,'2x2':4500,'4x2':6500,'1x4':5500};
+const checkoutModal   = document.getElementById('checkoutModal');
+const checkoutStep1   = document.getElementById('checkoutStep1');
+const checkoutStep2   = document.getElementById('checkoutStep2');
+const checkoutFooter1 = document.getElementById('checkoutFooter1');
+const checkoutFooter2 = document.getElementById('checkoutFooter2');
+const checkoutSuccess = document.getElementById('checkoutSuccess');
+const checkoutHeaderLabel   = document.getElementById('checkoutHeaderLabel');
+const checkoutStepIndicator = document.getElementById('checkoutStepIndicator');
+
+function openCheckoutModal(){
+  renderCheckoutCart();
+  showCheckoutStep(1);
+  checkoutModal.classList.add('open');
+  document.body.classList.add('modal-open');
+}
+function closeCheckoutModal(){
+  checkoutModal.classList.remove('open');
+  document.body.classList.remove('modal-open');
+}
+function showCheckoutStep(step){
+  checkoutStep1.style.display   = step===1 ? '' : 'none';
+  checkoutFooter1.style.display = step===1 ? '' : 'none';
+  checkoutStep2.style.display   = step===2 ? '' : 'none';
+  checkoutFooter2.style.display = step===2 ? '' : 'none';
+  checkoutSuccess.style.display = 'none';
+  checkoutHeaderLabel.textContent   = step===1 ? '◆ Your Order' : '◆ Order Details';
+  checkoutStepIndicator.textContent = `Step ${step} of 2`;
+}
+function renderCheckoutCart(){
+  const cart = JSON.parse(localStorage.getItem('acousticCart')||'[]');
+  const container = document.getElementById('checkoutCartItems');
+  const continueBtn = document.getElementById('checkoutContinueBtn');
+  if(!cart.length){
+    container.innerHTML = '<div class="checkout-empty">No panels designed yet.<br><a href="configurator.html">Design your panels →</a></div>';
+    container.dataset.orderSummary = '';
+    container.dataset.subtotal = '0';
+    continueBtn.disabled = true;
+    return;
+  }
+  continueBtn.disabled = false;
+  let subtotal = 0;
+  const summaryLines = [];
+  const rows = cart.map(item=>{
+    const price     = PANEL_PRICES[item.size]||0;
+    const qty       = item.quantity||1;
+    const lineTotal = price*qty;
+    subtotal += lineTotal;
+    const wood = item.woodVarnish==='light' ? 'Light varnish' : 'Dark varnish';
+    const wrap = item.fabricWrap==='half'   ? 'Half wrap'     : 'Full wrap';
+    summaryLines.push(`${item.size} ft · ${wood} · ${wrap} · Qty ${qty} · ₹${lineTotal.toLocaleString()}`);
+    const thumbHtml = item.image
+      ? `<img src="${item.image}" alt="Panel artwork">`
+      : '<div class="checkout-thumb-empty"></div>';
+    return `<div class="checkout-item">
+      <div class="checkout-thumb">${thumbHtml}</div>
+      <div class="checkout-item-info">
+        <div class="checkout-item-name">${item.size} ft Panel</div>
+        <div class="checkout-item-meta">${wood} · ${wrap}</div>
+      </div>
+      <div class="checkout-item-right">
+        <span>Qty ${qty}</span>
+        <span>₹${lineTotal.toLocaleString()}</span>
+      </div>
+    </div>`;
+  });
+  container.innerHTML = rows.join('')+`<div class="checkout-subtotal"><span>Subtotal</span><span>₹${subtotal.toLocaleString()}</span></div>`;
+  container.dataset.orderSummary = summaryLines.join('\n');
+  container.dataset.subtotal = String(subtotal);
+}
+document.getElementById('checkoutClose').addEventListener('click', closeCheckoutModal);
+document.getElementById('checkoutBackdrop').addEventListener('click', closeCheckoutModal);
+document.getElementById('checkoutCancelBtn').addEventListener('click', closeCheckoutModal);
+document.getElementById('checkoutContinueBtn').addEventListener('click', ()=>showCheckoutStep(2));
+document.getElementById('checkoutBackBtn').addEventListener('click', ()=>showCheckoutStep(1));
+document.getElementById('checkoutDoneBtn').addEventListener('click', closeCheckoutModal);
+document.addEventListener('keydown', e=>{
+  if(e.key==='Escape' && checkoutModal.classList.contains('open')) closeCheckoutModal();
+});
+document.querySelectorAll('[data-open-checkout]').forEach(el=>{
+  el.addEventListener('click', e=>{ e.preventDefault(); openCheckoutModal(); });
+});
+document.getElementById('checkoutSubmitBtn').addEventListener('click', async ()=>{
+  const rules = [
+    {id:'field-name',    input:'coName',    ok: v=>v.trim().length>0},
+    {id:'field-email',   input:'coEmail',   ok: v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)},
+    {id:'field-phone',   input:'coPhone',   ok: v=>v.trim().length>0},
+    {id:'field-address', input:'coAddress', ok: v=>v.trim().length>0},
+    {id:'field-pincode', input:'coPincode', ok: v=>v.trim().length>0},
+    {id:'field-city',    input:'coCity',    ok: v=>v.trim().length>0},
+  ];
+  let valid = true;
+  rules.forEach(r=>{
+    const val = document.getElementById(r.input).value;
+    const fieldEl = document.getElementById(r.id);
+    if(r.ok(val)){ fieldEl.classList.remove('invalid'); }
+    else          { fieldEl.classList.add('invalid'); valid=false; }
+  });
+  if(!valid) return;
+  const cartContainer = document.getElementById('checkoutCartItems');
+  const submitBtn     = document.getElementById('checkoutSubmitBtn');
+  const submitError   = document.getElementById('checkoutSubmitError');
+  submitBtn.disabled  = true;
+  submitBtn.textContent = 'Sending...';
+  submitError.style.display = 'none';
+  const email = document.getElementById('coEmail').value;
+  const payload = {
+    name:          document.getElementById('coName').value,
+    email,
+    phone:         document.getElementById('coPhone').value,
+    address:       document.getElementById('coAddress').value,
+    pincode:       document.getElementById('coPincode').value,
+    city:          document.getElementById('coCity').value,
+    notes:         document.getElementById('coNotes').value,
+    order_summary: cartContainer.dataset.orderSummary||'',
+    subtotal:      '₹'+Number(cartContainer.dataset.subtotal||0).toLocaleString(),
+  };
+  try{
+    const res = await fetch('https://formspree.io/f/YOUR_FORMSPREE_ID',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Accept':'application/json'},
+      body:JSON.stringify(payload),
+    });
+    if(!res.ok) throw new Error('non-ok');
+    checkoutStep2.style.display   = 'none';
+    checkoutFooter2.style.display = 'none';
+    checkoutSuccess.style.display = '';
+    checkoutHeaderLabel.textContent   = '◆ Ahata';
+    checkoutStepIndicator.textContent = '';
+    document.getElementById('checkoutSuccessMsg').textContent =
+      `We'll be in touch at ${email} within 1–2 business days to confirm your order and arrange delivery.`;
+  }catch{
+    submitError.style.display = 'block';
+    submitBtn.disabled  = false;
+    submitBtn.textContent = 'Place Order →';
+  }
+});
 </script>
 
 </body>
