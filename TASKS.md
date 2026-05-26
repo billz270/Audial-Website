@@ -138,7 +138,7 @@ Placed wall panels were lost whenever the user navigated away to the configurato
 ---
 
 ## Task #DEV-4: "Your Designs" Grid Order & Label Updates
-- **Status:** TODO
+- **Status:** DONE
 - **Priority:** MEDIUM
 - **File:** room-visualizer.html
 

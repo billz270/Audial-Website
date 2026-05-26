@@ -1031,7 +1031,8 @@ function renderDesignedPanels(){
     const btn = document.createElement('a');
     btn.href = 'configurator.html';
     btn.className = 'designs-add-btn';
-    btn.innerHTML = `<div class="designed-card-preview"><span class="designs-add-icon">+</span></div><div class="designed-card-info"><span class="designs-add-label">Click to design your first panel</span></div>`;
+    const addLabel = items.length === 0 ? 'Click to Design Your First Panel' : 'Click to Design Your Next Panel';
+    btn.innerHTML = `<div class="designed-card-preview"><span class="designs-add-icon">+</span></div><div class="designed-card-info"><span class="designs-add-label">${addLabel}</span></div>`;
     btn.addEventListener('click', saveRoomPlan);
     return btn;
   }
@@ -1115,7 +1116,8 @@ function renderDesignedPanels(){
       f.innerHTML = `<div class="designed-card-preview"></div><div class="designed-card-info"></div>`;
       pageEls.push(f);
     }
-    pageEls.forEach(el => page.appendChild(el));
+    // Reorder to column-major (top-left → bottom-left → top-right → bottom-right)
+    [pageEls[0], pageEls[2], pageEls[1], pageEls[3]].forEach(el => page.appendChild(el));
     container.appendChild(page);
   }
 }

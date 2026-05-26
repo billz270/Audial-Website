@@ -139,6 +139,8 @@ _(none)_
 
 ## Resolved bugs
 
+- **"Your Designs" grid order & label** ✓ — Grid now fills column-first (top-left → bottom-left → top-right → bottom-right) by reordering `pageEls` to `[0, 2, 1, 3]` before appending to the CSS row-first grid. Add-button label reads "Click to Design Your First Panel" when cart is empty and switches to "Click to Design Your Next Panel" once any design exists. (`room-visualizer.html`, `renderDesignedPanels`)
+
 - **Checkout flow** ✓ — Two-step checkout modal on both Configurator and Room Visualizer pages. "Checkout →" button in visualizer sidebar replaces "Clear All Panels"; "Checkout →" in configurator replaces "Request Quote →". Step 1: cart review (panel thumbnails, size, varnish, wrap, qty, subtotal from `acousticCart`). Step 2: full order form (name, email, phone, address, pincode, city, notes). Submits to `rohan270@gmail.com` via Formspree (`xbdbzvao`). Success state echoes the customer's email. (`configurator.html`, `room-visualizer.html`)
 
 - **"Clear All Panels" button relocated** ✓ — Removed from sidebar "Next step" section (replaced by "Checkout →") and moved to the main canvas area directly below the "Select a panel size first" hint. Styled as `.clear-canvas-btn` — same 10px uppercase typographic treatment as the hint, `width:fit-content`, `margin-left:auto` so it sits right-aligned flush under the hint. Confirm prompt on click. (`room-visualizer.html`)
