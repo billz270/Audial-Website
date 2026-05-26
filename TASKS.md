@@ -93,44 +93,8 @@ Add a "Start Over" button in the live preview window that clears the current des
 
 ---
 
-## Task #DEV-3: Contextual Wall Dimension Labels in Room Visualizer
-- **Status:** TODO
-- **Priority:** MEDIUM
-- **File:** room-visualizer.html
-
-### Goal
-Update the "Enter Exact Dimensions" input labels to reflect the active wall's actual dimension, while keeping the underlying room model (length × width × height) unchanged. Users see contextual labels that match the wall they're viewing.
-
-### Behavior Spec
-
-**Label mapping (Option A — contextual per wall):**
-- **Front/Back walls:** Show "Room Length" (14 ft) and "Height" (10 ft)
-- **Left/Right walls:** Show "Room Width" (10 ft) and "Height" (10 ft)
-- The input fields themselves remain unchanged — they still update the underlying room.length/width/height
-- Only the *labels* change based on active wall selection
-
-**When user switches walls:**
-- Active wall indicator updates (existing behavior)
-- Input field labels update to reflect the new wall's relevant dimensions
-- Input values update to show the correct dimension for that wall's axis
-
-**Visual presentation:**
-- Subtle label change (no animation needed)
-- Keep the same input field styling and layout
-
-### Acceptance Criteria
-✅ Front wall selected → labels show "Room Length" and "Height"
-✅ Right wall selected → labels show "Room Width" and "Height"
-✅ Back wall selected → labels show "Room Length" and "Height"
-✅ Left wall selected → labels show "Room Width" and "Height"
-✅ Input values correctly reflect the active wall's dimension
-✅ Underlying room model (length/width/height) remains unchanged
-✅ Existing dimension input behavior (typing, arrow keys, mouse drag) unchanged
-
----
-
-## Task #DEV-4: Checkout Button in Room Visualizer
-- **Status:** TODO
+## Task #DEV-3: Checkout Button in Room Visualizer
+- **Status:** DONE (committed `b822382`)
 - **Priority:** HIGH
 - **File:** room-visualizer.html
 
@@ -165,7 +129,7 @@ Add a "Checkout" button in the room visualizer page that allows users to review 
 
 ---
 
-## Task #DEV-5: "Your Designs" Grid Order & Label Updates
+## Task #DEV-4: "Your Designs" Grid Order & Label Updates
 - **Status:** TODO
 - **Priority:** MEDIUM
 - **File:** room-visualizer.html
