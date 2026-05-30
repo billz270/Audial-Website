@@ -210,9 +210,9 @@ The yellow notification band that appears when a user has designed panels (e.g.,
 ---
 
 ## Task #DES-6: Horizontal Misconceptions Tiles on How It Works Page
-- **Status:** TODO
+- **Status:** DONE
 - **Priority:** MEDIUM
-- **File:** how-it-works.html (new page, or section within existing page — TBD)
+- **File:** how-it-works.html
 
 ### Goal
 The "Common Misconceptions" section should display misconceptions as horizontally stacked tiles rather than a vertical list. Each tile presents one misconception and its correction in a clean, scannable format.
@@ -220,24 +220,50 @@ The "Common Misconceptions" section should display misconceptions as horizontall
 ### Behavior Spec
 
 **Layout:**
-- Horizontal row of tiles, edge-to-edge, divided by 1.5px borders (consistent with existing border language).
-- Each tile contains:
-  - **Misconception** (the wrong assumption) — styled as a struck-through or visually "corrected" statement
-  - **Reality** (the truth) — styled as the primary, confident statement
-- Number of tiles: TBD based on content (likely 3-5 misconceptions).
+- Horizontal row of 3 tiles, edge-to-edge, divided by 1.5px semi-transparent borders on the dark navy background.
+- Each tile contains: large accent number, dimmed italic misconception quote, 1px divider, bold accent reality headline + body copy.
 
-**Styling:**
-- Tiles should feel like the existing step cards on the homepage (`.step-card` pattern — hover fill, consistent padding, border-right dividers).
-- Tier 1 intensity: no blueprint elements. Clean typography, brand-forward.
-- Desktop: horizontal row. Tablet: 2-column grid. Mobile: single column stack.
+**Interaction:**
+- Text always visible (no flip or reveal). Hover triggers: paper-tint fill sweeps up from bottom via `::before`, misconception dims further (38% → 16% opacity), reality brightens to full opacity, accent underline sweeps left-to-right under the reality headline.
+- Tier 1 page — no blueprint elements. Brand-forward, warm.
 
-**Content (draft — to be finalized):**
-- TBD: misconceptions about acoustic panels (e.g., "foam is enough," "panels kill all sound," "you need to cover every wall," etc.)
+**Responsive:**
+- Desktop: 3-column horizontal row. Tablet (≤900px): 2-col, tile 3 spans full width. Mobile (≤560px): single column stack.
 
 ### Acceptance Criteria
-- [ ] Misconceptions displayed as horizontal tiles in a single row (desktop)
-- [ ] Each tile has misconception + reality clearly distinguished
-- [ ] Responsive: 2-col on tablet, 1-col on mobile
-- [ ] Styling consistent with existing card/tile patterns
-- [ ] Hover state on tiles (consistent with `.step-card` behavior)
-- [ ] Border language matches existing site (1.5px solid ink)
+- [x] Misconceptions displayed as horizontal tiles in a single row (desktop)
+- [x] Each tile has misconception (dimmed) + reality (bright) clearly distinguished
+- [x] Responsive: 2-col on tablet, 1-col on mobile
+- [x] Hover: bottom-fill sweep + accent underline animation on reality headline
+- [x] Border language matches dark-surface treatment (semi-transparent paper borders)
+- [x] Stays on dark navy background consistent with `.myths` section
+
+---
+
+## Task #DES-7: Fix Wall Container Colors in Room Visualizer
+- **Status:** TODO
+- **Priority:** LOW
+- **File:** room-visualizer.html
+
+### Goal
+The wall containers below the main canvas (Left Wall, Back Wall, Right Wall) use a dark teal/navy background color on their header bars that doesn't belong to the site's color palette. Update these to use the correct palette colors.
+
+### Behavior Spec
+
+**What to change:**
+- The `.wall-container` header background (currently a dark teal that's off-palette) should use the site's defined color variables.
+- The wall surface fill (currently a beige/tan) should also align with the palette.
+- Text color within the headers should maintain legibility against the new background.
+- Border colors should remain consistent with the existing border language (1.5px solid ink).
+
+**Constraints:**
+- Do not change the layout or structure of the wall containers.
+- Do not change any wall placement functionality.
+- Only update colors to match the defined palette in design.md.
+
+### Acceptance Criteria
+- [ ] Wall container headers use palette-approved colors
+- [ ] Wall surface backgrounds use palette-approved colors
+- [ ] Text remains legible
+- [ ] No off-palette colors remain in the wall container section
+- [ ] Visual consistency with the rest of the room visualizer page

@@ -82,6 +82,23 @@
   .myth-text{font-size:14px;line-height:1.65;opacity:0.85;max-width:700px}
   .myth-text strong{color:var(--accent);font-weight:700}
 
+  /* MISCONCEPTIONS TILE GRID */
+  .misconceptions-grid{display:grid;grid-template-columns:repeat(3,1fr);border:1.5px solid rgba(242,242,249,0.2)}
+  .misconception-tile{padding:28px 24px;border-right:1.5px solid rgba(242,242,249,0.2);position:relative;overflow:hidden;display:flex;flex-direction:column;gap:14px;cursor:default}
+  .misconception-tile:last-child{border-right:none}
+  .misconception-tile::before{content:'';position:absolute;inset:0;background:rgba(242,242,249,0.07);transform:translateY(100%);transition:transform 0.5s cubic-bezier(0.65,0,0.35,1);z-index:0}
+  .misconception-tile:hover::before{transform:translateY(0)}
+  .misconception-tile>*{position:relative;z-index:1}
+  .tile-num{font-family:'Archivo Black',sans-serif;font-size:32px;line-height:1;letter-spacing:-0.04em;color:var(--accent)}
+  .tile-myth{font-size:14px;line-height:1.55;color:rgba(242,242,249,0.38);font-style:italic;transition:color 0.45s ease}
+  .misconception-tile:hover .tile-myth{color:rgba(242,242,249,0.16)}
+  .tile-divider{height:1px;background:rgba(242,242,249,0.15);flex-shrink:0}
+  .tile-reality{font-size:13.5px;line-height:1.65;color:rgba(242,242,249,0.72);transition:color 0.45s ease;flex:1}
+  .misconception-tile:hover .tile-reality{color:rgba(242,242,249,0.95)}
+  .tile-reality-head{display:block;font-family:'Archivo Black',sans-serif;font-size:17px;letter-spacing:-0.02em;color:var(--accent);margin-bottom:10px;position:relative;padding-bottom:5px}
+  .tile-reality-head::after{content:'';position:absolute;left:0;bottom:0;height:1.5px;width:100%;background:var(--accent);transform:scaleX(0);transform-origin:left;transition:transform 0.45s cubic-bezier(0.65,0,0.35,1) 0.1s}
+  .misconception-tile:hover .tile-reality-head::after{transform:scaleX(1)}
+
   footer{padding:32px;display:flex;justify-content:space-between;font-size:11px;text-transform:uppercase;letter-spacing:0.1em}
 
   /* CONSULT MODAL */
@@ -123,11 +140,19 @@
     footer{padding:20px;flex-direction:column;gap:10px}
     .consult-panel{padding:22px 20px;max-height:88vh}
     .consult-row{grid-template-columns:1fr}
+    .misconceptions-grid{grid-template-columns:repeat(2,1fr)}
+    .misconception-tile:nth-child(1),.misconception-tile:nth-child(2){border-bottom:1.5px solid rgba(242,242,249,0.2)}
+    .misconception-tile:nth-child(2){border-right:none}
+    .misconception-tile:last-child{grid-column:1/-1;border-right:none;border-top:none}
   }
   @media (max-width:560px){
     .benefits-grid{grid-template-columns:1fr}
     .benefit{border-right:none !important}
     .benefit:not(:last-child){border-bottom:1.5px solid var(--ink)}
+    .misconceptions-grid{grid-template-columns:1fr}
+    .misconception-tile{border-right:none !important;border-bottom:1.5px solid rgba(242,242,249,0.2)}
+    .misconception-tile:last-child{grid-column:1;border-bottom:none}
+    .misconception-tile:nth-child(1),.misconception-tile:nth-child(2){border-bottom:1.5px solid rgba(242,242,249,0.2)}
   }
 
   /* Site max-width container — content constrained on wide screens */
@@ -190,27 +215,33 @@
   <div class="section-label">◆ The myths</div>
   <h2 class="section-title">Common <span class="accent">misconceptions.</span></h2>
 
-  <div class="myth">
-    <div class="myth-num">01</div>
-    <div>
-      <div class="myth-title">"Soundproofing and absorption are the same thing."</div>
-      <div class="myth-text"><strong>Not even close.</strong> Soundproofing stops sound from passing through a wall — it's about mass and isolation, and it's expensive construction work. Absorption stops sound from bouncing around inside a room — that's what our panels do. You can have one without the other, and most people only actually need absorption.</div>
+  <div class="misconceptions-grid">
+    <div class="misconception-tile">
+      <div class="tile-num">01</div>
+      <div class="tile-myth">"Soundproofing and absorption are the same thing."</div>
+      <div class="tile-divider"></div>
+      <div class="tile-reality">
+        <span class="tile-reality-head">Not even close.</span>
+        Soundproofing stops sound from passing through a wall — it's about mass and isolation, and it's expensive construction work. Absorption stops sound from bouncing around inside a room — that's what our panels do. You can have one without the other, and most people only actually need absorption.
+      </div>
     </div>
-  </div>
-
-  <div class="myth">
-    <div class="myth-num">02</div>
-    <div>
-      <div class="myth-title">"I need to cover every wall to make a difference."</div>
-      <div class="myth-text"><strong>You don't.</strong> Strategic placement at first-reflection points usually gets you 80% of the benefit with 30% of the panels. That's exactly what our consultation identifies.</div>
+    <div class="misconception-tile">
+      <div class="tile-num">02</div>
+      <div class="tile-myth">"I need to cover every wall to make a difference."</div>
+      <div class="tile-divider"></div>
+      <div class="tile-reality">
+        <span class="tile-reality-head">You don't.</span>
+        Strategic placement at first-reflection points usually gets you 80% of the benefit with 30% of the panels. That's exactly what our consultation identifies.
+      </div>
     </div>
-  </div>
-
-  <div class="myth">
-    <div class="myth-num">03</div>
-    <div>
-      <div class="myth-title">"Rugs and curtains do the same thing."</div>
-      <div class="myth-text"><strong>Partially — and only at high frequencies.</strong> Soft furnishings absorb the tinny stuff but do nothing for the mid-range frequencies that actually make a room sound muddy. Purpose-built panels with proper thickness and density cover the full range.</div>
+    <div class="misconception-tile">
+      <div class="tile-num">03</div>
+      <div class="tile-myth">"Rugs and curtains do the same thing."</div>
+      <div class="tile-divider"></div>
+      <div class="tile-reality">
+        <span class="tile-reality-head">Partially — and only at high frequencies.</span>
+        Soft furnishings absorb the tinny stuff but do nothing for the mid-range frequencies that actually make a room sound muddy. Purpose-built panels with proper thickness and density cover the full range.
+      </div>
     </div>
   </div>
 </section>
