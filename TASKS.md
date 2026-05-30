@@ -210,7 +210,7 @@ The yellow notification band that appears when a user has designed panels (e.g.,
 ---
 
 ## Task #DES-6: Horizontal Misconceptions Tiles on How It Works Page
-- **Status:** DONE
+- **Status:** DONE (committed `ff7a245`)
 - **Priority:** MEDIUM
 - **File:** how-it-works.html
 
