@@ -241,7 +241,7 @@ The "Common Misconceptions" section should display misconceptions as horizontall
 ---
 
 ## Task #DES-7: Fix Wall Container Colors in Room Visualizer
-- **Status:** TODO
+- **Status:** DONE (committed `16c98d5`)
 - **Priority:** LOW
 - **File:** room-visualizer.html
 
@@ -262,8 +262,62 @@ The wall containers below the main canvas (Left Wall, Back Wall, Right Wall) use
 - Only update colors to match the defined palette in design.md.
 
 ### Acceptance Criteria
-- [ ] Wall container headers use palette-approved colors
-- [ ] Wall surface backgrounds use palette-approved colors
-- [ ] Text remains legible
-- [ ] No off-palette colors remain in the wall container section
-- [ ] Visual consistency with the rest of the room visualizer page
+- [x] Wall container headers use palette-approved colors
+- [x] Wall surface backgrounds use palette-approved colors
+- [x] Text remains legible
+- [x] No off-palette colors remain in the wall container section
+- [x] Visual consistency with the rest of the room visualizer page
+
+---
+
+## Task #DES-8: Contextual Image Tips on Size Selection in Configurator
+- **Status:** TODO
+- **Priority:** MEDIUM
+- **File:** configurator.html
+
+### Goal
+When a user selects a panel size in the configurator (before uploading an image), display a contextual tip card in the sidebar that provides practical image guidance specific to that size.
+
+### Behavior Spec
+
+**Trigger:**
+- Tip card appears when a user clicks a size card (1×1, 2×1, 2×2, 4×2, 1×4).
+- Tip card disappears once the user uploads an image.
+
+**Placement:**
+- Inside the sidebar, between the "Upload artwork" section and the "Print tips" section.
+
+**Content per size:**
+
+- **1×1 ft:** Best for logos, monograms, bold icons, tight portrait crops. Avoid landscape photos, fine text, images with important edge detail.
+- **2×1 ft:** Best for horizon lines, cityscapes, wide album art, sound wave graphics. Avoid portraits, anything with strong vertical emphasis.
+- **2×2 ft:** Most versatile. Photography, illustrations, album covers all work well. Tip: two 2×2s side by side can split one image into a diptych.
+- **4×2 ft:** Statement pieces. Panoramic landscapes, studio shots, abstract art with horizontal flow. Tip: a square image can split across two 4×2s stacked vertically. Avoid small logos, single-subject portraits.
+- **1×4 ft:** Vertical portraits, architecture, abstract vertical patterns. Tip: two 1×4s can each hold one half of a split portrait.
+
+**General tips (shown on all sizes, below size-specific content):**
+- 300 DPI minimum for sharp print
+- High contrast outperforms subtle gradients through acoustic fabric
+- Dark-on-dark loses definition — use bright accents against dark backgrounds
+- Leave breathing room around focal point — wood frame overlaps outer edge
+
+**Styling:**
+- Matches existing sidebar section styling (`.side-section` pattern).
+- Section label: "IMAGE TIPS" or similar, with ◆ marker, matching existing `.side-title` style.
+- Size-specific tips visually distinct from general tips (subtle divider between them).
+- "Avoid" lines in muted color to de-emphasize.
+- "Tip" lines (multi-panel suggestions) prefixed with → to feel like a bonus insight.
+- Compact and scannable — not a wall of text.
+
+**Constraints:**
+- Do not change existing upload or preview functionality.
+- Tip card is informational only — no blocking, no modals, no required interaction.
+- Replaces or sits alongside the existing static "Print tips" section (decide during implementation).
+
+### Acceptance Criteria
+- [ ] Tip card appears in sidebar when a size is selected
+- [ ] Content updates to match the selected size
+- [ ] General tips shown alongside size-specific content
+- [ ] Tip card disappears after image upload
+- [ ] Styling matches existing sidebar sections
+- [ ] Does not interfere with upload or preview functionality
