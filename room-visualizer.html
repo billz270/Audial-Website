@@ -22,6 +22,7 @@
     --wood-dark:#2A1C10;
     --wood-edge:#1A0F08;
     --wrap-black:#0F0904;
+    --wall:var(--paper);
   }
   /* Inverted (dark) surfaces use the navy primary color, not ink */
   .cta-strip,.marquee{background:var(--primary)}
@@ -139,7 +140,7 @@
   .big-wall-meta{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--mute)}
 
   .big-wall-scene{position:relative;background:var(--paper);border:1.5px solid var(--ink);overflow:hidden;min-height:560px;padding:26px}
-  .wall-ground{position:absolute;bottom:0;left:0;right:0;height:26px;background:#D8D3C6;border-top:1px solid var(--ink)}
+  .wall-ground{position:absolute;bottom:0;left:0;right:0;height:26px;background:var(--line);border-top:1px solid var(--ink)}
   .side-wall{position:absolute;top:0;bottom:26px;width:26px;pointer-events:none}
   .side-wall.left{left:0;background:linear-gradient(to right,rgba(0,23,31,0.12),transparent)}
   .side-wall.right{right:0;background:linear-gradient(to left,rgba(0,23,31,0.12),transparent)}
@@ -157,18 +158,18 @@
 
   /* Compact thumbnails — small enough to keep wall-in-focus dominant */
   .wall-thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
-  .wall-thumb{background:var(--paper);border:1.5px solid var(--ink);padding:6px 8px;display:flex;flex-direction:column;gap:3px;cursor:pointer;transition:all 0.2s;position:relative;min-width:0}
-  .wall-thumb:hover{background:var(--ink);color:var(--paper)}
-  .wall-thumb:hover .thumb-meta{color:var(--paper);opacity:0.7}
+  .wall-thumb{background:var(--paper);border:1.5px solid var(--ink);padding:6px 8px;display:flex;flex-direction:column;gap:3px;cursor:pointer;transition:background 0.2s, border-color 0.2s, color 0.2s;position:relative;min-width:0}
+  .wall-thumb:hover{background:rgba(9,61,83,0.05);border-color:var(--primary-light);color:var(--primary-light)}
+  .wall-thumb:hover .thumb-meta{color:var(--primary-light);opacity:1}
   .thumb-label{font-family:'Archivo Black',sans-serif;font-size:10px;text-transform:uppercase;letter-spacing:-0.01em}
   .thumb-meta{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.05em;color:var(--mute);transition:color 0.2s}
-  .thumb-surface-wrap{aspect-ratio:16/7;display:flex;align-items:center;justify-content:center;background:#D8D3C6;padding:3px;border:1.5px solid var(--ink)}
+  .thumb-surface-wrap{aspect-ratio:16/7;display:flex;align-items:center;justify-content:center;background:var(--line);padding:3px;border:1.5px solid var(--ink)}
   .thumb-surface{position:relative;background:var(--wall);border:1px solid var(--ink);overflow:hidden}
   .thumb-surface .mini-panel{position:absolute;background:var(--accent);border:0.5px solid var(--ink);overflow:hidden}
   .thumb-surface .mini-panel img{display:block;pointer-events:none}
-  .wall-thumb:hover .mini-panel{border-color:var(--paper)}
+  .wall-thumb:hover .mini-panel{border-color:var(--ink)}
   .thumb-count{position:absolute;top:3px;right:3px;font-size:9px;font-weight:700;color:var(--mute);background:var(--paper);padding:1px 4px;border:1px solid var(--ink);z-index:2}
-  .wall-thumb:hover .thumb-count{background:var(--ink);color:var(--paper);border-color:var(--paper)}
+  .wall-thumb:hover .thumb-count{background:var(--paper);color:var(--primary-light);border-color:var(--primary-light)}
 
   .placed-panel{position:absolute;background:var(--accent);border:1.5px solid var(--ink);cursor:grab;transition:transform 0.1s, z-index 0s, box-shadow 0.15s, outline 0.15s;display:flex;align-items:center;justify-content:center;color:var(--ink);font-family:'Archivo Black',sans-serif;font-size:10px;text-align:center;user-select:none;overflow:hidden;touch-action:none}
   .placed-panel.dragging{cursor:grabbing;z-index:20;box-shadow:0 6px 20px rgba(0,23,31,0.3)}
