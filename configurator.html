@@ -223,6 +223,34 @@
   .tips-list li{padding-left:14px;position:relative;margin-bottom:5px}
   .tips-list li::before{content:'→';position:absolute;left:0;color:var(--accent);font-weight:700}
 
+  /* SIZE TIPS CARD */
+  #sizeTipsSection{transition:opacity 0.22s ease,transform 0.22s ease}
+  .size-tips-inner{transition:opacity 0.15s ease}
+  .stips-diagram{display:flex;align-items:center;gap:14px;padding-bottom:12px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+  .stips-dim-meta{display:flex;flex-direction:column;gap:3px}
+  .stips-dim-size{font-family:'Archivo Black',sans-serif;font-size:21px;letter-spacing:-0.03em;line-height:1;color:var(--ink)}
+  .stips-dim-ft{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--mute)}
+  .stips-orient{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--primary-light);margin-top:1px}
+  .stips-cols{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px}
+  .stips-col-head{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;margin-bottom:5px}
+  .stips-col-head.good{color:var(--accent)}
+  .stips-col-head.bad{color:var(--mute)}
+  .stips-col ul{list-style:none;margin:0;padding:0}
+  .stips-col ul li{font-size:10px;line-height:1.5;padding-left:13px;position:relative;margin-bottom:3px;color:var(--ink)}
+  .stips-col.good ul li::before{content:'✓';position:absolute;left:0;color:var(--accent);font-weight:700}
+  .stips-col.bad ul li{opacity:0.5}
+  .stips-col.bad ul li::before{content:'✗';position:absolute;left:0;font-weight:700}
+  .stips-bonus{font-size:10px;line-height:1.55;padding:7px 10px;border-left:2px solid var(--accent);margin-bottom:10px;color:var(--ink);background:rgba(236,173,73,0.07)}
+  .stips-bonus::before{content:'→ ';font-weight:700;color:var(--accent)}
+  details.stips-general{border-top:1px solid var(--line);padding-top:10px;margin-top:4px}
+  details.stips-general summary{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--mute);cursor:pointer;list-style:none;display:flex;align-items:center;justify-content:space-between;user-select:none;outline:none}
+  details.stips-general summary::-webkit-details-marker{display:none}
+  details.stips-general .stips-toggle{font-size:8px;display:inline-block;transition:transform 0.18s;margin-left:4px}
+  details.stips-general[open] .stips-toggle{transform:rotate(-180deg)}
+  details.stips-general .gen-list{list-style:none;padding:0;margin:8px 0 2px}
+  details.stips-general .gen-list li{font-size:10px;line-height:1.5;padding-left:13px;position:relative;margin-bottom:3px;color:var(--mute)}
+  details.stips-general .gen-list li::before{content:'→';position:absolute;left:0;color:var(--accent);font-weight:700;font-size:9px}
+
   .panel-actions{display:none;padding:14px 32px;border-bottom:1.5px solid var(--ink);gap:8px;flex-wrap:wrap;align-items:center}
   .panel-actions.visible{display:flex}
   .action-btn{flex:1 1 0;min-width:0;padding:10px 14px;font-family:inherit;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;text-align:center;text-decoration:none;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);cursor:pointer;transition:all 0.2s;min-height:38px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;justify-content:center;gap:6px}
@@ -584,6 +612,11 @@
       </div>
     </div>
 
+    <div class="side-section" id="sizeTipsSection" style="display:none;opacity:0;transform:translateY(4px)">
+      <div class="side-title">Image tips</div>
+      <div id="sizeTipsInner" class="size-tips-inner"></div>
+    </div>
+
     <div class="side-section">
       <div class="side-title">Print tips</div>
       <ul class="tips-list">
@@ -715,6 +748,99 @@ const floatAmount = $('floatAmount');
 const orientToggle = $('orientToggle');
 const modeIndicator = $('modeIndicator');
 const panHintText = $('panHintText');
+const sizeTipsSection = $('sizeTipsSection');
+const sizeTipsInner = $('sizeTipsInner');
+
+const SIZE_TIPS = {
+  '1x1':          {w:1,h:1,orient:'Square',   good:['Logos & monograms','Bold icons','Tight portrait crops','Abstract geometry'],          bad:['Landscape photos','Fine text & detail','Important edge content'],         bonus:null},
+  '2x1-horizontal':{w:2,h:1,orient:'Landscape', good:['Horizon lines & cityscapes','Wide album art','Sound wave graphics','Cinematic stills'],   bad:['Portraits','Strong vertical emphasis'],                                  bonus:null},
+  '2x1-vertical':  {w:1,h:2,orient:'Vertical',  good:['Tall portraits','Narrow architectural shots','Vertical abstract art','Bold vertical type'], bad:['Landscape photos','Wide horizontal compositions'],                       bonus:null},
+  '2x2':          {w:2,h:2,orient:'Square',   good:['Photography','Illustrations & album covers','Balanced compositions','Any orientation'], bad:['Ultra-fine text'],                                                         bonus:'Two 2×2s side by side split one image into a clean diptych.'},
+  '4x2-horizontal':{w:4,h:2,orient:'Landscape', good:['Panoramic landscapes','Studio shots','Abstract horizontal art','Bold typography banners'],bad:['Small logos','Single-subject portraits'],                                bonus:'A square image splits cleanly across two 4×2s stacked vertically.'},
+  '4x2-vertical':  {w:2,h:4,orient:'Vertical',  good:['Full-length portraits','Tall architecture','Floor-to-ceiling abstracts','Statement murals'],bad:['Landscape photos','Horizontal compositions'],                          bonus:'Two vertical 4×2s side by side can flank a doorway or window.'},
+  '1x4-vertical':  {w:1,h:4,orient:'Vertical',  good:['Vertical portraits','Architecture & towers','Abstract vertical patterns'],              bad:['Wide landscapes','Horizontal compositions'],                               bonus:'Two 1×4s each hold one half of a split portrait.'},
+  '1x4-horizontal':{w:4,h:1,orient:'Horizontal', good:['Ultra-wide panoramas','Skyline & horizon shots','Architectural cross-sections','Abstract horizontal flow'],bad:['Portraits','Vertical emphasis','Fine detail'],         bonus:null}
+};
+
+function buildDiagramSVG(fw, fh) {
+  const maxD = 60, vw = 72, vh = 72;
+  const ratio = fw / fh;
+  let rw = ratio >= 1 ? maxD : Math.round(maxD * ratio);
+  let rh = ratio < 1  ? maxD : Math.round(maxD / ratio);
+  rw = Math.max(rw, 12); rh = Math.max(rh, 12);
+  const x = Math.round((vw - rw) / 2);
+  const y = Math.round((vh - rh) / 2);
+  return `<svg width="72" height="72" viewBox="0 0 72 72" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <rect x="${x}" y="${y}" width="${rw}" height="${rh}" fill="rgba(9,61,83,0.05)" stroke="var(--ink)" stroke-width="1.5"/>
+    <rect x="${x+3}" y="${y+3}" width="${rw-6}" height="${rh-6}" fill="none" stroke="var(--ink)" stroke-width="0.5" opacity="0.3"/>
+  </svg>`;
+}
+
+function buildTipsHTML(d) {
+  const goodItems = d.good.map(t=>`<li>${t}</li>`).join('');
+  const badItems  = d.bad.map(t=>`<li>${t}</li>`).join('');
+  const bonus = d.bonus ? `<p class="stips-bonus">${d.bonus}</p>` : '';
+  return `
+    <div class="stips-diagram">
+      ${buildDiagramSVG(d.w, d.h)}
+      <div class="stips-dim-meta">
+        <span class="stips-dim-size">${d.w} × ${d.h}</span>
+        <span class="stips-dim-ft">feet</span>
+        <span class="stips-orient">${d.orient}</span>
+      </div>
+    </div>
+    <div class="stips-cols">
+      <div class="stips-col good">
+        <div class="stips-col-head good">Works well</div>
+        <ul>${goodItems}</ul>
+      </div>
+      <div class="stips-col bad">
+        <div class="stips-col-head bad">Avoid</div>
+        <ul>${badItems}</ul>
+      </div>
+    </div>
+    ${bonus}
+    <details class="stips-general">
+      <summary>General guidelines <span class="stips-toggle">▾</span></summary>
+      <ul class="gen-list">
+        <li>High contrast beats subtle gradients through acoustic fabric</li>
+        <li>Dark-on-dark loses definition — use bright accents on dark backgrounds</li>
+        <li>Leave breathing room around focal point — wood frame overlaps the outer edge</li>
+      </ul>
+    </details>`;
+}
+
+function showSizeTips(size, orient) {
+  const orientation = orient !== undefined ? orient : (currentPanel.orientation || 'horizontal');
+  const key = SIZE_TIPS[`${size}-${orientation}`] !== undefined ? `${size}-${orientation}` : size;
+  const d = SIZE_TIPS[key];
+  if (!d) return;
+  if (sizeTipsSection.style.display === 'none' || sizeTipsSection.style.display === '') {
+    sizeTipsInner.innerHTML = buildTipsHTML(d);
+    sizeTipsSection.style.display = 'block';
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      sizeTipsSection.style.opacity = '1';
+      sizeTipsSection.style.transform = 'translateY(0)';
+    }));
+  } else {
+    sizeTipsInner.style.opacity = '0';
+    setTimeout(() => {
+      sizeTipsInner.innerHTML = buildTipsHTML(d);
+      sizeTipsInner.style.opacity = '1';
+    }, 150);
+  }
+}
+
+function hideSizeTips() {
+  if (sizeTipsSection.style.display === 'none' || sizeTipsSection.style.display === '') return;
+  sizeTipsSection.style.opacity = '0';
+  sizeTipsSection.style.transform = 'translateY(-5px)';
+  setTimeout(() => {
+    sizeTipsSection.style.display = 'none';
+    sizeTipsSection.style.opacity = '0';
+    sizeTipsSection.style.transform = 'translateY(4px)';
+  }, 230);
+}
 const artworkLine = $('artworkLine') || {classList:{add:()=>{},remove:()=>{}},set innerHTML(v){},get innerHTML(){return ''}};
 const replaceBtn = $('replaceBtn');
 const clearArtGroup = $('clearArtGroup');
@@ -788,6 +914,7 @@ sizeCards.forEach(card=>{
     updatePanelPreview();
     showDesigner();
     panelActions.classList.add('visible');
+    if (!currentPanel.image) showSizeTips(card.dataset.size);
   });
 });
 
@@ -808,6 +935,7 @@ document.querySelectorAll('.orient-btn').forEach(btn=>{
     currentPanel.orientation = btn.dataset.orient;
     updatePanelPreview();
     if(currentPanel.image) setTimeout(fitImageToPanel, 50);
+    else showSizeTips(currentPanel.size, btn.dataset.orient);
   });
 });
 
@@ -965,6 +1093,7 @@ function handleImageUpload(file){
       clearArtGroup.style.display = 'flex';
       panelFace.classList.add('has-image');
       fitImageToPanel();
+      hideSizeTips();
 
       artworkLine.classList.add('loaded');
       const shortName = file.name.length > 28 ? file.name.slice(0,25)+'...' : file.name;
@@ -1436,6 +1565,7 @@ function resetCurrentPanel(){
   imgZoom = 1; imgPos = {x:0, y:0}; imgNaturalW = 0; imgNaturalH = 0;
   imgFlipH = false; imgFlipV = false; imgRotate = 0;
   sizeCards.forEach(c=>c.classList.remove('selected'));
+  hideSizeTips();
   designer.classList.remove('active');
   panelImage.style.display = 'none';
   panelImage.src = '';
@@ -1637,6 +1767,7 @@ function loadPanelToEditor(panel){
   panelActions.classList.add('visible');
   customSection.style.display = 'block';
 
+  hideSizeTips();
   panelImage.src = panel.image;
   panelImage.style.display = 'block';
   panelFace.classList.add('has-image');
