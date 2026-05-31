@@ -271,7 +271,7 @@ The wall containers below the main canvas (Left Wall, Back Wall, Right Wall) use
 ---
 
 ## Task #DES-8: Contextual Image Tips on Size Selection in Configurator
-- **Status:** TODO
+- **Status:** DONE (committed `bdeb20c`)
 - **Priority:** MEDIUM
 - **File:** configurator.html
 
@@ -315,12 +315,12 @@ When a user selects a panel size in the configurator (before uploading an image)
 - Replaces or sits alongside the existing static "Print tips" section (decide during implementation).
 
 ### Acceptance Criteria
-- [ ] Tip card appears in sidebar when a size is selected
-- [ ] Content updates to match the selected size
-- [ ] General tips shown alongside size-specific content
-- [ ] Tip card disappears after image upload
-- [ ] Styling matches existing sidebar sections
-- [ ] Does not interfere with upload or preview functionality
+- [x] Tip card appears in sidebar when a size is selected
+- [x] Content updates to match the selected size
+- [x] General tips shown alongside size-specific content
+- [x] Tip card disappears after image upload
+- [x] Styling matches existing sidebar sections
+- [x] Does not interfere with upload or preview functionality
 
 ---
 
@@ -376,3 +376,104 @@ This task requires a `/brainstorm` session in Claude Code before any code is wri
 - [ ] Slider transitions are smooth and performant
 - [ ] Works on desktop and mobile
 - [ ] Animation details finalized during brainstorm session
+
+---
+
+## Task #DES-10: Manufacturing Process Illustration on How It Works Page
+- **Status:** TODO
+- **Priority:** MEDIUM
+- **File:** how-it-works.html (new page — TBD if standalone or section within existing page)
+
+### Goal
+Add a horizontal timeline section showcasing the 7-step panel manufacturing process using the minimal line art SVG illustrations generated from Claude Design.
+
+### Layout
+
+**Desktop:**
+- Full-width horizontal strip with all 7 steps in a single row.
+- Each step: numbered label (01–07) above, illustration in the center, step name below.
+- Thin connecting line running horizontally through all steps.
+
+**Mobile:**
+- Horizontal scroll with CSS scroll-snap (snap to each step).
+- Dot indicators below showing current position (e.g., step 3 of 7).
+- Swipe to navigate between steps.
+
+### The 7 Steps
+1. Source Wood
+2. Create Frame
+3. Install Rockwool
+4. Add Fiberglass Backing
+5. Add Back Support
+6. Apply Acoustic Cloth
+7. Package & Ship
+
+### Assets
+- SVG illustrations from `/design-references/manufacturing-process/`
+
+### Animation
+- Scroll-triggered: illustrations draw themselves (stroke-dasharray/dashoffset line-draw effect) as the section enters the viewport.
+- Steps reveal sequentially with a stagger delay (e.g., 150ms between each step).
+- This section is on a How It Works page — blueprint design elements can be used at full intensity here (Tier 2–3 per design.md). Dimension lines, technical labels, and construction-line styling are encouraged.
+
+### Constraints
+- SVGs must retain clean path structure for animation targeting. If paths are flattened, restructure before implementing.
+- No autoplay animation — only triggers on scroll into viewport.
+- Illustrations should be consistent in size and visual weight (match the Claude Design output).
+- Connecting line between steps should feel technical (thin, precise) not decorative.
+
+### Acceptance Criteria
+- [ ] All 7 steps displayed in a horizontal timeline on desktop
+- [ ] Mobile: horizontal scroll with snap points and dot indicators
+- [ ] Line-draw animation triggers on scroll into viewport
+- [ ] Steps reveal sequentially with stagger delay
+- [ ] Blueprint design elements applied per design.md Tier 2–3 guidelines
+- [ ] SVGs sourced from `/design-references/manufacturing-process/`
+- [ ] Connecting line between steps is visible and consistent
+- [ ] No animation jank or layout shift
+
+---
+
+## Task #DES-11: Update Header Logo and Nav Text Across All Pages
+- **Status:** TODO
+- **Priority:** HIGH
+- **File:** index.html, configurator.html, room-visualizer.html (+ any future pages)
+
+### Goal
+Replace the current placeholder "ACOUSTIC◆" text logo in the navigation with the actual Ahata logo and brand name using the Bicubik font.
+
+### Assets
+- Logo files: `/design-references/logos/` (4 variants: logo only, logo + text vertical, logo + text horizontal, text only)
+- Font file: `/design-references/fonts/` (Bicubik)
+
+### Behavior Spec
+
+**Nav logo:**
+- Replace the current `.logo` element (text-based "ACOUSTIC◆") with the appropriate Ahata logo variant.
+- Recommended variant for nav: logo + text horizontal (best fit for horizontal nav bar). Confirm during implementation.
+- Logo links to homepage (`index.html`) — preserve existing behavior.
+
+**Font integration:**
+- Load Bicubik font via `@font-face` (self-hosted from `/design-references/fonts/`).
+- Apply Bicubik to the brand name text in the logo lockup.
+- Do not apply Bicubik to any other site text (headings, body, buttons) unless explicitly decided later.
+
+**Consistency:**
+- Logo must be updated on ALL existing pages (index.html, configurator.html, room-visualizer.html).
+- Footer brand text ("ACOUSTIC◆" or similar) should also update to Ahata.
+- Any other references to "ACOUSTIC" or "Acoustic" in copy, titles, or meta tags should update to "Ahata".
+
+### Constraints
+- Do not change nav layout or structure — only swap the logo content.
+- Do not change nav link destinations or styling.
+- Logo should maintain clear space and legibility at nav bar height.
+- If the SVG logo variant has sizing issues at nav scale, fall back to text-only variant in Bicubik.
+
+### Acceptance Criteria
+- [ ] Nav displays Ahata logo on all three existing pages
+- [ ] Bicubik font loaded via @font-face and applied to logo text
+- [ ] Logo links to homepage
+- [ ] Footer brand text updated to Ahata
+- [ ] All "ACOUSTIC" references replaced with "Ahata" across all pages
+- [ ] Logo is legible and properly sized at nav bar height
+- [ ] No layout shifts or broken styling from the swap
