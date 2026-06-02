@@ -435,9 +435,9 @@ Add a horizontal timeline section showcasing the 7-step panel manufacturing proc
 ---
 
 ## Task #DES-11: Update Header Logo and Nav Text Across All Pages
-- **Status:** TODO
+- **Status:** DONE (committed `daf199b`)
 - **Priority:** HIGH
-- **File:** index.html, configurator.html, room-visualizer.html (+ any future pages)
+- **File:** index.html, configurator.html, room-visualizer.html, how-it-works.html, about.html
 
 ### Goal
 Replace the current placeholder "ACOUSTIC◆" text logo in the navigation with the actual Ahata logo and brand name using the Bicubik font.
@@ -470,10 +470,10 @@ Replace the current placeholder "ACOUSTIC◆" text logo in the navigation with t
 - If the SVG logo variant has sizing issues at nav scale, fall back to text-only variant in Bicubik.
 
 ### Acceptance Criteria
-- [ ] Nav displays Ahata logo on all three existing pages
-- [ ] Bicubik font loaded via @font-face and applied to logo text
-- [ ] Logo links to homepage
-- [ ] Footer brand text updated to Ahata
-- [ ] All "ACOUSTIC" references replaced with "Ahata" across all pages
-- [ ] Logo is legible and properly sized at nav bar height
+- [x] Nav displays Ahata logo on all five existing pages
+- [~] Bicubik font — not used; logo delivered as PNG mark (1.png) + wordmark (4.png) side by side
+- [x] Logo links to homepage
+- [ ] Footer brand text updated to Ahata (deferred)
+- [ ] All "ACOUSTIC" references replaced with "Ahata" across all pages (deferred)
+- [x] Logo is legible and properly sized at nav bar height (64px nav, mark 50px, wordmark 64px)
 - [ ] No layout shifts or broken styling from the swap

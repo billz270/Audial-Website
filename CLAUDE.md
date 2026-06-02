@@ -25,13 +25,18 @@ ahata-website/
 ├── room-visualizer.html       ← wall layout planner with drag/marquee/snap
 ├── how-it-works.html          ← explainer page (acoustics myths above CTA)
 ├── about.html                 ← about/founder page
-└── assets/
-    ├── Logo_and_Name_Horizontal.svg
-    ├── Logo_and_Name_Vertical.svg
-    └── Primary.svg
+└── design-references/
+    └── assets/
+        ├── logos/
+        │   ├── 1.png              ← logo mark only (2000×2000)
+        │   ├── 2.png              ← logo + name vertical
+        │   ├── 3.png              ← logo + name horizontal (full combo)
+        │   └── 4.png              ← wordmark only / name only (2299×600)
+        ├── old-logo/              ← archived original SVG files
+        └── website-icons/         ← ahata-v3-*.svg icon set
 ```
 
-The horizontal logo SVG is also inlined directly into every HTML file's nav, so the assets folder is technically backup. Adding a font or photo? Drop it in `assets/` and ask Claude to wire it up.
+The nav logo is composed of two `<img>` tags inside `.logo`: `1.png` (mark, 50px height) + `4.png` (wordmark, 64px height), gap 8px. Nav auto-sizes to 64px. Adding a font or photo? Drop it in `assets/` and ask Claude to wire it up.
 
 ---
 
@@ -132,6 +137,8 @@ _(none)_
 _(none)_
 
 ### Recently resolved
+- **Nav logo swap (DES-11)** ✓ — Replaced inline SVG placeholder with two-PNG combo: `1.png` (logo mark, 50px) + `4.png` (wordmark, 64px), side by side with `gap:8px` in `.logo`. Nav height auto-sizes to 64px. Both PNGs have `--paper` background so whitespace is invisible. CSS classes: `.brand-logo-mark` / `.brand-logo-text`. Footer "ACOUSTIC◆" references and page title updates deferred. (`index.html`, `configurator.html`, `room-visualizer.html`, `how-it-works.html`, `about.html`)
+
 - **Contextual image tips (DES-8)** ✓ — Dynamic "Image tips" sidebar card in configurator. Appears on size selection, disappears on upload. Orientation-aware (2×1, 4×2, 1×4 each have horizontal + vertical tip sets). Shows aspect-ratio SVG diagram, Works well / Avoid columns, optional bonus tip, and collapsible general guidelines. (`configurator.html`, `SIZE_TIPS`, `showSizeTips`, `hideSizeTips`)
 
 ### Design/Brand (future)
