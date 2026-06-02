@@ -38,7 +38,7 @@
   .nav-links a:hover::after,.nav-links a.active::after,.nav-links button:hover::after{content:'';position:absolute;left:0;right:0;bottom:-4px;height:2px;background:var(--accent)}
 
   /* HERO — integrated banner with showcase */
-  .hero{padding:48px 40px 56px;border-bottom:1.5px solid var(--ink);display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;position:relative}
+  .hero{padding:48px 40px 56px;border-bottom:1.5px solid var(--ink);display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:stretch;position:relative}
   .hero-label{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;margin-bottom:22px;display:flex;align-items:center;gap:12px;color:var(--mute)}
   .hero-label::before{content:'';width:40px;height:2px;background:var(--accent)}
   h1{font-family:'Archivo Black',sans-serif;font-size:clamp(56px,9vw,140px);line-height:0.85;letter-spacing:-0.04em;margin-bottom:24px;text-transform:uppercase}
@@ -49,7 +49,7 @@
   .hero-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:28px}
   .hero-tag{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:5px 10px;border:1.5px solid var(--ink);background:var(--paper)}
   .hero-tag .dot{color:var(--accent);margin-right:4px}
-  .cta-group{display:flex;gap:0;border:1.5px solid var(--ink);max-width:480px}
+  .cta-group{display:flex;gap:0;border:1.5px solid var(--ink);max-width:480px;margin-top:auto}
   .cta{padding:16px 24px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;text-decoration:none;color:var(--ink);background:var(--paper);transition:all 0.2s;border-right:1.5px solid var(--ink);flex:1;text-align:center;font-family:inherit;border-top:none;border-bottom:none;border-left:none;cursor:pointer}
   .cta:last-child{border-right:none}
   .cta.primary{background:var(--ink);color:var(--paper)}
@@ -65,22 +65,78 @@
      Row 3   cols 3-4: 2×1 ft panel (wide)
      Row 3   cols 5-6: 2×1 ft panel (wide)
      Row 4   cols 3,4,5,6: 1×1 ft panels (×4)        */
-  .showcase{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(4,1fr);gap:8px;aspect-ratio:1.75;max-width:600px;margin-left:auto}
+  .showcase{display:grid;grid-template-columns:repeat(7,1fr);grid-template-rows:repeat(5,1fr);gap:8px;width:100%;height:100%;overflow:hidden}
   .panel-mock{position:relative;border:1.5px solid var(--ink);overflow:hidden;background:var(--paper);box-shadow:0 4px 14px rgba(0,23,31,0.12)}
   .panel-mock::after{content:'';position:absolute;left:0;right:0;bottom:0;height:6%;background:linear-gradient(to bottom,transparent,rgba(0,0,0,0.18));pointer-events:none}
   .panel-mock .label{position:absolute;left:7px;bottom:6px;font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:var(--paper);background:rgba(9,61,83,0.78);padding:2px 6px;z-index:2}
   .panel-mock svg{display:block;width:100%;height:100%}
   /* Cell placements */
-  .mock-4x2-a{grid-column:1/5;grid-row:1/3}    /* top-left wide 4×2 */
-  .mock-2x2-a{grid-column:5/7;grid-row:1/3}    /* top-mid 2×2 */
-  .mock-1x4-a{grid-column:7/8;grid-row:1/5}    /* right edge tall 1×4 */
-  .mock-2x2-b{grid-column:1/3;grid-row:3/5}    /* bottom-left 2×2 */
-  .mock-2x1-a{grid-column:3/5;grid-row:3/4}    /* mid 2×1 */
-  .mock-2x1-b{grid-column:5/7;grid-row:3/4}    /* mid-right 2×1 */
+  .mock-4x2-a{grid-column:1/5;grid-row:1/3}
+  .mock-2x2-a{grid-column:5/7;grid-row:1/3}
+  .mock-1x4-a{grid-column:7/8;grid-row:1/6}
+  .mock-2x2-b{grid-column:1/3;grid-row:3/5}
+  .mock-2x1-a{grid-column:3/5;grid-row:3/4}
+  .mock-2x1-b{grid-column:5/7;grid-row:3/4}
   .mock-1x1-a{grid-column:3/4;grid-row:4/5}
   .mock-1x1-b{grid-column:4/5;grid-row:4/5}
   .mock-1x1-c{grid-column:5/6;grid-row:4/5}
   .mock-1x1-d{grid-column:6/7;grid-row:4/5}
+  .mock-4x1-a{grid-column:1/5;grid-row:5/6}
+  .mock-2x1-c{grid-column:5/7;grid-row:5/6}
+
+  /* Hero columns */
+  .hero-left{display:flex;flex-direction:column}
+  .hero-right{height:100%;display:flex;flex-direction:column;position:relative;overflow:visible}
+
+  /* Slider structure */
+  .slide-wrapper{position:relative;flex:1;min-height:0;overflow:hidden}
+  .slide{position:absolute;inset:0;opacity:0;transition:opacity 1.2s ease-in-out;pointer-events:none}
+  .slide.active{opacity:1;pointer-events:auto}
+  .slide-dots{position:absolute;top:100%;left:0;right:0;display:flex;justify-content:center;gap:8px;padding-top:10px}
+  .slide-dot{width:8px;height:8px;border:1.5px solid var(--ink);background:transparent;cursor:pointer;transition:background 0.2s}
+  .slide-dot.active{background:var(--ink)}
+
+  /* Slide 1: line-draw configs */
+  .slide-configs{height:100%;display:flex;flex-direction:column;justify-content:space-around;padding:16px 0}
+  .cfg{display:flex;justify-content:center;align-items:center;flex:1;min-height:0;overflow:hidden}
+  .slide-configs svg{width:100%;height:100%;fill:none;stroke:var(--ink);stroke-width:1.5}
+  .slide-configs path,.slide-configs rect,.slide-configs line,.slide-configs polyline{stroke-dasharray:3000;stroke-dashoffset:3000}
+  .slide-configs circle{stroke-dasharray:3000;stroke-dashoffset:3000;fill:none;stroke:var(--ink);stroke-width:1.5}
+  .slide.active .cfg-1 svg path,.slide.active .cfg-1 svg rect,.slide.active .cfg-1 svg line{animation:lineDraw 1.8s cubic-bezier(0.4,0,0.2,1) 0.1s forwards}
+  .slide.active .cfg-1 svg circle{animation:lineDraw 0.5s ease 1.7s forwards}
+  .slide.active .cfg-2 svg path,.slide.active .cfg-2 svg rect,.slide.active .cfg-2 svg line{animation:lineDraw 1.6s cubic-bezier(0.4,0,0.2,1) 1.0s forwards}
+  .slide.active .cfg-2 svg circle{animation:lineDraw 0.5s ease 2.4s forwards}
+  .slide.active .cfg-3 svg path,.slide.active .cfg-3 svg rect,.slide.active .cfg-3 svg line{animation:lineDraw 1.5s cubic-bezier(0.4,0,0.2,1) 1.9s forwards}
+  .slide.active .cfg-3 svg circle{animation:lineDraw 0.5s ease 3.2s forwards}
+  @keyframes lineDraw{to{stroke-dashoffset:0}}
+
+  /* Slide 2: panel settle */
+  .slide-2-inner{width:100%;height:100%}
+  .slide .panel-mock{opacity:0;transform:scale(2.6) rotateX(20deg)}
+  @keyframes settle-p1 {from{opacity:0;transform:scale(2.6) rotateX(20deg) translate(-6%,-8%)} to{opacity:1;transform:none}}
+  @keyframes settle-p2 {from{opacity:0;transform:scale(2.4) rotateX(22deg) translate(8%,-10%)} to{opacity:1;transform:none}}
+  @keyframes settle-p3 {from{opacity:0;transform:scale(2.8) rotateX(18deg) translate(10%,-4%)} to{opacity:1;transform:none}}
+  @keyframes settle-p4 {from{opacity:0;transform:scale(2.3) rotateX(24deg) translate(-9%,8%)} to{opacity:1;transform:none}}
+  @keyframes settle-p5 {from{opacity:0;transform:scale(2.5) rotateX(20deg) translate(4%,7%)} to{opacity:1;transform:none}}
+  @keyframes settle-p6 {from{opacity:0;transform:scale(2.2) rotateX(22deg) translate(-5%,-11%)} to{opacity:1;transform:none}}
+  @keyframes settle-p7 {from{opacity:0;transform:scale(2.7) rotateX(19deg) translate(-11%,5%)} to{opacity:1;transform:none}}
+  @keyframes settle-p8 {from{opacity:0;transform:scale(2.1) rotateX(21deg) translate(9%,12%)} to{opacity:1;transform:none}}
+  @keyframes settle-p9 {from{opacity:0;transform:scale(1.9) rotateX(23deg) translate(-3%,-7%)} to{opacity:1;transform:none}}
+  @keyframes settle-p10{from{opacity:0;transform:scale(2.4) rotateX(20deg) translate(6%,-5%)} to{opacity:1;transform:none}}
+  @keyframes settle-p11{from{opacity:0;transform:scale(2.3) rotateX(21deg) translate(-7%,9%)} to{opacity:1;transform:none}}
+  @keyframes settle-p12{from{opacity:0;transform:scale(2.5) rotateX(19deg) translate(5%,11%)} to{opacity:1;transform:none}}
+  .slide.active .p1 {animation:settle-p1  0.8s cubic-bezier(0.22,1,0.36,1) 0.00s forwards}
+  .slide.active .p2 {animation:settle-p2  0.8s cubic-bezier(0.22,1,0.36,1) 0.10s forwards}
+  .slide.active .p3 {animation:settle-p3  0.8s cubic-bezier(0.22,1,0.36,1) 0.04s forwards}
+  .slide.active .p4 {animation:settle-p4  0.8s cubic-bezier(0.22,1,0.36,1) 0.22s forwards}
+  .slide.active .p5 {animation:settle-p5  0.8s cubic-bezier(0.22,1,0.36,1) 0.30s forwards}
+  .slide.active .p6 {animation:settle-p6  0.8s cubic-bezier(0.22,1,0.36,1) 0.38s forwards}
+  .slide.active .p7 {animation:settle-p7  0.8s cubic-bezier(0.22,1,0.36,1) 0.44s forwards}
+  .slide.active .p8 {animation:settle-p8  0.8s cubic-bezier(0.22,1,0.36,1) 0.50s forwards}
+  .slide.active .p9 {animation:settle-p9  0.8s cubic-bezier(0.22,1,0.36,1) 0.55s forwards}
+  .slide.active .p10{animation:settle-p10 0.8s cubic-bezier(0.22,1,0.36,1) 0.60s forwards}
+  .slide.active .p11{animation:settle-p11 0.8s cubic-bezier(0.22,1,0.36,1) 0.68s forwards}
+  .slide.active .p12{animation:settle-p12 0.8s cubic-bezier(0.22,1,0.36,1) 0.74s forwards}
 
   /* PROCESS — compact 4-step grid */
   .process{padding:56px 40px;border-bottom:1.5px solid var(--ink)}
@@ -173,7 +229,9 @@
     nav{padding:0 20px}
     .nav-links{display:none}
     .hero{grid-template-columns:1fr;padding:36px 20px 48px;gap:32px}
-    .showcase{max-width:100%;margin:0 auto}
+    .hero-right{height:auto}
+    .slide-wrapper{aspect-ratio:1.4;flex:none}
+    .cta-group{margin-top:0}
     .process,.why-strip{padding:48px 20px}
     .process-header{grid-template-columns:1fr;gap:18px;margin-bottom:24px}
     footer{grid-template-columns:1fr 1fr;padding:40px 20px 20px;gap:28px}
@@ -221,7 +279,7 @@
 </nav>
 
 <section class="hero">
-  <div>
+  <div class="hero-left">
     <div class="hero-label">Listening spaces · Reimagined</div>
     <h1><span class="word-sound">SOUND</span><br><span class="word-as">AS</span><br><span class="word-art">ART.</span></h1>
     <p class="hero-desc">Hand-built acoustic panels that carry your artwork. For studios, theaters, and rooms that deserve better than foam.</p>
@@ -238,9 +296,70 @@
     </div>
   </div>
 
-  <div class="showcase" aria-label="Sample personalized panel arrangements">
-    <!-- 4×2 ft wide landscape (top-left, dominant) -->
-    <div class="panel-mock mock-4x2-a">
+  <div class="hero-right">
+    <div class="slide-wrapper">
+
+      <!-- SLIDE 1: Line art configurations -->
+      <div class="slide active" id="heroSlide1">
+        <div class="slide-configs">
+          <div class="cfg cfg-1">
+            <svg viewBox="70 70 340 170" preserveAspectRatio="xMidYMid meet" fill="none" stroke="var(--ink)" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+              <defs><clipPath id="cp1"><rect x="77" y="77" width="326" height="156"/></clipPath></defs>
+              <rect x="70" y="70" width="340" height="170"/>
+              <rect x="77" y="77" width="326" height="156"/>
+              <g clip-path="url(#cp1)" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M77 186.2C129.2 126.9 181.3 114.4 233.5 142.5"/><path d="M116.1 176.8C86.8 158.1 109.6 128.5 152 137.8C184.6 145.6 174.8 170.6 132.4 168.3C109.6 166.7 104.7 155 124.3 153.4"/><path d="M77 208C135.7 170.6 187.8 204.9 233.5 176.8"/><path d="M187.8 126.9C210.7 112.9 230.2 119.1 240 130.8"/><path d="M187.8 183.1C210.7 197.1 230.2 190.9 240 179.2"/><path d="M240 120.7C204.1 137.8 204.1 172.2 240 189.3"/><path d="M240 134.7C220.4 145.6 220.4 164.4 240 175.3"/><path d="M403 186.2C350.8 126.9 298.7 114.4 246.5 142.5"/><path d="M363.9 176.8C393.2 158.1 370.4 128.5 328 137.8C295.4 145.6 305.2 170.6 347.6 168.3C370.4 166.7 375.3 155 355.7 153.4"/><path d="M403 208C344.3 170.6 292.2 204.9 246.5 176.8"/><path d="M292.2 126.9C269.3 112.9 249.8 119.1 240 130.8"/><path d="M292.2 183.1C269.3 197.1 249.8 190.9 240 179.2"/><path d="M240 120.7C275.9 137.8 275.9 172.2 240 189.3"/><path d="M240 134.7C259.6 145.6 259.6 164.4 240 175.3"/><path d="M142.2 125.4C191.1 103.5 288.9 103.5 337.8 125.4"/><path d="M142.2 184.6C191.1 206.5 288.9 206.5 337.8 184.6"/>
+                <circle cx="240" cy="155" r="9"/><circle cx="240" cy="155" r="3.4"/>
+              </g>
+            </svg>
+          </div>
+          <div class="cfg cfg-2">
+            <svg viewBox="490 66 370 178" preserveAspectRatio="xMidYMid meet" fill="none" stroke="var(--ink)" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <clipPath id="cp2a"><rect x="497" y="73" width="164" height="164"/></clipPath>
+                <clipPath id="cp2b"><rect x="689" y="73" width="164" height="164"/></clipPath>
+              </defs>
+              <rect x="490" y="66" width="178" height="178"/><rect x="497" y="73" width="164" height="164"/><rect x="682" y="66" width="178" height="178"/><rect x="689" y="73" width="164" height="164"/>
+              <g clip-path="url(#cp2a)" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M497 187.8C549.5 125.5 602 112.4 654.4 141.9"/><path d="M536.4 178C506.8 158.3 529.8 127.1 572.4 137C605.2 145.2 595.4 171.4 552.8 168.9C529.8 167.3 524.9 155 544.6 153.4"/><path d="M497 210.8C556 171.4 608.5 207.5 654.4 178"/><path d="M608.5 125.5C631.5 110.7 651.2 117.3 661 129.6"/><path d="M608.5 184.5C631.5 199.3 651.2 192.7 661 180.4"/><path d="M661 118.9C624.9 137 624.9 173 661 191.1"/><path d="M661 133.7C641.3 145.2 641.3 164.8 661 176.3"/><path d="M825 187.8C772.5 125.5 720 112.4 667.6 141.9"/><path d="M785.6 178C815.2 158.3 792.2 127.1 749.6 137C716.8 145.2 726.6 171.4 769.2 168.9C792.2 167.3 797.1 155 777.4 153.4"/><path d="M825 210.8C766 171.4 713.5 207.5 667.6 178"/><path d="M713.5 125.5C690.5 110.7 670.8 117.3 661 129.6"/><path d="M713.5 184.5C690.5 199.3 670.8 192.7 661 180.4"/><path d="M661 118.9C697.1 137 697.1 173 661 191.1"/><path d="M661 133.7C680.7 145.2 680.7 164.8 661 176.3"/><path d="M562.6 123.8C611.8 100.9 710.2 100.9 759.4 123.8"/><path d="M562.6 186.2C611.8 209.1 710.2 209.1 759.4 186.2"/>
+                <circle cx="661" cy="155" r="9"/><circle cx="661" cy="155" r="3.4"/>
+              </g>
+              <g clip-path="url(#cp2b)" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M525 187.8C577.5 125.5 630 112.4 682.4 141.9"/><path d="M564.4 178C534.8 158.3 557.8 127.1 600.4 137C633.2 145.2 623.4 171.4 580.8 168.9C557.8 167.3 552.9 155 572.6 153.4"/><path d="M525 210.8C584 171.4 636.5 207.5 682.4 178"/><path d="M636.5 125.5C659.5 110.7 679.2 117.3 689 129.6"/><path d="M636.5 184.5C659.5 199.3 679.2 192.7 689 180.4"/><path d="M689 118.9C652.9 137 652.9 173 689 191.1"/><path d="M689 133.7C669.3 145.2 669.3 164.8 689 176.3"/><path d="M853 187.8C800.5 125.5 748 112.4 695.6 141.9"/><path d="M813.6 178C843.2 158.3 820.2 127.1 777.6 137C744.8 145.2 754.6 171.4 797.2 168.9C820.2 167.3 825.1 155 805.4 153.4"/><path d="M853 210.8C794 171.4 741.5 207.5 695.6 178"/><path d="M741.5 125.5C718.5 110.7 698.8 117.3 689 129.6"/><path d="M741.5 184.5C718.5 199.3 698.8 192.7 689 180.4"/><path d="M689 118.9C725.1 137 725.1 173 689 191.1"/><path d="M689 133.7C708.7 145.2 708.7 164.8 689 176.3"/><path d="M590.6 123.8C639.8 100.9 738.2 100.9 787.4 123.8"/><path d="M590.6 186.2C639.8 209.1 738.2 209.1 787.4 186.2"/>
+                <circle cx="689" cy="155" r="9"/><circle cx="689" cy="155" r="3.4"/>
+              </g>
+            </svg>
+          </div>
+          <div class="cfg cfg-3">
+            <svg viewBox="940 70 279 170" preserveAspectRatio="xMidYMid meet" fill="none" stroke="var(--ink)" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+              <defs>
+                <clipPath id="cp3a"><rect x="947" y="77" width="71" height="156"/></clipPath>
+                <clipPath id="cp3b"><rect x="1044" y="77" width="71" height="156"/></clipPath>
+                <clipPath id="cp3c"><rect x="1141" y="77" width="71" height="156"/></clipPath>
+              </defs>
+              <rect x="940" y="70" width="85" height="170"/><rect x="947" y="77" width="71" height="156"/><rect x="1037" y="70" width="85" height="170"/><rect x="1044" y="77" width="71" height="156"/><rect x="1134" y="70" width="85" height="170"/><rect x="1141" y="77" width="71" height="156"/>
+              <g clip-path="url(#cp3a)" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M947 186.2C981.1 126.9 1015.2 114.4 1049.2 142.5"/><path d="M972.6 176.8C953.4 158.1 968.3 128.5 996 137.8C1017.3 145.6 1010.9 170.6 983.2 168.3C968.3 166.7 965.1 155 977.9 153.4"/><path d="M947 208C985.3 170.6 1019.4 204.9 1049.2 176.8"/><path d="M1019.4 126.9C1034.3 112.9 1047.1 119.1 1053.5 130.8"/><path d="M1019.4 183.1C1034.3 197.1 1047.1 190.9 1053.5 179.2"/><path d="M1053.5 120.7C1030.1 137.8 1030.1 172.2 1053.5 189.3"/><path d="M1053.5 134.7C1040.7 145.6 1040.7 164.4 1053.5 175.3"/><path d="M1160 186.2C1125.9 126.9 1091.8 114.4 1057.8 142.5"/><path d="M1134.4 176.8C1153.6 158.1 1138.7 128.5 1111 137.8C1089.7 145.6 1096.1 170.6 1123.8 168.3C1138.7 166.7 1141.9 155 1129.1 153.4"/><path d="M1160 208C1121.7 170.6 1087.6 204.9 1057.8 176.8"/><path d="M1087.6 126.9C1072.7 112.9 1059.9 119.1 1053.5 130.8"/><path d="M1087.6 183.1C1072.7 197.1 1059.9 190.9 1053.5 179.2"/><path d="M1053.5 120.7C1076.9 137.8 1076.9 172.2 1053.5 189.3"/><path d="M1053.5 134.7C1066.3 145.6 1066.3 164.4 1053.5 175.3"/><path d="M989.6 125.4C1021.6 103.5 1085.5 103.5 1117.4 125.4"/><path d="M989.6 184.6C1021.6 206.5 1085.5 206.5 1117.4 184.6"/>
+                <circle cx="1053.5" cy="155" r="9"/><circle cx="1053.5" cy="155" r="3.4"/>
+              </g>
+              <g clip-path="url(#cp3b)" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M973 186.2C1007.1 126.9 1041.2 114.4 1075.2 142.5"/><path d="M998.6 176.8C979.4 158.1 994.3 128.5 1022 137.8C1043.3 145.6 1036.9 170.6 1009.2 168.3C994.3 166.7 991.1 155 1003.9 153.4"/><path d="M973 208C1011.3 170.6 1045.4 204.9 1075.2 176.8"/><path d="M1045.4 126.9C1060.3 112.9 1073.1 119.1 1079.5 130.8"/><path d="M1045.4 183.1C1060.3 197.1 1073.1 190.9 1079.5 179.2"/><path d="M1079.5 120.7C1056.1 137.8 1056.1 172.2 1079.5 189.3"/><path d="M1079.5 134.7C1066.7 145.6 1066.7 164.8 1079.5 176.3"/><path d="M1186 186.2C1151.9 126.9 1117.8 114.4 1083.8 142.5"/><path d="M1160.4 176.8C1179.6 158.1 1164.7 128.5 1137 137.8C1115.7 145.6 1122.1 170.6 1149.8 168.3C1164.7 166.7 1167.9 155 1155.1 153.4"/><path d="M1186 208C1147.7 170.6 1113.6 204.9 1083.8 176.8"/><path d="M1113.6 126.9C1098.7 112.9 1085.9 119.1 1079.5 130.8"/><path d="M1113.6 183.1C1098.7 197.1 1085.9 190.9 1079.5 179.2"/><path d="M1079.5 120.7C1102.9 137.8 1102.9 172.2 1079.5 189.3"/><path d="M1079.5 134.7C1092.3 145.6 1092.3 164.8 1079.5 176.3"/><path d="M1015.6 125.4C1047.6 103.5 1111.5 103.5 1143.4 125.4"/><path d="M1015.6 184.6C1047.6 206.5 1111.5 206.5 1143.4 184.6"/>
+                <circle cx="1079.5" cy="155" r="9"/><circle cx="1079.5" cy="155" r="3.4"/>
+              </g>
+              <g clip-path="url(#cp3c)" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M999 186.2C1033.1 126.9 1067.2 114.4 1101.2 142.5"/><path d="M1024.6 176.8C1005.4 158.1 1020.3 128.5 1048 137.8C1069.3 145.6 1062.9 170.6 1035.2 168.3C1020.3 166.7 1017.1 155 1029.9 153.4"/><path d="M999 208C1037.3 170.6 1071.4 204.9 1101.2 176.8"/><path d="M1071.4 126.9C1086.3 112.9 1099.1 119.1 1105.5 130.8"/><path d="M1071.4 183.1C1086.3 197.1 1099.1 190.9 1105.5 179.2"/><path d="M1105.5 120.7C1082.1 137.8 1082.1 172.2 1105.5 189.3"/><path d="M1105.5 134.7C1092.7 145.6 1092.7 164.4 1105.5 175.3"/><path d="M1212 186.2C1177.9 126.9 1143.8 114.4 1109.8 142.5"/><path d="M1186.4 176.8C1205.6 158.1 1190.7 128.5 1163 137.8C1141.7 145.6 1148.1 170.6 1175.8 168.3C1190.7 166.7 1193.9 155 1181.1 153.4"/><path d="M1212 208C1173.7 170.6 1139.6 204.9 1109.8 176.8"/><path d="M1139.6 126.9C1124.7 112.9 1111.9 119.1 1105.5 130.8"/><path d="M1139.6 183.1C1124.7 197.1 1111.9 190.9 1105.5 179.2"/><path d="M1105.5 120.7C1128.9 137.8 1128.9 172.2 1105.5 189.3"/><path d="M1105.5 134.7C1118.3 145.6 1118.3 164.4 1105.5 175.3"/><path d="M1041.6 125.4C1073.6 103.5 1137.5 103.5 1169.4 125.4"/><path d="M1041.6 184.6C1073.6 206.5 1137.5 206.5 1169.4 184.6"/>
+                <circle cx="1105.5" cy="155" r="9"/><circle cx="1105.5" cy="155" r="3.4"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+      </div><!-- /slide1 -->
+
+      <!-- SLIDE 2: Art grid — overhead camera zoom-out scatter -->
+      <div class="slide" id="heroSlide2">
+        <div class="slide-2-inner">
+          <div class="showcase" aria-label="Sample personalized panel arrangements">
+    <div class="panel-mock mock-4x2-a p1">
       <svg viewBox="0 0 200 100" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="g4x2a" x1="0" y1="0" x2="0" y2="1">
@@ -257,8 +376,7 @@
       <span class="label">4×2 ft</span>
     </div>
 
-    <!-- 2×2 ft square (top-right) — abstract gradient with circles -->
-    <div class="panel-mock mock-2x2-a">
+    <div class="panel-mock mock-2x2-a p2">
       <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="g2x2a" x1="0" y1="0" x2="1" y2="1">
@@ -275,8 +393,7 @@
       <span class="label">2×2 ft</span>
     </div>
 
-    <!-- 1×4 ft tall vertical (right edge, full height) — minimalist column with rhythmic accents -->
-    <div class="panel-mock mock-1x4-a">
+    <div class="panel-mock mock-1x4-a p3">
       <svg viewBox="0 0 50 200" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="g1x4a" x1="0" y1="0" x2="0" y2="1">
@@ -296,8 +413,7 @@
       <span class="label">1×4 ft</span>
     </div>
 
-    <!-- 2×2 ft square (bottom-left) — geometric pattern -->
-    <div class="panel-mock mock-2x2-b">
+    <div class="panel-mock mock-2x2-b p4">
       <svg viewBox="0 0 100 100" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <rect width="100" height="100" fill="#00171f"/>
         <g stroke="#007da6" stroke-width="1.2" fill="none" opacity="0.85">
@@ -314,8 +430,7 @@
       <span class="label">2×2 ft</span>
     </div>
 
-    <!-- 2×1 ft horizontal rectangle (mid-row, middle) — wave pattern -->
-    <div class="panel-mock mock-2x1-a">
+    <div class="panel-mock mock-2x1-a p5">
       <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <linearGradient id="g2x1a" x1="0" y1="0" x2="1" y2="0">
@@ -333,8 +448,7 @@
       <span class="label">2×1 ft</span>
     </div>
 
-    <!-- 2×1 ft horizontal rectangle (bottom row, middle) — bold landscape silhouette -->
-    <div class="panel-mock mock-2x1-b">
+    <div class="panel-mock mock-2x1-b p6">
       <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <rect width="100" height="50" fill="#093d53"/>
         <circle cx="78" cy="14" r="6" fill="#ecad49" opacity="0.9"/>
@@ -344,8 +458,7 @@
       <span class="label">2×1 ft</span>
     </div>
 
-    <!-- 1×1 panels (×4) — distinctive small squares in the right column -->
-    <div class="panel-mock mock-1x1-a">
+    <div class="panel-mock mock-1x1-a p7">
       <svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <rect width="50" height="50" fill="#093d53"/>
         <circle cx="25" cy="25" r="12" fill="none" stroke="#ecad49" stroke-width="2"/>
@@ -353,14 +466,14 @@
       </svg>
       <span class="label">1×1</span>
     </div>
-    <div class="panel-mock mock-1x1-b">
+    <div class="panel-mock mock-1x1-b p8">
       <svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <rect width="50" height="50" fill="#ecad49"/>
         <path d="M0 0 L50 50 M50 0 L0 50" stroke="#093d53" stroke-width="2"/>
       </svg>
       <span class="label">1×1</span>
     </div>
-    <div class="panel-mock mock-1x1-c">
+    <div class="panel-mock mock-1x1-c p9">
       <svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <rect width="50" height="50" fill="#007da6"/>
         <rect x="10" y="10" width="30" height="30" fill="none" stroke="#f2f2f9" stroke-width="1.5"/>
@@ -368,7 +481,7 @@
       </svg>
       <span class="label">1×1</span>
     </div>
-    <div class="panel-mock mock-1x1-d">
+    <div class="panel-mock mock-1x1-d p10">
       <svg viewBox="0 0 50 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
         <rect width="50" height="50" fill="#00171f"/>
         <g stroke="#007da6" stroke-width="1.2" fill="none">
@@ -379,7 +492,43 @@
       </svg>
       <span class="label">1×1</span>
     </div>
-  </div>
+
+    <div class="panel-mock mock-4x1-a p11">
+      <svg viewBox="0 0 200 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="gh1" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="#00171f"/><stop offset="40%" stop-color="#093d53"/><stop offset="100%" stop-color="#007da6"/></linearGradient></defs>
+        <rect width="200" height="50" fill="url(#gh1)"/>
+        <path d="M0 32Q25 18 50 28T100 24T150 30T200 22" fill="none" stroke="#ecad49" stroke-width="1.2" opacity="0.8"/>
+        <path d="M0 38Q25 26 50 34T100 30T150 36T200 28" fill="none" stroke="#f2f2f9" stroke-width="0.7" opacity="0.35"/>
+        <line x1="0" y1="25" x2="200" y2="25" stroke="#007da6" stroke-width="0.5" opacity="0.4" stroke-dasharray="4 6"/>
+        <circle cx="50" cy="28" r="3" fill="#ecad49" opacity="0.7"/>
+        <circle cx="100" cy="24" r="3" fill="#ecad49" opacity="0.7"/>
+        <circle cx="150" cy="30" r="3" fill="#ecad49" opacity="0.7"/>
+      </svg>
+      <span class="label">4×1 ft</span>
+    </div>
+
+    <div class="panel-mock mock-2x1-c p12">
+      <svg viewBox="0 0 100 50" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
+        <defs><linearGradient id="gh2" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#093d53"/><stop offset="100%" stop-color="#00171f"/></linearGradient></defs>
+        <rect width="100" height="50" fill="url(#gh2)"/>
+        <rect x="12" y="12" width="76" height="26" fill="none" stroke="#ecad49" stroke-width="1" opacity="0.6"/>
+        <rect x="20" y="18" width="60" height="14" fill="none" stroke="#f2f2f9" stroke-width="0.6" opacity="0.35"/>
+        <line x1="50" y1="12" x2="50" y2="38" stroke="#ecad49" stroke-width="0.8" opacity="0.4"/>
+      </svg>
+      <span class="label">2×1 ft</span>
+    </div>
+
+          </div><!-- /showcase -->
+        </div><!-- /slide-2-inner -->
+      </div><!-- /slide2 -->
+
+    </div><!-- /slide-wrapper -->
+
+    <div class="slide-dots">
+      <div class="slide-dot active" onclick="goHeroSlide(0)"></div>
+      <div class="slide-dot" onclick="goHeroSlide(1)"></div>
+    </div>
+  </div><!-- /hero-right -->
 </section>
 
 <section class="process">
@@ -553,6 +702,27 @@ document.querySelectorAll('[data-open-consult]').forEach(el => el.addEventListen
 document.querySelectorAll('[data-close-consult]').forEach(el => el.addEventListener('click', () => { consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }));
 document.addEventListener('keydown', e => { if(e.key==='Escape' && consultModal.classList.contains('open')){ consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }});
 consultModal.addEventListener('click', e => { if(e.target === consultModal){ consultModal.classList.remove('open'); document.body.classList.remove('modal-open'); }});
+
+// Hero slider
+let heroSlide = 0;
+let heroTimer = null;
+const heroSlides = Array.from(document.querySelectorAll('.slide'));
+const heroDots   = Array.from(document.querySelectorAll('.slide-dot'));
+const HERO_DWELL = [7200, 4900]; // slide 0: anim(3.7s)+hold(3.5s); slide 1: anim(1.4s)+hold(3.5s)
+
+function goHeroSlide(n) {
+  clearTimeout(heroTimer);
+  heroSlides[heroSlide].classList.remove('active');
+  heroDots[heroSlide].classList.remove('active');
+  heroSlide = n;
+  const s = heroSlides[n];
+  s.classList.remove('active');
+  void s.offsetWidth;
+  s.classList.add('active');
+  heroDots[n].classList.add('active');
+  heroTimer = setTimeout(() => goHeroSlide((heroSlide + 1) % heroSlides.length), HERO_DWELL[n]);
+}
+goHeroSlide(0);
 
 document.getElementById('consultForm').addEventListener('submit', e => {
   e.preventDefault();

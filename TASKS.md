@@ -325,7 +325,7 @@ When a user selects a panel size in the configurator (before uploading an image)
 ---
 
 ## Task #DES-9: Hero Slider — Artwork Showcase + Configuration Illustration
-- **Status:** TODO (brainstorm first, then implement)
+- **Status:** DONE (committed pending)
 - **Priority:** HIGH
 - **File:** index.html
 
@@ -370,12 +370,13 @@ This task requires a `/brainstorm` session in Claude Code before any code is wri
 - Follow design.md: Tier 1 page, so technical elements stay minimal. The line-draw animation on slide 2 is the exception — it's illustrative, not blueprint UI.
 
 ### Acceptance Criteria
-- [ ] Hero right side is a functional slider with two slides
-- [ ] Slide 1 shows panel tiles with assembly animation
-- [ ] Slide 2 shows artwork usage illustration with line-draw animation
-- [ ] Slider transitions are smooth and performant
-- [ ] Works on desktop and mobile
-- [ ] Animation details finalized during brainstorm session
+- [x] Hero right side is a functional slider with two slides
+- [x] Slide 1 shows line-art configuration illustration with sequential stroke-draw animation
+- [x] Slide 2 shows artwork grid with overhead scatter-settle animation (12 panels, 5-row grid)
+- [x] Slider transitions are smooth (1.2s film dissolve crossfade)
+- [x] Cinematic loop: 7.2s dwell on slide 1, 4.9s dwell on slide 2
+- [x] Dots positioned below hero art area
+- [x] Works on desktop and mobile (aspect-ratio:1.4 on ≤900px)
 
 ---
 
@@ -477,3 +478,62 @@ Replace the current placeholder "ACOUSTIC◆" text logo in the navigation with t
 - [ ] All "ACOUSTIC" references replaced with "Ahata" across all pages (deferred)
 - [x] Logo is legible and properly sized at nav bar height (64px nav, mark 50px, wordmark 64px)
 - [ ] No layout shifts or broken styling from the swap
+
+---
+
+## Task #DEV-12: Custom Size Panel Button
+- **Status:** TODO
+- **Priority:** HIGH
+- **File:** configurator.html
+
+### Goal
+Make the "Custom" size button functional. Users select custom width and height, then get the full configurator experience (upload image, preview, transforms, add to cart). Pricing is per square foot. Checkout shows "We'll confirm pricing within 24 hours."
+
+### Behavior Spec
+
+**Custom button click:**
+- Opens a small pop-up/dropdown directly above the Custom button
+- Pop-up contains two inputs: Width (ft) and Height (ft)
+- Both inputs: min 1, max 8, increment 1 (whole feet only)
+- Default values: 2 × 2
+- "Create Panel" button inside pop-up to confirm
+
+**On confirm:**
+- Pop-up closes
+- Panel preview updates to show custom dimensions
+- Preview viewer stays fixed size — panel scales to fit inside (same behavior as existing sizes, just extended range)
+- Smallest (1×1) looks small in viewer, largest (8×8) fills the viewer
+- Odd sizes (7×2, 3×5, etc.) scale proportionally to fit
+- Full configurator experience: image upload, position, zoom, flip, rotate, wood/wrap options — all work identically
+
+**Pricing:**
+- Price calculated as: square footage × per-sq-ft rate
+- Per-sq-ft rate: TBD (use ₹650/sq ft as placeholder for now)
+- Price displayed on the panel card same as catalog sizes
+- At checkout: append note "Custom size — we'll confirm pricing within 24 hours"
+
+**Cart behavior:**
+- Custom panels save to cart with size field "custom"
+- baseW and baseH store the actual custom dimensions
+- All other cart fields (image, transforms, wood, wrap, qty) work identically to catalog sizes
+
+**Preview scaling:**
+- Current MAX_PANEL_AREA is 8 (for 4×2). Update to 64 (for 8×8)
+- The existing area-based scaling math should handle this — larger panels get smaller pxPerFt, smaller panels get larger pxPerFt
+- Viewer height stays locked regardless of panel dimensions
+
+### Acceptance Criteria
+✅ Custom button opens dimension picker pop-up
+✅ Width/Height inputs: 1–8 ft, whole feet, defaults 2×2
+✅ "Create Panel" confirms and loads custom-sized panel in preview
+✅ Panel scales to fit fixed-size viewer at any dimension (1×1 through 8×8)
+✅ Full configurator works: image upload, transforms, wood/wrap
+✅ Price shows as sq ft × rate (placeholder ₹650/sq ft)
+✅ Saves to cart correctly with custom dimensions
+✅ Displays in room visualizer "Your Designs" like any other panel
+✅ Checkout flags custom sizes with "confirm within 24 hours" note
+
+### Out of Scope
+- Final per-sq-ft pricing (placeholder for now)
+- Manufacturing feasibility warnings for odd sizes (future)
+- Decimal increments (whole feet only for now)
