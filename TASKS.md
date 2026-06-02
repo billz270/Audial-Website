@@ -482,7 +482,7 @@ Replace the current placeholder "ACOUSTIC◆" text logo in the navigation with t
 ---
 
 ## Task #DEV-12: Custom Size Panel Button
-- **Status:** TODO
+- **Status:** DONE (committed pending)
 - **Priority:** HIGH
 - **File:** configurator.html
 

@@ -74,6 +74,24 @@
   .size-card.custom .size-visual svg{stroke:var(--ink);fill:none;stroke-width:1.5;transition:stroke 0.25s}
   .size-card.custom:hover .size-visual svg,.size-card.custom.selected .size-visual svg{stroke:var(--paper)}
 
+  .size-grid{position:relative}
+  #customPickerPopup{display:none;position:absolute;bottom:calc(100% + 10px);right:0;width:210px;background:var(--paper);border:1.5px solid var(--ink);padding:14px 14px 12px;z-index:50}
+  #customPickerPopup.open{display:block}
+  #customPickerPopup::after{content:'';position:absolute;bottom:-9px;right:14px;width:0;height:0;border-left:8px solid transparent;border-right:8px solid transparent;border-top:8px solid var(--ink)}
+  #customPickerPopup::before{content:'';position:absolute;bottom:-6px;right:15px;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-top:7px solid var(--paper);z-index:1}
+  .picker-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--ink);margin-bottom:10px}
+  .picker-inputs{display:flex;gap:8px;margin-bottom:10px}
+  .picker-field{flex:1;display:flex;flex-direction:column;gap:4px}
+  .picker-field label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--mute)}
+  .picker-stepper{display:flex;align-items:stretch}
+  .picker-btn{width:28px;flex-shrink:0;border:1.5px solid var(--ink);background:var(--paper);color:var(--ink);font-family:inherit;font-size:16px;font-weight:400;line-height:1;cursor:pointer;transition:background 0.15s,color 0.15s;padding:0}
+  .picker-btn:hover:not(:disabled){background:var(--ink);color:var(--paper)}
+  .picker-btn:disabled{opacity:0.25;cursor:not-allowed}
+  .picker-stepper input{flex:1;min-width:0;font-family:inherit;font-size:14px;font-weight:700;padding:7px 4px;border-top:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);border-left:none;border-right:none;background:var(--paper);color:var(--ink);outline:none;text-align:center;-moz-appearance:textfield}
+  .picker-stepper input::-webkit-outer-spin-button,.picker-stepper input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  #pickerCreate{width:100%;padding:9px 0;font-family:inherit;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;border:1.5px solid var(--accent);background:var(--accent);color:var(--ink);cursor:pointer;transition:all 0.2s}
+  #pickerCreate:hover{background:var(--ink);border-color:var(--ink);color:var(--paper)}
+
   .designer{display:none;grid-template-columns:minmax(0,1fr) 280px;border-bottom:1.5px solid var(--ink);scroll-margin-top:64px}
   .designer.active{display:grid}
   .preview-area{padding:20px 28px 24px;border-right:1.5px solid var(--ink);background:linear-gradient(to right,rgba(0,23,31,0.04) 1px,transparent 1px),linear-gradient(to bottom,rgba(0,23,31,0.04) 1px,transparent 1px);background-size:20px 20px;display:flex;flex-direction:column;gap:14px;min-width:0}
@@ -487,7 +505,29 @@
     <div class="size-card custom" data-size="custom">
       <div class="size-visual"><svg width="56" height="56" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></div>
       <div class="size-name">Custom</div>
-      <div class="size-price">Talk to us</div>
+      <div class="size-price" id="customCardPrice">Talk to us</div>
+    </div>
+    <div id="customPickerPopup" role="dialog" aria-label="Custom panel size">
+      <div class="picker-label">Custom Size</div>
+      <div class="picker-inputs">
+        <div class="picker-field">
+          <label for="pickerW">W (ft)</label>
+          <div class="picker-stepper">
+            <button class="picker-btn" id="pickerWMinus" aria-label="Decrease width">−</button>
+            <input type="number" id="pickerW" min="1" max="8" step="1" value="2">
+            <button class="picker-btn" id="pickerWPlus" aria-label="Increase width">+</button>
+          </div>
+        </div>
+        <div class="picker-field">
+          <label for="pickerH">H (ft)</label>
+          <div class="picker-stepper">
+            <button class="picker-btn" id="pickerHMinus" aria-label="Decrease height">−</button>
+            <input type="number" id="pickerH" min="1" max="8" step="1" value="2">
+            <button class="picker-btn" id="pickerHPlus" aria-label="Increase height">+</button>
+          </div>
+        </div>
+      </div>
+      <button id="pickerCreate">Create Panel →</button>
     </div>
   </div>
 </section>
@@ -723,6 +763,8 @@ let imageMode = false;
 let _skipDesignerScroll = false;
 
 const PRICES = {'1x1':2500,'2x1':3500,'2x2':4500,'4x2':6500,'1x4':5500};
+const CUSTOM_RATE = 650;
+function getPanelPrice(panel){ return panel.size === 'custom' ? (panel.price || 0) : (PRICES[panel.size] || 0); }
 
 const $ = id => document.getElementById(id);
 const sizeCards = document.querySelectorAll('.size-card:not(.custom)');
@@ -894,6 +936,8 @@ sizeCards.forEach(card=>{
   card.addEventListener('click',()=>{
     sizeCards.forEach(c=>c.classList.remove('selected'));
     customCard.classList.remove('selected');
+    customCardPrice.textContent = 'Talk to us';
+    closeCustomPicker();
     card.classList.add('selected');
     currentPanel.size = card.dataset.size;
     currentPanel.baseW = parseFloat(card.dataset.w);
@@ -918,8 +962,90 @@ sizeCards.forEach(card=>{
   });
 });
 
-customCard.addEventListener('click',()=>{
-  alert('Custom sizes — please contact us for a consultation.\n\nhello@ahata.in');
+const customPickerPopup = $('customPickerPopup');
+const customCardPrice   = $('customCardPrice');
+
+function openCustomPicker(){
+  customPickerPopup.classList.add('open');
+  updateStepperButtons('pickerW','pickerWMinus','pickerWPlus');
+  updateStepperButtons('pickerH','pickerHMinus','pickerHPlus');
+  $('pickerW').focus();
+}
+function closeCustomPicker(){
+  customPickerPopup.classList.remove('open');
+}
+
+function updateStepperButtons(inputId, minusId, plusId){
+  const v = parseInt($(inputId).value, 10);
+  $(minusId).disabled = v <= 1;
+  $(plusId).disabled  = v >= 8;
+}
+function makeStepperHandlers(inputId, minusId, plusId){
+  updateStepperButtons(inputId, minusId, plusId);
+  $(minusId).addEventListener('click', () => {
+    const el = $(inputId);
+    const v = Math.max(1, (parseInt(el.value,10)||1) - 1);
+    el.value = v;
+    updateStepperButtons(inputId, minusId, plusId);
+  });
+  $(plusId).addEventListener('click', () => {
+    const el = $(inputId);
+    const v = Math.min(8, (parseInt(el.value,10)||1) + 1);
+    el.value = v;
+    updateStepperButtons(inputId, minusId, plusId);
+  });
+  $(inputId).addEventListener('input', () => updateStepperButtons(inputId, minusId, plusId));
+}
+makeStepperHandlers('pickerW','pickerWMinus','pickerWPlus');
+makeStepperHandlers('pickerH','pickerHMinus','pickerHPlus');
+
+customCard.addEventListener('click', e => {
+  e.stopPropagation();
+  if(customPickerPopup.classList.contains('open')){
+    closeCustomPicker();
+  } else {
+    openCustomPicker();
+  }
+});
+
+customPickerPopup.addEventListener('click', e => e.stopPropagation());
+
+document.addEventListener('click', closeCustomPicker);
+document.addEventListener('keydown', e => { if(e.key === 'Escape') closeCustomPicker(); });
+
+$('pickerCreate').addEventListener('click', () => {
+  let w = Math.min(8, Math.max(1, parseInt($('pickerW').value, 10) || 2));
+  let h = Math.min(8, Math.max(1, parseInt($('pickerH').value, 10) || 2));
+  $('pickerW').value = w;
+  $('pickerH').value = h;
+
+  closeCustomPicker();
+  sizeCards.forEach(c => c.classList.remove('selected'));
+  customCard.classList.add('selected');
+
+  const price = w * h * CUSTOM_RATE;
+  customCardPrice.textContent = '₹' + price.toLocaleString();
+
+  currentPanel.size = 'custom';
+  currentPanel.baseW = w;
+  currentPanel.baseH = h;
+  currentPanel.price = price;
+
+  if(w !== h){
+    orientToggle.classList.add('visible');
+    const defaultOrient = w >= h ? 'horizontal' : 'vertical';
+    currentPanel.orientation = defaultOrient;
+    document.querySelectorAll('.orient-btn').forEach(b => b.classList.toggle('active', b.dataset.orient === defaultOrient));
+  } else {
+    orientToggle.classList.remove('visible');
+    currentPanel.orientation = 'horizontal';
+  }
+
+  sceneZoom = 0.82; panYaw = -18; panPitch = 6;
+  updatePanelPreview();
+  showDesigner();
+  panelActions.classList.add('visible');
+  hideSizeTips();
 });
 
 function showDesigner(){
@@ -943,7 +1069,7 @@ document.querySelectorAll('.orient-btn').forEach(btn=>{
 // Scale by actual panel area so 1×1 visibly smaller than 2×2 smaller than 4×2 etc.
 // Target: largest panel (4x4 area = 4×2 @ 8sqft, or 2x4 at 8sqft) occupies ~72% of viewport.
 // Scale by sqrt(area) so linear sizes are proportional to sqrt(area).
-const MAX_PANEL_AREA = 8; // sq ft — the largest panel in the catalog
+const MAX_PANEL_AREA = 8; // sq ft — largest catalog panel (4×2)
 const VIEWPORT_FILL_AT_MAX = 0.94; // fraction of viewport dim the max panel occupies
 
 function updatePanelPreview(){
@@ -964,6 +1090,12 @@ function updatePanelPreview(){
     w = fw * pxPerFt; h = fh * pxPerFt;
   } else if(size === '4x2'){
     const pxPerFt = refMaxLinear * 1.127 / 4;
+    w = fw * pxPerFt; h = fh * pxPerFt;
+  } else if(size === 'custom'){
+    // Fit-to-container: always fills available space regardless of aspect ratio
+    const maxW = containerW * VIEWPORT_FILL_AT_MAX;
+    const maxH = containerH * VIEWPORT_FILL_AT_MAX;
+    const pxPerFt = Math.min(maxW / fw, maxH / fh);
     w = fw * pxPerFt; h = fh * pxPerFt;
   } else {
     const panelArea = fw * fh;
@@ -1539,6 +1671,7 @@ function panelToCartItem(p){
   return {
     id: Date.now() + Math.random(),
     size: p.size,
+    price: p.price || 0,
     baseW: p.baseW, baseH: p.baseH,
     orientation: p.orientation,
     effectiveW: eff.w, effectiveH: eff.h,  // canonical rendered dimensions in feet
@@ -1565,6 +1698,9 @@ function resetCurrentPanel(){
   imgZoom = 1; imgPos = {x:0, y:0}; imgNaturalW = 0; imgNaturalH = 0;
   imgFlipH = false; imgFlipV = false; imgRotate = 0;
   sizeCards.forEach(c=>c.classList.remove('selected'));
+  customCard.classList.remove('selected');
+  customCardPrice.textContent = 'Talk to us';
+  closeCustomPicker();
   hideSizeTips();
   designer.classList.remove('active');
   panelImage.style.display = 'none';
@@ -1601,14 +1737,20 @@ function renderCartCardPreview(panel){
 
   // Size card 3D render proportional to panel area (so 1x4 tall, 4x2 wide, 1x1 small)
   const CARD_MAX_AREA = 8;
-  const cardArea = effW * effH;
-  const cardLinearFraction = Math.sqrt(cardArea / CARD_MAX_AREA);
   const CARD_MAX_LINEAR = 160; // px for the max panel's long side in cart
-  const thisMaxLinear = CARD_MAX_LINEAR * cardLinearFraction;
-  const longSideFt = Math.max(effW, effH);
-  const pxPerFt = thisMaxLinear / longSideFt;
-  let w = effW * pxPerFt;
-  let h = effH * pxPerFt;
+  let w, h;
+  if(panel.size === 'custom'){
+    // Long-side fixed: always 160px on longest side, aspect ratio preserved
+    const pxPerFt = CARD_MAX_LINEAR / Math.max(effW, effH);
+    w = effW * pxPerFt; h = effH * pxPerFt;
+  } else {
+    const cardArea = effW * effH;
+    const cardLinearFraction = Math.sqrt(cardArea / CARD_MAX_AREA);
+    const thisMaxLinear = CARD_MAX_LINEAR * cardLinearFraction;
+    const longSideFt = Math.max(effW, effH);
+    const pxPerFt = thisMaxLinear / longSideFt;
+    w = effW * pxPerFt; h = effH * pxPerFt;
+  }
   // Ensure minimum legibility
   const MIN_DIM = 40;
   if(Math.max(w, h) < MIN_DIM){
@@ -1660,7 +1802,7 @@ function updateCart(){
   cartStrip.innerHTML = '';
   let subtotal = 0;
   cart.forEach((panel,i)=>{
-    const price = PRICES[panel.size] || 0;
+    const price = getPanelPrice(panel);
     const qty = panel.quantity || 1;
     subtotal += price * qty;
     const preview = renderCartCardPreview(panel);
@@ -1993,21 +2135,26 @@ function renderCheckoutCart(){
   let subtotal = 0;
   const summaryLines = [];
   const rows = cart.map(item=>{
-    const price     = PANEL_PRICES[item.size]||0;
+    const isCustom  = item.size === 'custom';
+    const price     = isCustom ? (item.price||0) : (PANEL_PRICES[item.size]||0);
     const qty       = item.quantity||1;
     const lineTotal = price*qty;
     subtotal += lineTotal;
     const wood = item.woodVarnish==='light' ? 'Light varnish' : 'Dark varnish';
     const wrap = item.fabricWrap==='half'   ? 'Half wrap'     : 'Full wrap';
-    summaryLines.push(`${item.size} ft · ${wood} · ${wrap} · Qty ${qty} · ₹${lineTotal.toLocaleString()}`);
+    const effW = item.effectiveW || item.baseW;
+    const effH = item.effectiveH || item.baseH;
+    const sizeLabel = isCustom ? `${effW}×${effH} ft Custom` : `${item.size} ft`;
+    const customNote = isCustom ? ' · Pricing confirmed within 24 hrs' : '';
+    summaryLines.push(`${sizeLabel} · ${wood} · ${wrap} · Qty ${qty} · ₹${lineTotal.toLocaleString()}${isCustom ? ' · CUSTOM — pricing TBC' : ''}`);
     const thumbHtml = item.image
       ? `<img src="${item.image}" alt="Panel artwork">`
       : '<div class="checkout-thumb-empty"></div>';
     return `<div class="checkout-item">
       <div class="checkout-thumb">${thumbHtml}</div>
       <div class="checkout-item-info">
-        <div class="checkout-item-name">${item.size} ft Panel</div>
-        <div class="checkout-item-meta">${wood} · ${wrap}</div>
+        <div class="checkout-item-name">${sizeLabel} Panel</div>
+        <div class="checkout-item-meta">${wood} · ${wrap}${customNote ? `<span style="color:var(--mute)">${customNote}</span>` : ''}</div>
       </div>
       <div class="checkout-item-right">
         <span>Qty ${qty}</span>
