@@ -638,7 +638,7 @@ On mobile, position "What works" and "What doesn't" text beside the image icon (
 ---
 
 ## Task #MOB-16: Horizontal Room Presets & Dimensions in Visualizer
-- **Status:** DONE (committed pending)
+- **Status:** DONE (committed `1fcf207`)
 - **Priority:** MEDIUM
 - **File:** room-visualizer.html
 
