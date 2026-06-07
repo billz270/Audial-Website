@@ -137,6 +137,8 @@ _(none)_
 _(none)_
 
 ### Recently resolved
+- **Horizontal wall thumbnails (MOB-17)** ✓ — On mobile (≤560px), the 3 inactive wall thumbnails (Left/Back/Right Wall) were stacking vertically. Root cause: `@media (max-width:560px)` overrode `.wall-thumbs` to `grid-template-columns:1fr`. Fix: removed that override so the desktop `repeat(3,1fr)` grid persists at mobile. Also tightened spacing in the same block: gap 8px → 4px, thumb padding `6px 8px` → `4px 5px`, label font 10px → 9px, meta font 8px → 7px so all three thumbnails fit comfortably on narrow screens. (`room-visualizer.html`, `.wall-thumbs`, `@media (max-width:560px)`)
+
 - **Horizontal room presets & dimensions (MOB-16)** ✓ — On mobile (≤560px), the 4 preset cards were collapsing to a single-column stack and the 4 dimension inputs were stacking individually (8 rows total). Root cause: the 560px media query overrode `.preset-grid` to `grid-template-columns:1fr` and added `flex-direction:column` to `.dim-row`. Fix: removed those overrides — the desktop `repeat(2,1fr)` grid and horizontal `flex` rows now persist at mobile, giving a 2×2 preset grid and two 2-field rows for dimensions. Existing border selectors (`nth-child(2n)`, `nth-last-child(-n+2)`, `:last-child`) correctly handle both layouts without extra overrides. (`room-visualizer.html`, `@media (max-width:560px)`)
 
 - **"Your Designs" grid glitch (MOB-19)** ✓ — On mobile, design cards shrunk while the "+" add button stretched wider. Root cause: `.designs-add-btn` and `.designs-filler` were missing `width:100%;min-width:0`, unlike `.designed-card` which already had both. Added to both selectors so all four grid slots are equally constrained. (`room-visualizer.html`, `.designs-add-btn`, `.designs-filler`)

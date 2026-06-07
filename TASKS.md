@@ -662,7 +662,7 @@ Compress room presets and exact dimension inputs into horizontal layout on mobil
 ---
 
 ## Task #MOB-17: Horizontal Wall Thumbnails in Visualizer
-- **Status:** TODO
+- **Status:** DONE
 - **Priority:** MEDIUM
 - **File:** room-visualizer.html
 
