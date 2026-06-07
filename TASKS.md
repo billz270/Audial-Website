@@ -684,7 +684,7 @@ Inactive wall thumbnails (below the active wall) should be in one horizontal row
 ---
 
 ## Task #MOB-18: Compact Panel Size Buttons in Visualizer
-- **Status:** TODO
+- **Status:** DONE
 - **Priority:** MEDIUM
 - **File:** room-visualizer.html
 
