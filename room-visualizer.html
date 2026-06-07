@@ -38,6 +38,15 @@
   .nav-links a,.nav-links button{color:var(--ink);text-decoration:none;position:relative;background:none;border:none;font:inherit;cursor:pointer;padding:0;letter-spacing:inherit;text-transform:inherit}
   .nav-links a.active{color:var(--accent)}
   .nav-links a:hover::after,.nav-links a.active::after,.nav-links button:hover::after{content:'';position:absolute;left:0;right:0;bottom:-4px;height:2px;background:var(--accent)}
+  .hamburger-btn{display:none;flex-direction:column;justify-content:center;gap:5px;background:none;border:none;cursor:pointer;padding:8px;margin:-8px}
+  .hamburger-btn span{display:block;width:22px;height:1.5px;background:var(--ink);transition:transform 0.2s,opacity 0.2s}
+  nav.nav-open .hamburger-btn span:nth-child(1){transform:translateY(6.5px) rotate(45deg)}
+  nav.nav-open .hamburger-btn span:nth-child(2){opacity:0}
+  nav.nav-open .hamburger-btn span:nth-child(3){transform:translateY(-6.5px) rotate(-45deg)}
+  .mobile-menu{display:none;width:100%;flex-direction:column;border-top:1.5px solid var(--ink);padding:8px 0}
+  .mobile-menu a,.mobile-menu button{font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em;color:var(--ink);text-decoration:none;padding:14px 20px;background:none;border:none;cursor:pointer;font-family:inherit;text-align:left;display:block;width:100%;box-sizing:border-box}
+  .mobile-menu a.active{color:var(--accent)}
+  .mobile-menu a:hover,.mobile-menu button:hover{color:var(--accent)}
 
   .page-header{padding:18px 32px;border-bottom:1.5px solid var(--ink);display:grid;grid-template-columns:auto 1fr auto;gap:24px;align-items:center}
   .page-header .page-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--mute);display:flex;align-items:center;gap:10px}
@@ -331,8 +340,10 @@
     .walls-area{border-right:none;border-bottom:1.5px solid var(--ink)}
   }
   @media (max-width:900px){
-    nav{padding:0 20px}
+    nav{padding:0 20px;flex-wrap:wrap}
     .nav-links{display:none}
+    .hamburger-btn{display:flex}
+    nav.nav-open .mobile-menu{display:flex}
     .page-header{grid-template-columns:1fr;padding:14px 20px;gap:8px;text-align:left}
     .page-header .page-desc{display:none}
     .page-header .page-progress{display:none}
@@ -412,6 +423,16 @@
 <nav>
   <a href="index.html" class="logo" aria-label="Ahata — home"><img src="design-references/assets/logos/1.png" class="brand-logo-mark" alt=""><img src="design-references/assets/logos/4.png" class="brand-logo-text" alt="Ahata"></a>
   <div class="nav-links">
+    <a href="configurator.html">Design</a>
+    <a href="room-visualizer.html" class="active">Visualize</a>
+    <a href="how-it-works.html">How It Works</a>
+    <button data-open-consult>Consult</button>
+    <a href="about.html">About</a>
+  </div>
+  <button class="hamburger-btn" aria-label="Open menu" aria-expanded="false">
+    <span></span><span></span><span></span>
+  </button>
+  <div class="mobile-menu">
     <a href="configurator.html">Design</a>
     <a href="room-visualizer.html" class="active">Visualize</a>
     <a href="how-it-works.html">How It Works</a>
@@ -2137,6 +2158,14 @@ bigWallScene.addEventListener('pointercancel', e=>{
 
 updateDimensions();
 requestAnimationFrame(()=>{sizeWallSurface();renderActivePanels();renderThumbnails()});
+
+// Hamburger menu
+(function(){
+  var hn=document.querySelector('nav'),hb=document.querySelector('.hamburger-btn');
+  hb.addEventListener('click',function(e){e.stopPropagation();var o=hn.classList.toggle('nav-open');hb.setAttribute('aria-expanded',String(o));});
+  document.addEventListener('click',function(e){if(!hn.contains(e.target)){hn.classList.remove('nav-open');hb.setAttribute('aria-expanded','false');}});
+  document.querySelectorAll('.mobile-menu a,.mobile-menu button').forEach(function(el){el.addEventListener('click',function(){hn.classList.remove('nav-open');hb.setAttribute('aria-expanded','false');});});
+})();
 </script>
 
 </body>

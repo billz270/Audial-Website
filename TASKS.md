@@ -537,3 +537,217 @@ Make the "Custom" size button functional. Users select custom width and height, 
 - Final per-sq-ft pricing (placeholder for now)
 - Manufacturing feasibility warnings for odd sizes (future)
 - Decimal increments (whole feet only for now)
+
+---
+
+## Task #MOB-13: Hamburger Menu for Mobile Navigation (All Pages)
+- **Status:** DONE
+- **Priority:** HIGH
+- **File:** All HTML files (index.html, configurator.html, room-visualizer.html, how-it-works.html, about.html)
+
+### Goal
+Add a hamburger menu button (three horizontal lines) in the top-right corner of the nav bar on mobile. Desktop nav stays unchanged.
+
+### Behavior Spec
+
+**Trigger:** Only visible at max-width 768px (or wherever .nav-links currently hides)
+
+**Button:**
+- Three horizontal lines icon, top-right of nav bar
+- Replaces the hidden .nav-links on mobile
+
+**On click:**
+- Opens a dropdown or slide-out menu showing all page links: Design, Visualize, How It Works, About
+- Tapping a link navigates to that page
+- Tapping the button again (or tapping outside) closes the menu
+
+**Styling:**
+- Match existing nav styling (--ink background when open, --paper text)
+- Smooth open/close transition
+- Menu overlays page content, doesn't push it down
+
+### Acceptance Criteria
+✅ Hamburger icon visible on mobile, hidden on desktop
+✅ Desktop nav completely unchanged
+✅ Menu opens/closes on tap
+✅ All page links present and functional
+✅ Menu closes when a link is tapped
+✅ Consistent across all 5 pages
+
+---
+
+## Task #MOB-14: Horizontal CTA Buttons on Index Hero
+- **Status:** TODO
+- **Priority:** LOW
+- **File:** index.html
+
+### Goal
+Make "Design Panels" and "Visualize Room" CTA buttons sit side by side on mobile instead of stacking vertically.
+
+### Behavior Spec
+
+**Change:** Inside @media max-width breakpoint, set .cta-group to flex-direction: row instead of column. Buttons share the row equally.
+
+**Constraint:** Desktop layout unchanged. Buttons should still be tappable (minimum 44px height).
+
+### Acceptance Criteria
+✅ Buttons are horizontal on mobile
+✅ Both buttons visible without scrolling
+✅ Desktop layout unchanged
+✅ Buttons remain tappable (44px minimum touch target)
+
+---
+
+## Task #MOB-15: Image Tips Layout in Configurator
+- **Status:** TODO
+- **Priority:** LOW
+- **File:** configurator.html
+
+### Goal
+On mobile, position "What works" and "What doesn't" text beside the image icon (to its right) instead of below it.
+
+### Behavior Spec
+
+**Change:** Inside @media breakpoint, set the tips container to flex-direction: row with icon on the left and text on the right.
+
+**Constraint:** Desktop layout unchanged.
+
+### Acceptance Criteria
+✅ Icon sits left, tip text sits right on mobile
+✅ Text is readable (no truncation or overflow)
+✅ Desktop layout unchanged
+
+---
+
+## Task #MOB-16: Horizontal Room Presets & Dimensions in Visualizer
+- **Status:** TODO
+- **Priority:** MEDIUM
+- **File:** room-visualizer.html
+
+### Goal
+Compress room presets and exact dimension inputs into horizontal layout on mobile. One row preferred, two rows acceptable. No vertical stacking of individual items.
+
+### Behavior Spec
+
+**Room presets:** Currently 4 cards stacked vertically on mobile. Change to 2×2 grid or single horizontal scroll row.
+
+**Exact dimensions:** Currently stacked vertically. Change to 2×2 grid (Length + Width on row 1, Height + Total Area on row 2) or single horizontal row if it fits.
+
+**Constraint:** Desktop layout unchanged.
+
+### Acceptance Criteria
+✅ Presets are horizontal (grid or scroll row) on mobile
+✅ Dimension inputs are horizontal (grid or row) on mobile
+✅ All inputs remain functional and tappable
+✅ Desktop layout unchanged
+
+---
+
+## Task #MOB-17: Horizontal Wall Thumbnails in Visualizer
+- **Status:** TODO
+- **Priority:** MEDIUM
+- **File:** room-visualizer.html
+
+### Goal
+Inactive wall thumbnails (below the active wall) should be in one horizontal row on mobile instead of stacked vertically. Reduce their sizes to fit.
+
+### Behavior Spec
+
+**Change:** Inside @media breakpoint, set wall-thumbs container to flex-direction: row. Reduce individual thumbnail max-width/height so all 3 fit in one row.
+
+**Constraint:** Desktop layout unchanged. Thumbnails must remain clickable to switch walls.
+
+### Acceptance Criteria
+✅ All 3 inactive wall thumbnails in one horizontal row on mobile
+✅ Thumbnails are smaller but still recognizable
+✅ Clicking a thumbnail switches the active wall
+✅ Desktop layout unchanged
+
+---
+
+## Task #MOB-18: Compact Panel Size Buttons in Visualizer
+- **Status:** TODO
+- **Priority:** MEDIUM
+- **File:** room-visualizer.html
+
+### Goal
+Reduce panel size buttons to smaller dimensions on mobile so all 5 fit in one horizontal row.
+
+### Behavior Spec
+
+**Change:** Inside @media breakpoint, reduce padding, font-size, and min-width of .size-chip buttons. Set container to single-row flex with no wrap.
+
+**Constraint:** Desktop layout unchanged. Buttons must remain tappable (minimum 44px height).
+
+### Acceptance Criteria
+✅ All 5 size buttons visible in one horizontal row on mobile
+✅ Buttons are smaller but still readable and tappable
+✅ Active state (selected) still visually distinct
+✅ Desktop layout unchanged
+
+---
+
+## Task #MOB-19: Fix "Your Designs" Grid Glitch in Visualizer
+- **Status:** TODO
+- **Priority:** HIGH
+- **File:** room-visualizer.html
+
+### Goal
+Fix the mobile glitch where designed panel cards shrink disproportionately and the empty plus button becomes much wider than the design cards.
+
+### Behavior Spec
+
+**Current bug:** On mobile, the 2×2 grid breaks — designed panel cards become tiny while the "+" placeholder stretches to fill remaining space.
+
+**Fix:** Ensure all grid items (both design cards and the "+" button) have equal width. Grid should be 2 columns with equal column widths (1fr 1fr). All items respect the same min/max sizing.
+
+**Constraint:** Desktop layout unchanged.
+
+### Acceptance Criteria
+✅ Design cards and "+" button are equal width on mobile
+✅ Grid maintains 2-column layout
+✅ Cards show preview, size, and finish info without truncation
+✅ "+" button is same size as design cards
+✅ Desktop layout unchanged
+
+---
+
+## Task #MOB-20: Tighter Step Spacing on How It Works
+- **Status:** TODO
+- **Priority:** LOW
+- **File:** how-it-works.html
+
+### Goal
+Reduce horizontal spacing between the seven step blocks on mobile so they sit closer together.
+
+### Behavior Spec
+
+**Change:** Inside @media breakpoint, reduce gap/margin between step blocks. If currently using a large gap value, halve it.
+
+**Constraint:** Desktop layout unchanged.
+
+### Acceptance Criteria
+✅ Steps are visually closer together on mobile
+✅ Content remains readable
+✅ Desktop layout unchanged
+
+---
+
+## Task #MOB-21: 2×2 Grid for "Sound That Works" Section
+- **Status:** TODO
+- **Priority:** LOW
+- **File:** how-it-works.html
+
+### Goal
+Arrange the "Sound That Works" section in a 2×2 grid (2 rows, 2 columns) on mobile instead of vertical stack.
+
+### Behavior Spec
+
+**Change:** Inside @media breakpoint, set container to grid-template-columns: 1fr 1fr. Items flow into 2×2 layout.
+
+**Constraint:** Desktop layout unchanged.
+
+### Acceptance Criteria
+✅ Section displays as 2×2 grid on mobile
+✅ Content readable at half-width
+✅ Desktop layout unchanged

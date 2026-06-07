@@ -131,12 +131,14 @@ The configurator's `renderCartCardPreview` and the visualizer's `computeArtTrans
 ## Issues & Backlog
 
 ### High Priority
-_(none)_
+- **MOB-19** — "Your Designs" grid glitch in room visualizer. 2×2 grid breaks on mobile: design cards shrink while "+" stretches. Fix: equal-width `1fr 1fr` columns for all grid items.
 
 ### Medium Priority
 _(none)_
 
 ### Recently resolved
+- **Hamburger menu (MOB-13)** ✓ — Mobile navigation across all 5 pages. Three-line button in nav top-right, hidden on desktop (`display:none`), visible at `max-width:900px`. Animates to X on open (top/bottom spans rotate ±45°, middle fades). Mobile menu drops below nav bar full-width with `--ink` border-top, `--paper` bg, all 5 links vertical with 14px padding. Active page link highlighted in `--accent`. Closes on outside tap or link tap. Also unified `about.html` breakpoint from `600px` → `900px` to match all other pages. (`index.html`, `configurator.html`, `room-visualizer.html`, `how-it-works.html`, `about.html`, `.hamburger-btn`, `.mobile-menu`, `nav.nav-open`)
+
 - **Custom size panel (DEV-12)** ✓ — Custom size chip in configurator now opens a floating pop-up (anchored above the card, `position:absolute` on `.size-grid`) with W/H steppers (1–8 ft, `−`/`+` buttons with disable-at-limits). Confirms into the full configurator experience — image upload, transforms, wood/wrap all work identically to catalog sizes. Preview uses fit-to-container scaling so extreme aspect ratios (8×1, 7×2) always fill the viewer. Pricing: ₹650/sq ft placeholder, stored on cart item as `price` field. `getPanelPrice(panel)` helper used in both `updateCart()` and `renderCheckoutCart()`. Checkout shows `"{W}×{H} ft Custom Panel"` with a `"Pricing confirmed within 24 hrs"` note. (`configurator.html`, `#customPickerPopup`, `getPanelPrice`, `updatePanelPreview`, `renderCartCardPreview`)
 
 - **Hero slider (DES-9)** ✓ — Two-slide looping hero on `index.html`. Slide 1: three panel configurations (single 4×2, split 2×2 pair, triptych ×3) draw sequentially via `stroke-dashoffset` line-draw animation. Slide 2: 7-col × 5-row artwork grid (12 panels, p1–p12) zooms in from overhead and scatter-settles with spring easing. Crossfade: `1.2s ease-in-out` film dissolve. Dwell: 7.2s on slide 1, 4.9s on slide 2. Dots positioned `position:absolute; top:100%` on `.hero-right` (outside flex flow, below art area). Key layout fix: `.cfg` needs `min-height:0` so flex children can shrink below SVG intrinsic height; SVG uses `width:100%; height:100%` with `preserveAspectRatio="xMidYMid meet"` to letterbox within available space. Mobile: `.hero-right{height:auto}` + `.slide-wrapper{aspect-ratio:1.4;flex:none}`. (`index.html`, `.hero-right`, `.slide-wrapper`, `.slide-configs`, `.cfg`, `goHeroSlide()`)
