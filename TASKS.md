@@ -595,7 +595,7 @@ Add a hamburger menu button (three horizontal lines) in the top-right corner of 
 ---
 
 ## Task #MOB-14: Horizontal CTA Buttons on Index Hero
-- **Status:** TODO
+- **Status:** DONE
 - **Priority:** LOW
 - **File:** index.html
 
