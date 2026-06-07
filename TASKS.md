@@ -617,7 +617,7 @@ Make "Design Panels" and "Visualize Room" CTA buttons sit side by side on mobile
 ---
 
 ## Task #MOB-15: Image Tips Layout in Configurator
-- **Status:** TODO
+- **Status:** DONE
 - **Priority:** LOW
 - **File:** configurator.html
 
