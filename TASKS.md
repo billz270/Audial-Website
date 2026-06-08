@@ -752,7 +752,7 @@ Reduce horizontal spacing between the seven step blocks on mobile so they sit cl
 ---
 
 ## Task #MOB-21: 2×2 Grid for "Sound That Works" Section
-- **Status:** TODO
+- **Status:** DONE
 - **Priority:** LOW
 - **File:** how-it-works.html
 

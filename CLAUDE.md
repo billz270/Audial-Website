@@ -137,6 +137,8 @@ _(none)_
 _(none)_
 
 ### Recently resolved
+- **2×2 grid for "Sound That Works" on mobile (MOB-21)** ✓ — On mobile (≤560px), the 4 benefit cards in the "Sound That Works" section were stacking into a single column. Fix: changed `.benefits-grid` from `grid-template-columns:1fr` to `1fr 1fr` in the `@media(max-width:560px)` block, and removed the single-column border overrides (`.benefit{border-right:none}` and `.benefit:not(:last-child){border-bottom}`) so the tablet's 2-column border rules (`nth-child(2n)` removes right border, `nth-last-child(-n+2)` removes bottom border) apply correctly. Desktop and tablet layouts unchanged. (`how-it-works.html`, `.benefits-grid`, `@media(max-width:560px)`)
+
 - **Tighter step spacing on mobile (MOB-20)** ✓ — On mobile (≤900px), the 7 process step blocks in the horizontal scroll timeline had excess side padding making them feel spread apart. Fix: added `padding:0 2px` to `.process-step` inside the `@media(max-width:900px)` block, reducing side padding from the base `8px` down to `2px`. Desktop unchanged. (`how-it-works.html`, `.process-step`, `@media(max-width:900px)`)
 - **Image tips layout on mobile (MOB-15)** ✓ — On mobile (≤560px), the "Works well" and "Avoid" columns in the image tips sidebar card were stacking below the SVG diagram. Fix: added a `@media (max-width:560px)` block that turns `.size-tips-inner` into a `grid` with `grid-template-columns:auto 1fr` — diagram pinned to column 1, `.stips-cols` to column 2, `.stips-bonus` and `details.stips-general` span both columns. Bottom border removed from `.stips-diagram` on mobile. Desktop unchanged. (`configurator.html`, `.size-tips-inner`, `.stips-diagram`, `.stips-cols`, `@media (max-width:560px)`)
 
