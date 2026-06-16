@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Ahata — Visualize Your Space</title>
+<title>Audial — Visualize Your Space</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;700&display=swap" rel="stylesheet">
@@ -421,7 +421,7 @@
 <body>
 
 <nav>
-  <a href="index.html" class="logo" aria-label="Ahata — home"><img src="design-references/assets/logos/1.png" class="brand-logo-mark" alt=""><img src="design-references/assets/logos/4.png" class="brand-logo-text" alt="Ahata"></a>
+  <a href="index.html" class="logo" aria-label="Audial — home"><img src="design-references/assets/logos/1.png" class="brand-logo-mark" alt=""><img src="design-references/assets/logos/4.png" class="brand-logo-text" alt="Audial"></a>
   <div class="nav-links">
     <a href="configurator.html">Design</a>
     <a href="room-visualizer.html" class="active">Visualize</a>
@@ -601,7 +601,7 @@
 </section>
 
 <footer>
-  <span>© 2026 Ahata◆</span>
+  <span>© 2026 Audial◆</span>
   <span>Hand built · Mumbai</span>
 </footer>
 
@@ -855,7 +855,7 @@ document.getElementById('checkoutSubmitBtn').addEventListener('click', async ()=
     checkoutStep2.style.display   = 'none';
     checkoutFooter2.style.display = 'none';
     checkoutSuccess.style.display = '';
-    checkoutHeaderLabel.textContent   = '◆ Ahata';
+    checkoutHeaderLabel.textContent   = '◆ Audial';
     checkoutStepIndicator.textContent = '';
     document.getElementById('checkoutSuccessMsg').textContent =
       `We'll be in touch at ${email} within 1–2 business days to confirm your order and arrange delivery.`;
@@ -870,7 +870,7 @@ document.getElementById('consultForm').addEventListener('submit',e=>{
   e.preventDefault();
   const fd = new FormData(e.target);
   const body = `Name: ${fd.get('name')}\nEmail: ${fd.get('email')}\nPhone: ${fd.get('phone')}\nRoom type: ${fd.get('room')}\nPreferred date: ${fd.get('date')||'—'}\n\nNotes:\n${fd.get('notes')||'—'}`;
-  window.location.href = `mailto:hello@ahata.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
+  window.location.href = `mailto:hello@audial.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
 });
 
 const state = {roomLength:14, roomWidth:12, roomHeight:10, activeWall:'front', selectedSize:null, selectedDesignedId:null, orientation:'horizontal', panels:[], designedCart:[], selectedPanelIds:new Set()};

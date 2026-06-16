@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-<title>Ahata — About</title>
+<title>Audial — About</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;700&display=swap" rel="stylesheet">
@@ -177,7 +177,7 @@
 <body>
 
 <nav>
-  <a href="index.html" class="logo" aria-label="Ahata — home"><img src="design-references/assets/logos/1.png" class="brand-logo-mark" alt=""><img src="design-references/assets/logos/4.png" class="brand-logo-text" alt="Ahata"></a>
+  <a href="index.html" class="logo" aria-label="Audial — home"><img src="design-references/assets/logos/1.png" class="brand-logo-mark" alt=""><img src="design-references/assets/logos/4.png" class="brand-logo-text" alt="Audial"></a>
   <div class="nav-links">
     <a href="configurator.html">Design</a>
     <a href="room-visualizer.html">Visualize</a>
@@ -260,7 +260,7 @@
     <div class="contact-methods">
       <div class="contact-row">
         <span class="contact-key">Email</span>
-        <a class="contact-val" href="mailto:hello@ahata.in">hello@ahata.in</a>
+        <a class="contact-val" href="mailto:hello@audial.in">hello@audial.in</a>
       </div>
       <div class="contact-row">
         <span class="contact-key">Phone</span>
@@ -307,7 +307,7 @@
 </section>
 
 <footer>
-  <span>© 2026 Ahata · Hand built · Mumbai</span>
+  <span>© 2026 Audial · Hand built · Mumbai</span>
   <span class="foot-links">
     <a href="configurator.html">Design</a>
     <a href="room-visualizer.html">Visualize</a>
@@ -373,7 +373,7 @@ document.getElementById('consultForm').addEventListener('submit', e => {
   e.preventDefault();
   const fd = new FormData(e.target);
   const body = `Name: ${fd.get('name')}\nEmail: ${fd.get('email')}\nPhone: ${fd.get('phone')}\nRoom type: ${fd.get('room')}\nPreferred date: ${fd.get('date')||'—'}\n\nNotes:\n${fd.get('notes')||'—'}`;
-  window.location.href = `mailto:hello@ahata.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
+  window.location.href = `mailto:hello@audial.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
 });
 
 document.getElementById('contactForm').addEventListener('submit', e => {
@@ -381,7 +381,7 @@ document.getElementById('contactForm').addEventListener('submit', e => {
   const fd = new FormData(e.target);
   const subject = fd.get('subject') || 'Message from Acoustic website';
   const body = `Name: ${fd.get('name')}\nEmail: ${fd.get('email')}\nPhone: ${fd.get('phone')||'—'}\n\nMessage:\n${fd.get('message')}`;
-  window.location.href = `mailto:hello@ahata.in?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  window.location.href = `mailto:hello@audial.in?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
 });
 
 // Hamburger menu

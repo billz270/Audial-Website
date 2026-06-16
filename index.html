@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Ahata — Sound as Art</title>
+<title>Audial — Sound as Art</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Archivo:wght@400;500;700&display=swap" rel="stylesheet">
@@ -276,7 +276,7 @@
 <body>
 
 <nav>
-  <a href="index.html" class="logo" aria-label="Ahata — home"><img src="design-references/assets/logos/1.png" class="brand-logo-mark" alt=""><img src="design-references/assets/logos/4.png" class="brand-logo-text" alt="Ahata"></a>
+  <a href="index.html" class="logo" aria-label="Audial — home"><img src="design-references/assets/logos/1.png" class="brand-logo-mark" alt=""><img src="design-references/assets/logos/4.png" class="brand-logo-text" alt="Audial"></a>
   <div class="nav-links">
     <a href="configurator.html">Design</a>
     <a href="room-visualizer.html">Visualize</a>
@@ -634,7 +634,7 @@
 
 <footer>
   <div class="footer-brand">
-    <h3>Ahata◆</h3>
+    <h3>Audial◆</h3>
     <p>Custom acoustic treatment. Hand-built. Human-scaled. For rooms that deserve better.</p>
   </div>
   <div class="footer-col">
@@ -651,12 +651,12 @@
   </div>
   <div class="footer-col">
     <h4>Connect</h4>
-    <a href="mailto:hello@ahata.in">Email</a>
+    <a href="mailto:hello@audial.in">Email</a>
     <a href="#">Instagram</a>
     <a href="tel:+919000000000">Phone</a>
   </div>
   <div class="footer-bottom">
-    <span>© 2026 Ahata · Round 05</span>
+    <span>© 2026 Audial · Round 05</span>
     <span>Hand built · Mumbai</span>
   </div>
 </footer>
@@ -746,7 +746,7 @@ document.getElementById('consultForm').addEventListener('submit', e => {
   e.preventDefault();
   const fd = new FormData(e.target);
   const body = `Name: ${fd.get('name')}\nEmail: ${fd.get('email')}\nPhone: ${fd.get('phone')}\nRoom type: ${fd.get('room')}\nPreferred date: ${fd.get('date')||'—'}\n\nNotes:\n${fd.get('notes')||'—'}`;
-  window.location.href = `mailto:hello@ahata.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
+  window.location.href = `mailto:hello@audial.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
 });
 
 // Hamburger menu

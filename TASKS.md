@@ -441,7 +441,7 @@ Add a horizontal timeline section showcasing the 7-step panel manufacturing proc
 - **File:** index.html, configurator.html, room-visualizer.html, how-it-works.html, about.html
 
 ### Goal
-Replace the current placeholder "ACOUSTIC◆" text logo in the navigation with the actual Ahata logo and brand name using the Bicubik font.
+Replace the current placeholder "ACOUSTIC◆" text logo in the navigation with the actual Audial logo and brand name using the Bicubik font.
 
 ### Assets
 - Logo files: `/design-references/logos/` (4 variants: logo only, logo + text vertical, logo + text horizontal, text only)
@@ -450,7 +450,7 @@ Replace the current placeholder "ACOUSTIC◆" text logo in the navigation with t
 ### Behavior Spec
 
 **Nav logo:**
-- Replace the current `.logo` element (text-based "ACOUSTIC◆") with the appropriate Ahata logo variant.
+- Replace the current `.logo` element (text-based "ACOUSTIC◆") with the appropriate Audial logo variant.
 - Recommended variant for nav: logo + text horizontal (best fit for horizontal nav bar). Confirm during implementation.
 - Logo links to homepage (`index.html`) — preserve existing behavior.
 
@@ -461,8 +461,8 @@ Replace the current placeholder "ACOUSTIC◆" text logo in the navigation with t
 
 **Consistency:**
 - Logo must be updated on ALL existing pages (index.html, configurator.html, room-visualizer.html).
-- Footer brand text ("ACOUSTIC◆" or similar) should also update to Ahata.
-- Any other references to "ACOUSTIC" or "Acoustic" in copy, titles, or meta tags should update to "Ahata".
+- Footer brand text ("ACOUSTIC◆" or similar) should also update to Audial.
+- Any other references to "ACOUSTIC" or "Acoustic" in copy, titles, or meta tags should update to "Audial".
 
 ### Constraints
 - Do not change nav layout or structure — only swap the logo content.
@@ -471,11 +471,11 @@ Replace the current placeholder "ACOUSTIC◆" text logo in the navigation with t
 - If the SVG logo variant has sizing issues at nav scale, fall back to text-only variant in Bicubik.
 
 ### Acceptance Criteria
-- [x] Nav displays Ahata logo on all five existing pages
+- [x] Nav displays Audial logo on all five existing pages
 - [~] Bicubik font — not used; logo delivered as PNG mark (1.png) + wordmark (4.png) side by side
 - [x] Logo links to homepage
-- [ ] Footer brand text updated to Ahata (deferred)
-- [ ] All "ACOUSTIC" references replaced with "Ahata" across all pages (deferred)
+- [ ] Footer brand text updated to Audial (deferred)
+- [ ] All "ACOUSTIC" references replaced with "Audial" across all pages (deferred)
 - [x] Logo is legible and properly sized at nav bar height (64px nav, mark 50px, wordmark 64px)
 - [ ] No layout shifts or broken styling from the swap
 

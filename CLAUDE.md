@@ -1,16 +1,16 @@
-# Ahata — Project Documentation
+# Audial — Project Documentation
 
-This file documents the Ahata website project. It's read by Claude Code at the start of every session so the AI has consistent context. Edit it freely as the project evolves — this is a living document.
+This file documents the Audial website project. It's read by Claude Code at the start of every session so the AI has consistent context. Edit it freely as the project evolves — this is a living document.
 
 ---
 
 ## What this is
 
-**Ahata** is a custom acoustic-panel business based in Mumbai. The website lets customers design panels with their own artwork, plan panel layouts in their rooms, and place orders. Five static HTML pages, no backend (yet), no build step.
+**Audial** is a custom acoustic-panel business based in Mumbai. The website lets customers design panels with their own artwork, plan panel layouts in their rooms, and place orders. Five static HTML pages, no backend (yet), no build step.
 
 The brand name is Sanskrit — "human effort striking sound" — paired with the concept of *Nada* in Carnatic music. Five logo shapes = five fingers of a hand = five letters of the name.
 
-Email: hello@ahata.in
+Email: hello@audial.in
 Location: Mumbai
 
 ---
@@ -18,7 +18,7 @@ Location: Mumbai
 ## File structure
 
 ```
-ahata-website/
+audial-website/
 ├── CLAUDE.md                  ← this file
 ├── index.html                 ← landing page, design-led hero
 ├── configurator.html          ← panel designer (3D viewer, image upload, transforms)
@@ -229,7 +229,7 @@ _(none)_
 - Sparse, technical, slightly philosophical
 - Never cute, never marketing-speak
 - Use real numbers: 7-day build, 100% rockwool density, etc.
-- Hindi/Sanskrit grace where natural (e.g., "Ahata", "Nada"), never forced
+- Hindi/Sanskrit grace where natural (e.g., "Audial", "Nada"), never forced
 - Pair with English clarity — bilingual readers should feel at home, English-only readers should never feel locked out
 - Use ₹ for prices, never $
 

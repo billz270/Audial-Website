@@ -1,8 +1,8 @@
-# Ahata — Design Language
+# Audial — Design Language
 
 ## Philosophy
 
-Ahata's design is warm, minimal, and craft-forward. Technical precision with visual cues inspired by subtle blueprint design elements (lines, dimensions, brackets, grids) are used as functional design tools on pages where users make decisions — not as a theme or decoration. It complements the overall aesthetic; it is never the centerpiece.
+Audial's design is warm, minimal, and craft-forward. Technical precision with visual cues inspired by subtle blueprint design elements (lines, dimensions, brackets, grids) are used as functional design tools on pages where users make decisions — not as a theme or decoration. It complements the overall aesthetic; it is never the centerpiece.
 
 **The rule:** Technical precision scales with user agency.
 
