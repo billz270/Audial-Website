@@ -26,14 +26,14 @@
   /* Inverted (dark) surfaces use the navy primary color, not ink */
   .cta-strip,.marquee{background:var(--primary)}
   *{margin:0;padding:0;box-sizing:border-box}
-  html{scroll-behavior:smooth}
+  html{scroll-behavior:smooth;scrollbar-gutter:stable;overflow-y:auto;overflow-x:hidden}
   body{font-family:'Archivo',sans-serif;background:var(--paper);color:var(--ink);overflow-x:hidden;-webkit-tap-highlight-color:transparent}
   body.modal-open{overflow:hidden}
 
   nav{position:sticky;top:0;left:0;right:0;display:flex;justify-content:space-between;align-items:center;padding:0 32px;border-bottom:1.5px solid var(--ink);background:var(--paper);z-index:100}
   .logo{display:inline-flex;align-items:center;gap:8px;text-decoration:none;line-height:0;color:var(--ink)}
   .logo .brand-logo-mark{height:50px;width:auto;display:block;flex-shrink:0}.logo .brand-logo-text{height:64px;width:auto;display:block;flex-shrink:0}
-  .nav-links{display:flex;gap:24px;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em}
+  .nav-links{display:flex;gap:28px;font-size:12px;font-weight:500;text-transform:uppercase;letter-spacing:0.05em}
   .nav-links a,.nav-links button{color:var(--ink);text-decoration:none;position:relative;background:none;border:none;font:inherit;cursor:pointer;padding:0;letter-spacing:inherit;text-transform:inherit}
   .nav-links a.active{color:var(--accent)}
   .nav-links a:hover::after,.nav-links a.active::after,.nav-links button:hover::after{content:'';position:absolute;left:0;right:0;bottom:-4px;height:2px;background:var(--accent)}
