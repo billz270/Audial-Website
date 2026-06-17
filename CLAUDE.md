@@ -28,15 +28,13 @@ audial-website/
 └── design-references/
     └── assets/
         ├── logos/
-        │   ├── 1.png              ← logo mark only (2000×2000)
-        │   ├── 2.png              ← logo + name vertical
-        │   ├── 3.png              ← logo + name horizontal (full combo)
-        │   └── 4.png              ← wordmark only / name only (2299×600)
+        │   ├── Audial Logo.png        ← logo mark only (2000×2000)
+        │   └── Audial Logo_Black.png  ← wordmark only (2000×300)
         ├── old-logo/              ← archived original SVG files
         └── website-icons/         ← ahata-v3-*.svg icon set
 ```
 
-The nav logo is composed of two `<img>` tags inside `.logo`: `1.png` (mark, 50px height) + `4.png` (wordmark, 64px height), gap 8px. Nav auto-sizes to 64px. Adding a font or photo? Drop it in `assets/` and ask Claude to wire it up.
+The nav logo is composed of two `<img>` tags inside `.logo`: `Audial Logo.png` (mark, 50px height) + `Audial Logo_Black.png` (wordmark, 64px height), gap 8px. Nav auto-sizes to 64px. Adding a font or photo? Drop it in `assets/` and ask Claude to wire it up.
 
 ---
 

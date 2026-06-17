@@ -769,3 +769,37 @@ Arrange the "Sound That Works" section in a 2×2 grid (2 rows, 2 columns) on mob
 ✅ Section displays as 2×2 grid on mobile
 ✅ Content readable at half-width
 ✅ Desktop layout unchanged
+
+---
+
+## Task #DEV-22: Rebrand Logo — Ahata to Audial
+- **Status:** DONE
+- **Priority:** HIGH
+- **File:** All HTML files (index.html, configurator.html, room-visualizer.html, how-it-works.html, about.html)
+
+### Goal
+Replace all instances of the Ahata logo with the new Audial logo. The new logo SVG file has been placed in the assets/ folder. Update all inlined logo SVGs across every page.
+
+### Behavior Spec
+
+**Logo replacement:**
+- All 5 HTML files have the Ahata horizontal logo SVG inlined in the nav bar — replace with new Audial logo SVG
+- Update any alt text, aria-labels, or title attributes referencing "Ahata" to "Audial"
+- Update the assets/ folder: remove old Ahata SVGs, confirm new Audial SVG is present
+
+**Text references:**
+- Search all HTML files for any text mention of "Ahata" (headings, paragraphs, footer, meta tags, page titles) and replace with "Audial"
+- Update <title> tags on all pages
+- Update meta descriptions if present
+- Update CLAUDE.md project name and all references
+
+**Favicon:**
+- If a favicon exists, update it. If not, note for future task.
+
+### Acceptance Criteria
+✅ New Audial logo displays correctly in nav on all 5 pages
+✅ No remaining references to "Ahata" in any HTML file
+✅ Page titles updated to "Audial"
+✅ assets/ folder contains only Audial logo files
+✅ CLAUDE.md updated with new brand name
+✅ Desktop and mobile nav both show correct logo
