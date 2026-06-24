@@ -772,7 +772,7 @@ document.getElementById('consultForm').addEventListener('submit', e => {
   e.preventDefault();
   const fd = new FormData(e.target);
   const body = `Name: ${fd.get('name')}\nEmail: ${fd.get('email')}\nPhone: ${fd.get('phone')}\nRoom type: ${fd.get('room')}\nPreferred date: ${fd.get('date')||'—'}\n\nNotes:\n${fd.get('notes')||'—'}`;
-  window.location.href = `mailto:hello@audial.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
+  window.location.href = `mailto:support@audial.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
 });
 
 // ============ STATE ============
@@ -2075,7 +2075,7 @@ if(_isModal){
           </div>
           <div class="checkout-field" id="field-phone">
             <label for="coPhone">Phone</label>
-            <input type="tel" id="coPhone" name="phone" autocomplete="tel" placeholder="+91 98765 43210">
+            <input type="tel" id="coPhone" name="phone" autocomplete="tel" placeholder="+91 77180 49186">
             <span class="field-error">Phone is required</span>
           </div>
         </div>

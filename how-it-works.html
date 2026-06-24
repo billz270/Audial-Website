@@ -479,7 +479,7 @@ document.getElementById('consultForm').addEventListener('submit', e => {
   e.preventDefault();
   const fd = new FormData(e.target);
   const body = `Name: ${fd.get('name')}\nEmail: ${fd.get('email')}\nPhone: ${fd.get('phone')}\nRoom type: ${fd.get('room')}\nPreferred date: ${fd.get('date')||'—'}\n\nNotes:\n${fd.get('notes')||'—'}`;
-  window.location.href = `mailto:hello@audial.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
+  window.location.href = `mailto:support@audial.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
 });
 
 // Process timeline animation + mobile dots

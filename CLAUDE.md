@@ -10,7 +10,8 @@ This file documents the Audial website project. It's read by Claude Code at the 
 
 The brand name is Sanskrit — "human effort striking sound" — paired with the concept of *Nada* in Carnatic music. Five logo shapes = five fingers of a hand = five letters of the name.
 
-Email: hello@audial.in
+Email: support@audial.in
+Phone: +91 77180 49186
 Location: Mumbai
 
 ---

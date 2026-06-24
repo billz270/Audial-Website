@@ -918,3 +918,33 @@ Make the notification bands on both the configurator and room visualizer pages v
 - [x] Dismiss button hover state is consistent on both pages
 - [x] Text remains fully legible on both bands
 - [x] Pattern gradient behavior identical on both pages (left 0% → right ~70%)
+
+---
+
+## Task #DEV-26: Update Contact Details Across All Pages
+- **Status:** DONE
+- **Priority:** HIGH
+- **File:** All HTML files
+
+### Goal
+Update phone number and email address everywhere they appear across the site.
+
+### Behavior Spec
+
+**New contact details:**
+- Phone: +91 77180 49186
+- Email: support@audial.in
+
+**Search and replace across all 5 HTML files:**
+- About page (primary contact section)
+- Footer (if contact info is displayed)
+- Any mailto: links
+- Any tel: links
+- Any meta tags or structured data referencing contact info
+
+### Acceptance Criteria
+✅ Phone displays as +91 77180 49186 everywhere
+✅ Email displays as support@audial.in everywhere
+✅ All mailto: links point to support@audial.in
+✅ All tel: links point to +917718049186
+✅ No old contact details remain on any page
