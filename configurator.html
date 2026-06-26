@@ -786,8 +786,8 @@ let imgPos = {x:0, y:0};
 let imgNaturalW = 0, imgNaturalH = 0;
 let imgFlipH = false, imgFlipV = false, imgRotate = 0; // 0, 90, 180, 270
 let sceneZoom = 0.82;
-let panYaw = -18, panPitch = 6;
-const MAX_YAW = 30, MAX_PITCH = 20;
+let panYaw = -20, panPitch = 6;
+const MAX_YAW = 45, MAX_PITCH = 20;
 const DEPTH = 30;
 let imageMode = false;
 let _skipDesignerScroll = false;
@@ -984,7 +984,6 @@ sizeCards.forEach(card=>{
     }
 
     sceneZoom = 0.82;
-    panYaw = -18; panPitch = 6;
     showDesigner();
     panelActions.classList.add('visible');
     panelContainer.getBoundingClientRect(); // force layout so offsetWidth/offsetHeight are real
@@ -1072,7 +1071,7 @@ $('pickerCreate').addEventListener('click', () => {
     currentPanel.orientation = 'horizontal';
   }
 
-  sceneZoom = 0.82; panYaw = -18; panPitch = 6;
+  sceneZoom = 0.82;
   showDesigner();
   panelActions.classList.add('visible');
   panelContainer.getBoundingClientRect();
@@ -1522,7 +1521,7 @@ panelContainer.addEventListener('touchmove', e => { if(activeDrag) e.preventDefa
 $('sceneZoomIn').addEventListener('click',()=>{sceneZoom = Math.min(sceneZoom + 0.1, 1.8); applyRotation()});
 $('sceneZoomOut').addEventListener('click',()=>{sceneZoom = Math.max(sceneZoom - 0.1, 0.5); applyRotation()});
 $('sceneZoomFit').addEventListener('click',()=>{sceneZoom = 0.82; applyRotation()});
-$('resetViewBtn').addEventListener('click',()=>{panYaw = -18; panPitch = 6; sceneZoom = 0.82; applyRotation()});
+$('resetViewBtn').addEventListener('click',()=>{panYaw = -20; panPitch = 6; sceneZoom = 0.82; applyRotation()});
 $('clearArtBtn').addEventListener('click', e => {
   e.stopPropagation();
   currentPanel.image = null;
@@ -1743,7 +1742,7 @@ function resetCurrentPanel(){
   panelFace.classList.remove('image-armed','has-image');
   panel3d.classList.remove('wood-dark-scene','wrap-full-scene');
   panel3d.classList.add('wrap-half-scene');
-  sceneZoom = 0.82; panYaw = -18; panPitch = 6;
+  sceneZoom = 0.82; panYaw = -20; panPitch = 6;
   imageMode = false;
   modeIndicator.classList.remove('visible','image-mode');
   imageInfo.classList.remove('visible');
@@ -1935,7 +1934,7 @@ function loadPanelToEditor(panel){
   panel3d.classList.toggle('wrap-full-scene', panel.fabricWrap==='full');
   panel3d.classList.toggle('wrap-half-scene', panel.fabricWrap==='half');
 
-  sceneZoom = 0.82; panYaw = -18; panPitch = 6;
+  sceneZoom = 0.82; panYaw = -20; panPitch = 6;
   updatePanelPreview();
   designer.classList.add('active');
   panelActions.classList.add('visible');
