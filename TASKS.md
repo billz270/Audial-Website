@@ -854,7 +854,7 @@ Replace accent color from yellow (#ecad49) to peach-red (#e26167) across the ent
 ---
 
 ## Task #DEV-24: Swap Nav Button Order & Fix Dividing Lines
-- **Status:** TODO
+- **Status:** DONE (committed `d5d83ff`)
 - **Priority:** HIGH
 - **File:** index.html (and potentially all HTML files if nav is shared)
 
