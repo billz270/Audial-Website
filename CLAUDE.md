@@ -32,7 +32,9 @@ audial-website/
         │   ├── Audial Logo.png        ← logo mark only (2000×2000)
         │   └── Audial Logo_Black.png  ← wordmark only (2000×300)
         ├── old-logo/              ← archived original SVG files
-        └── website-icons/         ← ahata-v3-*.svg icon set
+        ├── website-icons/         ← ahata-v3-*.svg icon set
+        └── 3d-models/
+            └── panel-viewer.html  ← standalone Three.js panel viewer + cinematic assembly animation (DEV-31)
 ```
 
 The nav logo is composed of two `<img>` tags inside `.logo`: `Audial Logo.png` (mark, 50px height) + `Audial Logo_Black.png` (wordmark, 64px height), gap 8px. Nav auto-sizes to 64px. Adding a font or photo? Drop it in `assets/` and ask Claude to wire it up.
@@ -137,6 +139,8 @@ _(none)_
 _(none)_
 
 ### Recently resolved
+- **Cinematic assembly animation for 3D panel viewer (DEV-31)** ✓ — Rebuilt `playAssemblyAnimation()` in the standalone Three.js viewer (`design-references/assets/3d-models/panel-viewer.html`) as a 4-phase cinematic sequence: (1) camera eases to a per-panel cached "home" transform (`homeCameraCache`, `tweenCamera`, 800ms ease-in-out-cubic); (2) all layers hidden, rotation zeroed; (3) each of the 6 layers reveals in physical build order (Frame → Rockwool → Fiberglass Sheet → Back Support → Fiberglass Screen → Acoustic Fabric) — panel rotates around its own vertical centerline (`panelPivot` at world origin, `tweenModelRotationY`), then layer fades opacity 0→1 (`tweenLayerFadeIn`), then holds 800ms; (4) OrbitControls, size buttons, and toggles re-enable (`setControlsDisabled` + `isAnimating` guard). Three load-time fixes: baked 180° base rotation (`model.rotation.y = Math.PI`) so the front/artwork side faces the camera; back layers swing full 180° (`BACK_SWING_ANGLE = Math.PI`); per-layer material cloning (`child.material.clone()`) so fades don't blink the shared-wood Frame. **Follow-up tweak:** near-square 2×2 loaded larger than the elongated panels under max-dimension fitting (`distance = maxDim * 2.5`); added `PANEL_DISTANCE_FACTOR = { '2x2': 1.45 }` applied in both `centerCameraOn` and `computeHomeCameraTransform` to pull its camera back so all 4 sizes load at comparable size. Standalone/internal viewer — not yet wired into the configurator (that's DEV-32). (`design-references/assets/3d-models/panel-viewer.html`)
+
 - **Website text content update (CON-30)** ✓ — Content-only copy update across three pages, sourced from `website-content/Website Content Update.docx`. **index.html:** hero heading "SOUND AS ART." → "Your Sound. Your Art." (restructured from 3-span to 2-span layout — `.word-as` dropped) and new sub-heading. **how-it-works.html:** hero description, "What They Do" section title ("No More Reflections. Just You & Your Sound"), Point 4 wording, misconception tile 01 body, and tile 03 header ("Partials only at high-frequencies."). **about.html:** hero title ("Customized Hand-Built Acoustic Panels"), full "Our Story" rewrite (heading + 3 paragraphs), and all 3 value point bodies (value 02 retitled "Orbed-Based Production" — transcribed as-is from source doc per founder confirmation, despite reading as a likely typo for "Order-Based"). No CSS/JS changes. (`index.html`, `how-it-works.html`, `about.html`)
 
 - **8-step manufacturing timeline (DES-29)** ✓ — Expanded the How It Works process timeline from 7 to 8 steps by inserting a new Step 06 "Apply Fiberglass Screen" (grid-mesh SVG) between Back Support and Acoustic Cloth. Old steps 06/07 renumbered to 07/08. Heading updated to "Eight steps." and 8th mobile dot indicator added. SVG assets migrated from `7-steps/` to `8-steps/` folder. (`how-it-works.html`, `.process-track`, `#processDots`)
