@@ -1110,3 +1110,176 @@ Update text content across three existing pages, per `website-content/Website Co
 - [x] Misconception tile 03 header text changed to "Partials only at high-frequencies."
 - [x] about.html hero title, Our Story, and all 3 value points updated
 - [x] No CSS or JS changes
+
+---
+
+## Task #DEV-31: Cinematic Assembly Animation for 3D Panel Viewer
+- **Status:** DONE
+- **Priority:** HIGH
+- **File:** design-references/assets/3d-models/panel-viewer.html (confirmed location)
+
+### Implementation notes (as built)
+Rebuilt `playAssemblyAnimation()` as a 4-phase cinematic sequence: (1) camera eases to a per-panel cached "home" transform (`homeCameraCache`) over 800ms via `tweenCamera`; (2) all layers hidden, rotation zeroed; (3) each layer reveals in build order — the panel rotates around its own vertical centerline (`panelPivot` group at world origin) via `tweenModelRotationY`, then the layer fades opacity 0→1 via `tweenLayerFadeIn`, then holds 800ms; (4) OrbitControls, size buttons, and toggles re-enable. All controls disabled during playback (`setControlsDisabled` + `isAnimating` guard).
+
+Three issues surfaced during review and were fixed:
+- **Default load showed the back of the panel.** Geometry inspection confirmed the wall-mounting layers (Back Support z=+0.025, Fiberglass Sheet z=+0.016) sat nearest the +Z camera. Fix: baked a 180° base rotation into the model at load (`model.rotation.y = Math.PI`) so the FRONT (artwork/acoustic-fabric side) faces the camera. Rotated the model, not the camera, so the key light (on the camera side) keeps the front lit. All 4 sizes now load front-facing at the same 3/4 angle.
+- **Back-layer reveals faced away / invisible swing.** Root cause was the inverted default orientation above, compounded by an initial edge-hinge experiment. Reverted to center rotation. Back layers (Fiberglass Sheet, Back Support) swing a full 180° (`BACK_SWING_ANGLE = Math.PI`) to land on the mirror of the front load pose — a clean 3/4 view of the back face. Removed the "shortest-path" angle wrapping (`shortestAngleDelta`) that could flip swing direction.
+- **Jump/reset before Back Support.** The `.glb` shared one wood material between Frame and Back Support; fading Back Support's opacity blinked the already-visible Frame. Fix: clone each layer's material at load (`child.material = child.material.clone()`) so per-layer fades are independent (texture maps still shared by reference).
+
+Verified via Playwright headless renders: front-facing load on all 4 sizes, clean `0 → 180° → 0` swing path, no shared materials remaining, no Frame blink during Back Support reveal. User-confirmed "exactly what we wanted."
+
+**Follow-up tweak — 2×2 default zoom.** The near-square 2×2 loaded noticeably larger than the three elongated panels because max-dimension camera fitting (`distance = maxDim * 2.5`) frames a square to fill both axes, while the 4ft long axis of the others pushes the camera back. Added a per-panel `PANEL_DISTANCE_FACTOR` map (`{ '2x2': 1.45 }`) applied in both `centerCameraOn` and `computeHomeCameraTransform`, so the 2×2 camera pulls back ~45% on load and on animation reset. Other three sizes fall through to `|| 1`, unchanged.
+
+### Goal
+Transform the current "Play Assembly Animation" button behavior from a quick layer flash into a cinematic, deliberately-paced reveal. Camera moves to a locked home position, each layer fades in with the panel rotating to face the viewport, giving the viewer a proper "how it's built" experience.
+
+### Behavior Spec
+
+**Phase 1 — Camera reset (~800ms):**
+- Regardless of where the user has orbited the panel, smoothly transition the camera back to the default cinematic 3/4 front angle
+- Easing: ease-in-out cubic
+- No layer changes happen until camera reset is complete
+
+**Phase 2 — Clear and orient:**
+- Hide all 6 components (Frame, Rockwool, Fiberglass Sheet, Back Support, Fiberglass Screen, Acoustic Fabric)
+- Panel rotation returns to default starting Y rotation
+
+**Phase 3 — Layer-by-layer reveal (physical build order):**
+- Order: Frame → Rockwool → Fiberglass Sheet → Back Support → Fiberglass Screen → Acoustic Fabric
+- For each layer:
+  - Determine facing direction:
+    - Back Support, Fiberglass Sheet → BACK of panel
+    - Frame, Rockwool → CORE (centered)
+    - Fiberglass Screen, Acoustic Fabric → FRONT of panel
+  - Smoothly rotate panel to face the appropriate side toward viewport (shortest path — left OR right, whichever is closer to current rotation)
+  - Rotation duration: ~600ms with easing
+  - Once panel is oriented, fade in the new layer (opacity 0 → 1) over ~500ms
+  - Hold ~800ms after fade completes so viewer can appreciate the change
+  - Total per-layer time: ~1900ms
+- Total animation length: ~11-12 seconds
+
+**Phase 4 — Restore:**
+- Re-enable OrbitControls (user regains camera control)
+- Panel stays at whatever final rotation it ended on
+- Assembly animation button becomes clickable again
+- All toggles and panel size switcher re-enabled
+
+**During animation, disable:**
+- OrbitControls (so user drag doesn't interfere)
+- Component toggle switches (grey out visually)
+- Play Assembly Animation button (add .disabled state)
+- Panel size switcher
+
+### Implementation Guidance
+- Use Three.js built-in interpolation for camera position and quaternion for rotation
+- Consider THREE.MathUtils.lerp for camera transitions, or a lightweight tween library like GSAP if needed
+- For fade-in on meshes: transition material.opacity, set material.transparent = true during fade, revert to false after fade completes for performance
+- Store the "home camera position" as a constant at initialization
+
+### Constraints
+- Do NOT break existing toggle functionality
+- Do NOT break the existing panel size switching
+- Do NOT add new dependencies unless necessary — vanilla Three.js is preferred
+- Fade-in effect only applies to the "Play Assembly Animation" flow, NOT regular toggle interactions
+- Regular toggle switches remain instant (no fade) as before
+
+### Acceptance Criteria
+✅ Camera returns to home position smoothly at animation start
+✅ All layers hidden after camera reset
+✅ Each layer reveals in physical build order
+✅ Panel rotates to face the correct side before each layer appears (shortest path rotation)
+✅ Each layer fades in smoothly (opacity 0 → 1)
+✅ Hold time between layers gives viewer time to see the change
+✅ Total animation feels cinematic (~11-12 seconds)
+✅ User controls disabled during animation
+✅ User controls restored after animation
+✅ No breaking changes to existing toggle behavior
+✅ Works for all 4 panel configurations (4×2V, 4×2H, 2×2, 1×4V)
+
+### Out of Scope
+- Sound effects during animation
+- Multiple animation speed options
+- Camera path variations (e.g., different angles per layer)
+- Any changes to configurator.html (that's DEV-32)
+
+---
+
+## Task #DEV-32: Integrate 3D Panel Viewer into Configurator Page
+- **Status:** TODO (depends on DEV-31 completion)
+- **Priority:** HIGH
+- **File:** configurator.html, panel-viewer.html
+
+### Goal
+Replace the current CSS 3D panel preview in the configurator with the Three.js panel viewer. The 3D viewer becomes the primary product preview surface where users see their design in full 3D detail as they configure it.
+
+### Behavior Spec
+
+**What replaces what:**
+- Remove the current CSS .panel-3d element and its associated wood-edge divs
+- Insert the Three.js canvas + rendering pipeline in the same preview area
+- The 3D viewer becomes the preview surface for the configurator
+
+**Panel size selection (existing → adapt):**
+- When user selects a size (1×1, 2×1, 2×2, 4×2, 1×4), the 3D viewer switches to that configuration
+- Current .glb has 4x2V, 4x2H, 2x2, 1x4V — may need to add 1x1, 2x1 variants in Blender later
+- For sizes not in the .glb yet: map to closest available or show placeholder until modeling is done
+
+**Artwork upload (existing → adapt):**
+- When user uploads an image, apply as texture to the Acoustic Fabric mesh's material
+- Image applies to fabric's UV-mapped surface, replacing placeholder artwork
+- Handle image aspect ratio and centering
+
+**Wood varnish toggle (existing → adapt):**
+- Light/Dark toggle swaps the Pine Wood material's base color/texture
+- Real-time 3D preview
+
+**Fabric wrap toggle (existing → adapt):**
+- Halfway vs Full Wrap: may require different acoustic fabric geometry or scaling
+- Determine if new Blender models needed, or if texture stretching handles it
+
+**Component toggles (from panel-viewer.html):**
+- DO NOT include in customer-facing configurator
+- Customers don't need to toggle rockwool/back support visibility while designing
+- Keep only in internal panel-viewer.html for testing/demo purposes
+
+**Performance considerations:**
+- Loading a 1-3MB .glb on every configurator visit is a hit — ensure lazy loading, cache headers, and a loading state
+- Show a loading spinner while the model initializes
+- Fall back gracefully if WebGL is not supported
+
+**Cart thumbnails:**
+- Current cart shows small CSS 3D thumbnails of designed panels
+- Approach: capture a canvas screenshot at "Add to Cart" moment and save the image data as cart thumbnail
+- Lightweight — avoids rendering Three.js per cart item
+- Do NOT render Three.js thumbnails per cart item
+
+**Mobile experience:**
+- 3D on mobile can be laggy — test performance
+- Consider "View in 3D" toggle for mobile users to fall back to a static image if performance is poor
+- Touch controls (pinch to zoom, single-finger rotate) — Three.js OrbitControls handles by default
+
+### Constraints
+- Do NOT break the existing configurator flow (size selection, upload, cart)
+- Do NOT include the component visibility toggles in customer-facing configurator
+- Preserve all existing cart/checkout functionality
+- The Play Assembly Animation feature from panel-viewer.html should NOT appear in the configurator — that's a marketing/demo feature, not a shopping feature
+- Maintain all styling per the design.md tier system (configurator is Tier 2-3)
+
+### Acceptance Criteria
+✅ CSS 3D panel replaced with Three.js viewer in configurator
+✅ Panel size selector properly switches the 3D configuration
+✅ User artwork upload applies to the Acoustic Fabric texture in real-time
+✅ Wood varnish (light/dark) toggle updates the 3D wood material
+✅ Fabric wrap toggle handled appropriately
+✅ Cart thumbnails work (via canvas screenshot capture)
+✅ Loading state shown while .glb loads
+✅ No breaking changes to cart/checkout flow
+✅ Component visibility toggles NOT included in customer-facing view
+✅ Mobile experience tested and functional
+✅ Design.md tier styling maintained
+
+### Out of Scope
+- Play Assembly Animation button (marketing feature, stays in panel-viewer.html only)
+- New Blender models for 1×1 and 2×1 panels (separate task if needed)
+- Backend/database changes
+- Any changes to room-visualizer.html

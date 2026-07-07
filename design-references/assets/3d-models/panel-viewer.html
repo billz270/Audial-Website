@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Audial — 3D Panel Viewer</title>
+<style>
+  :root {
+    --primary: #093d53;
+    --primary-light: #007da6;
+    --accent: #e26167;
+    --ink: #00171f;
+    --paper: #f2f2f9;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Archivo', sans-serif;
+    background: var(--paper);
+    color: var(--ink);
+    overflow: hidden;
+  }
+
+  #canvas-container { width: 100vw; height: 100vh; position: relative; }
+  #canvas { width: 100%; height: 100%; display: block; }
+
+  .controls {
+    position: absolute; top: 20px; right: 20px;
+    background: var(--paper); border: 1.5px solid var(--ink);
+    padding: 20px; width: 260px; z-index: 10;
+  }
+  .controls h3 {
+    font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.15em;
+    margin-bottom: 16px; color: var(--ink);
+  }
+  .controls h3::before { content: '◆'; color: var(--accent); margin-right: 6px; }
+
+  .panel-select { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-bottom: 20px; }
+  .panel-btn {
+    padding: 10px 8px; font-family: inherit; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    background: var(--paper); color: var(--ink);
+    border: 1.5px solid var(--ink); cursor: pointer; transition: all 0.2s;
+  }
+  .panel-btn:hover { background: var(--ink); color: var(--paper); }
+  .panel-btn.active { background: var(--accent); color: var(--paper); border-color: var(--accent); }
+
+  .action-btn {
+    width: 100%; padding: 12px; margin-bottom: 8px;
+    font-family: inherit; font-size: 11px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.1em;
+    background: var(--primary); color: var(--paper);
+    border: 1.5px solid var(--primary); cursor: pointer; transition: all 0.2s;
+  }
+  .action-btn:hover { background: var(--accent); border-color: var(--accent); }
+  .action-btn.secondary { background: var(--paper); color: var(--ink); border-color: var(--ink); }
+  .action-btn.secondary:hover { background: var(--ink); color: var(--paper); }
+
+  .toggle-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 8px 0; border-bottom: 1px dashed rgba(0,23,31,0.15);
+    font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.05em;
+  }
+  .toggle-row:last-child { border-bottom: none; }
+  .toggle-switch {
+    width: 32px; height: 18px; background: rgba(0,23,31,0.2);
+    border-radius: 9px; position: relative; cursor: pointer; transition: background 0.2s;
+  }
+  .toggle-switch::after {
+    content: ''; position: absolute; top: 2px; left: 2px;
+    width: 14px; height: 14px; background: var(--paper);
+    border-radius: 50%; transition: transform 0.2s;
+  }
+  .toggle-switch.active { background: var(--accent); }
+  .toggle-switch.active::after { transform: translateX(14px); }
+
+  .panel-btn.disabled, .action-btn.disabled, .toggle-switch.disabled {
+    opacity: 0.4; pointer-events: none; cursor: not-allowed;
+  }
+
+  .info {
+    position: absolute; bottom: 20px; left: 20px; font-size: 10px;
+    color: rgba(0,23,31,0.5); text-transform: uppercase; letter-spacing: 0.1em;
+  }
+
+  .loading {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.15em; color: var(--ink); text-align: center;
+  }
+
+  .error-box {
+    position: absolute; top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    background: var(--paper); border: 1.5px solid var(--accent);
+    padding: 30px; max-width: 500px; text-align: left; display: none;
+  }
+  .error-box h4 {
+    font-size: 14px; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--accent); margin-bottom: 16px;
+  }
+  .error-box p { font-size: 13px; line-height: 1.6; margin-bottom: 12px; }
+  .error-box code {
+    background: rgba(0,23,31,0.05); padding: 2px 6px;
+    font-family: monospace; font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<div id="canvas-container">
+  <canvas id="canvas"></canvas>
+  <div class="loading" id="loading">Loading 3D Model...</div>
+
+  <div class="error-box" id="error-box">
+    <h4>◆ Model not found</h4>
+    <p>The 3D panel model couldn't be loaded. Make sure <code>Panels.glb</code> is in the same folder.</p>
+  </div>
+
+  <div class="controls" id="controls" style="display:none">
+    <h3>Panel Configuration</h3>
+    <div class="panel-select">
+      <button class="panel-btn active" data-panel="4x2V">4×2 V</button>
+      <button class="panel-btn" data-panel="4x2H">4×2 H</button>
+      <button class="panel-btn" data-panel="2x2">2×2</button>
+      <button class="panel-btn" data-panel="1x4V">1×4</button>
+    </div>
+
+    <h3>Show Components</h3>
+    <div class="toggle-row">
+      <span>Frame</span>
+      <div class="toggle-switch active" data-component="Frame"></div>
+    </div>
+    <div class="toggle-row">
+      <span>Rockwool</span>
+      <div class="toggle-switch active" data-component="Rockwool"></div>
+    </div>
+    <div class="toggle-row">
+      <span>Fiberglass Sheet</span>
+      <div class="toggle-switch active" data-component="Fiberglass Sheet"></div>
+    </div>
+    <div class="toggle-row">
+      <span>Back Support</span>
+      <div class="toggle-switch active" data-component="Back Support"></div>
+    </div>
+    <div class="toggle-row">
+      <span>Fiberglass Screen</span>
+      <div class="toggle-switch active" data-component="Fiberglass Screen"></div>
+    </div>
+    <div class="toggle-row">
+      <span>Acoustic Fabric</span>
+      <div class="toggle-switch active" data-component="Acoustic Fabric"></div>
+    </div>
+    <div class="toggle-row" style="margin-bottom: 16px;">
+      <span>Artwork</span>
+      <div class="toggle-switch" data-component="Artwork"></div>
+    </div>
+
+    <button class="action-btn" id="animate-btn">Play Assembly Animation</button>
+    <button class="action-btn secondary" id="reset-btn">Reset View</button>
+  </div>
+
+  <div class="info">Drag to rotate · Scroll to zoom</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ============ SCENE ============
+const canvas = document.getElementById('canvas');
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0xf2f2f9);
+
+const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 1000);
+camera.position.set(3, 2, 4);
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+
+// ============ LIGHTS ============
+scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+
+const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+keyLight.position.set(5, 8, 5);
+keyLight.castShadow = true;
+keyLight.shadow.mapSize.set(2048, 2048);
+scene.add(keyLight);
+
+const fillLight = new THREE.DirectionalLight(0x93b5c6, 0.4);
+fillLight.position.set(-5, 3, 2);
+scene.add(fillLight);
+
+const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+rimLight.position.set(0, 2, -5);
+scene.add(rimLight);
+
+// Panel pivot: the model sits inside this group, which rotates around the
+// panel's own vertical centerline (world origin passes through the panel
+// center in the XZ plane). The assembly animation drives panelPivot.rotation.y.
+// panelPivot.rotation.y === 0 is the home pose: the panel FRONT (artwork /
+// acoustic-fabric side) faces the camera. The 180deg needed to bring the
+// front around is baked into the model itself at load (see model.rotation.y),
+// so the camera and key light stay on the +Z side where the front is best lit.
+const panelPivot = new THREE.Group();
+scene.add(panelPivot);
+
+// ============ ORBIT ============
+const controls = new OrbitControls(camera, canvas);
+controls.enableDamping = true;
+controls.enablePan = false;
+controls.minDistance = 2;
+controls.maxDistance = 15;
+
+// ============ STATE ============
+// Confirmed from .glb inspection — 1x4 is named "1x4V" in Blender
+const PANEL_KEYS = ['4x2V', '4x2H', '2x2', '1x4V'];
+const COMPONENTS = ['Frame', 'Rockwool', 'Fiberglass Sheet', 'Back Support', 'Fiberglass Screen', 'Acoustic Fabric'];
+
+const panelMeshes = { '4x2V': {}, '4x2H': {}, '2x2': {}, '1x4V': {} };
+// Per-panel camera pull-back multiplier on the base fit distance. 2×2 is
+// near-square, so max-dimension fitting frames it larger than the elongated
+// panels (whose 4ft long axis pushes the camera back). Pull 2×2 back so it
+// loads at a size comparable to the others. Tune this value to taste.
+const PANEL_DISTANCE_FACTOR = { '2x2': 1.45 };
+let currentPanel = '4x2V';
+let modelReady = false;
+let panelRoot = null;
+let isAnimating = false;
+const homeCameraCache = {};
+
+// Cinematic assembly animation timing
+const CAMERA_RESET_DURATION = 800;
+const LAYER_ROTATION_DURATION = 600;
+const LAYER_FADE_DURATION = 500;
+const LAYER_HOLD_DURATION = 800;
+
+// The back-facing layers swing a full 180deg so the panel lands on the mirror
+// of its front load pose — a clean 3/4 view of the BACK face (rather than a
+// raking edge-on angle that shows mostly the side frame). Front and back are
+// now visually distinct (artwork vs grey backing + support rails), so 180deg
+// reads unambiguously as "the other side" despite the rectangular symmetry.
+const BACK_SWING_ANGLE = Math.PI; // 180 deg — mirror of the front 3/4 view
+
+// Which side of the panel each layer belongs to, as a Y rotation (radians)
+// the panel must swing to (around its centerline) before that layer fades in.
+const LAYER_FACING = {
+  'Frame': 0,
+  'Rockwool': 0,
+  'Fiberglass Sheet': BACK_SWING_ANGLE,
+  'Back Support': BACK_SWING_ANGLE,
+  'Fiberglass Screen': 0,
+  'Acoustic Fabric': 0
+};
+
+// ============ IDENTIFY ============
+// CRITICAL: use the parent NODE name for classification, not the mesh name.
+// Blender sometimes appends .001/.002 to mesh names but node names stay clean.
+function getIdentifyingName(mesh) {
+  // Prefer parent name (node name from Blender) which is clean
+  if (mesh.parent && mesh.parent.name && mesh.parent.name !== 'Scene') {
+    return mesh.parent.name;
+  }
+  // Fallback to mesh name, stripping any Blender .001/.002 suffix
+  if (mesh.name) {
+    return mesh.name.replace(/\.\d+$/, '');
+  }
+  return '';
+}
+
+function classifyMesh(mesh) {
+  const name = getIdentifyingName(mesh);
+  if (!name) return null;
+
+  // Sort by descending length so "4x2V" matches before "4x2" would
+  const sortedKeys = [...PANEL_KEYS].sort((a, b) => b.length - a.length);
+
+  for (const panelKey of sortedKeys) {
+    // Match with underscore OR space separator
+    for (const separator of [' ', '_']) {
+      const prefix = panelKey + separator;
+      if (name.startsWith(prefix)) {
+        const rawComponent = name.substring(prefix.length).trim();
+        const component = rawComponent.replace(/_/g, ' ');
+        if (COMPONENTS.includes(component)) {
+          return { panelKey, component };
+        }
+      }
+    }
+  }
+  return null;
+}
+
+// ============ LOAD ============
+const loader = new GLTFLoader();
+loader.load(
+  './Panels.glb',
+  (gltf) => {
+    const model = gltf.scene;
+
+    console.log('=== GLTF LOADED ===');
+
+    model.traverse((child) => {
+      if (child.isMesh) {
+        child.castShadow = true;
+        child.receiveShadow = true;
+
+        const identifyingName = getIdentifyingName(child);
+        console.log(`Mesh: '${child.name}' | parent: '${child.parent?.name}' | using: '${identifyingName}'`);
+
+        // Handle backdrop
+        if (identifyingName === 'Backdrop' || child.parent?.name === 'Backdrop') {
+          child.visible = false;
+          console.log(`  → Hidden as Backdrop`);
+          return;
+        }
+
+        const cls = classifyMesh(child);
+        if (cls) {
+          // Give every layer its own material instance. The .glb shares one
+          // wood material between Frame and Back Support, so animating one
+          // layer's opacity would blink the other (a visible jump/reset during
+          // the assembly fade-in). Cloning keeps per-layer fades independent;
+          // the underlying texture maps are still shared by reference.
+          if (child.material) child.material = child.material.clone();
+          panelMeshes[cls.panelKey][cls.component] = child;
+          console.log(`  → ${cls.panelKey} / ${cls.component}`);
+        } else {
+          console.log(`  → UNCLASSIFIED`);
+        }
+      }
+    });
+
+    console.log('=== CLASSIFICATION RESULT ===');
+    for (const key of PANEL_KEYS) {
+      console.log(`${key}:`, Object.keys(panelMeshes[key]));
+    }
+
+    // Bake a 180deg base rotation so the panel FRONT (artwork side) faces the
+    // +Z camera at load. Without this the model loads back-to-camera (the
+    // wall-mounting side — Back Support / Fiberglass Sheet — sits nearest +Z).
+    model.rotation.y = Math.PI;
+    panelPivot.add(model);
+    panelRoot = model;
+    modelReady = true;
+
+    cacheHomeCameraTransforms();
+    showOnlyPanel('4x2V');
+
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('controls').style.display = 'block';
+  },
+  (progress) => {
+    if (progress.total > 0) {
+      const percent = (progress.loaded / progress.total * 100).toFixed(0);
+      document.getElementById('loading').textContent = `Loading... ${percent}%`;
+    }
+  },
+  (error) => {
+    console.error('Error loading model:', error);
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('error-box').style.display = 'block';
+  }
+);
+
+// ============ FUNCTIONS ============
+function showOnlyPanel(panelKey) {
+  currentPanel = panelKey;
+  // Hide EVERYTHING first
+  for (const key of PANEL_KEYS) {
+    for (const component of COMPONENTS) {
+      const mesh = panelMeshes[key][component];
+      if (mesh) mesh.visible = false;
+    }
+  }
+  resetSwingState();
+  updateComponentVisibility();
+  centerCameraOn(panelKey);
+}
+
+// Return the panel to its home pose (front facing camera, rotation 0).
+function resetSwingState() {
+  panelPivot.rotation.y = 0;
+}
+
+function getToggleState(componentName) {
+  const toggle = document.querySelector(`[data-component="${componentName}"]`);
+  return toggle && toggle.classList.contains('active');
+}
+
+function updateComponentVisibility() {
+  if (!modelReady) return;
+
+  for (const component of COMPONENTS) {
+    const mesh = panelMeshes[currentPanel][component];
+    if (!mesh) continue;
+
+    mesh.visible = getToggleState(component);
+
+    if (component === 'Acoustic Fabric' && mesh.material) {
+      applyAcousticFabricMaterial(mesh);
+      mesh.material.needsUpdate = true;
+    }
+  }
+}
+
+// Shared by the manual "Artwork" toggle and the assembly animation's fade-in,
+// so both paths render the fabric identically.
+function applyAcousticFabricMaterial(mesh) {
+  const mat = mesh.material;
+  if (!mat) return;
+  const artworkOn = getToggleState('Artwork');
+  if (artworkOn) {
+    if (mat.userData.originalMap) {
+      mat.map = mat.userData.originalMap;
+      mat.color.set(0xffffff);
+    }
+  } else {
+    if (!mat.userData.originalMap && mat.map) {
+      mat.userData.originalMap = mat.map;
+    }
+    mat.map = null;
+    mat.color.set(0xd9d5c9);
+  }
+}
+
+function centerCameraOn(panelKey) {
+  const box = new THREE.Box3();
+  for (const component of COMPONENTS) {
+    const mesh = panelMeshes[panelKey][component];
+    if (mesh && mesh.visible) box.expandByObject(mesh);
+  }
+  if (box.isEmpty()) return;
+
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const distance = maxDim * 2.5 * (PANEL_DISTANCE_FACTOR[panelKey] || 1);
+
+  controls.target.copy(center);
+  camera.position.set(center.x + distance * 0.6, center.y + distance * 0.3, center.z + distance);
+  controls.update();
+}
+
+// Computed once per panel while panelPivot.rotation.y is still 0 (at load time),
+// so the cached transform is a fixed "home" shot unaffected by later rotation.
+function computeHomeCameraTransform(panelKey) {
+  const box = new THREE.Box3();
+  let hasAny = false;
+  for (const component of COMPONENTS) {
+    const mesh = panelMeshes[panelKey][component];
+    if (mesh) {
+      box.expandByObject(mesh);
+      hasAny = true;
+    }
+  }
+  if (!hasAny) return null;
+
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const distance = maxDim * 2.5 * (PANEL_DISTANCE_FACTOR[panelKey] || 1);
+
+  return {
+    position: new THREE.Vector3(center.x + distance * 0.6, center.y + distance * 0.3, center.z + distance),
+    target: center.clone()
+  };
+}
+
+function cacheHomeCameraTransforms() {
+  for (const key of PANEL_KEYS) {
+    homeCameraCache[key] = computeHomeCameraTransform(key);
+  }
+}
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+function tweenCamera(fromPos, toPos, fromTarget, toTarget, duration) {
+  return new Promise((resolve) => {
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min((now - start) / duration, 1);
+      const e = easeInOutCubic(t);
+      camera.position.lerpVectors(fromPos, toPos, e);
+      controls.target.lerpVectors(fromTarget, toTarget, e);
+      controls.update();
+      if (t < 1) requestAnimationFrame(step);
+      else resolve();
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+// Always takes the full duration (even when delta is ~0) so every layer holds
+// the same ~1900ms beat, matching the cinematic pacing in the spec. Rotates
+// the panel around its own vertical centerline (panelPivot at world origin).
+function tweenModelRotationY(deltaY, duration) {
+  return new Promise((resolve) => {
+    if (Math.abs(deltaY) < 0.0001) {
+      setTimeout(resolve, duration);
+      return;
+    }
+    const startY = panelPivot.rotation.y;
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min((now - start) / duration, 1);
+      const e = easeInOutCubic(t);
+      panelPivot.rotation.y = startY + deltaY * e;
+      if (t < 1) requestAnimationFrame(step);
+      else resolve();
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+function tweenLayerFadeIn(mesh, component, duration) {
+  return new Promise((resolve) => {
+    if (!mesh || !mesh.material) {
+      if (mesh) mesh.visible = true;
+      resolve();
+      return;
+    }
+
+    if (component === 'Acoustic Fabric') applyAcousticFabricMaterial(mesh);
+
+    const mat = mesh.material;
+    mesh.visible = true;
+    mat.transparent = true;
+    mat.opacity = 0;
+    mat.needsUpdate = true;
+
+    const start = performance.now();
+    function step(now) {
+      const t = Math.min((now - start) / duration, 1);
+      mat.opacity = t;
+      mat.needsUpdate = true;
+      if (t < 1) {
+        requestAnimationFrame(step);
+      } else {
+        mat.transparent = false;
+        mat.opacity = 1;
+        mat.needsUpdate = true;
+        resolve();
+      }
+    }
+    requestAnimationFrame(step);
+  });
+}
+
+function setControlsDisabled(disabled) {
+  controls.enabled = !disabled;
+  document.getElementById('animate-btn').classList.toggle('disabled', disabled);
+  document.getElementById('reset-btn').classList.toggle('disabled', disabled);
+  document.querySelectorAll('.panel-btn').forEach(b => b.classList.toggle('disabled', disabled));
+  document.querySelectorAll('[data-component]').forEach(t => t.classList.toggle('disabled', disabled));
+}
+
+async function playAssemblyAnimation() {
+  if (isAnimating || !modelReady || !panelRoot) return;
+  isAnimating = true;
+  setControlsDisabled(true);
+
+  // Phase 1: camera reset to locked home position — no layer changes yet
+  const home = homeCameraCache[currentPanel];
+  if (home) {
+    await tweenCamera(
+      camera.position.clone(),
+      home.position.clone(),
+      controls.target.clone(),
+      home.target.clone(),
+      CAMERA_RESET_DURATION
+    );
+  }
+
+  // Phase 2: clear and orient — hide all layers, reset rotation to default
+  for (const component of COMPONENTS) {
+    const mesh = panelMeshes[currentPanel][component];
+    if (mesh) {
+      mesh.visible = false;
+      if (mesh.material) {
+        mesh.material.opacity = 1;
+        mesh.material.transparent = false;
+      }
+    }
+  }
+  document.querySelectorAll('[data-component]').forEach(t => {
+    if (t.dataset.component !== 'Artwork') t.classList.remove('active');
+  });
+  resetSwingState();
+
+  // Phase 3: reveal layers in physical build order
+  for (const component of COMPONENTS) {
+    const mesh = panelMeshes[currentPanel][component];
+    if (!mesh) continue;
+
+    const targetY = LAYER_FACING[component];
+    const delta = targetY - panelPivot.rotation.y;
+    await tweenModelRotationY(delta, LAYER_ROTATION_DURATION);
+
+    await tweenLayerFadeIn(mesh, component, LAYER_FADE_DURATION);
+
+    const toggle = document.querySelector(`[data-component="${component}"]`);
+    if (toggle) toggle.classList.add('active');
+
+    await sleep(LAYER_HOLD_DURATION);
+  }
+
+  // Phase 4: restore user control
+  setControlsDisabled(false);
+  isAnimating = false;
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+// ============ UI ============
+document.querySelectorAll('.panel-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (isAnimating) return;
+    document.querySelectorAll('.panel-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    showOnlyPanel(btn.dataset.panel);
+  });
+});
+
+document.querySelectorAll('[data-component]').forEach(toggle => {
+  toggle.addEventListener('click', () => {
+    if (isAnimating) return;
+    toggle.classList.toggle('active');
+    updateComponentVisibility();
+  });
+});
+
+document.getElementById('animate-btn').addEventListener('click', playAssemblyAnimation);
+
+document.getElementById('reset-btn').addEventListener('click', () => {
+  if (isAnimating) return;
+  document.querySelectorAll('[data-component]').forEach(t => {
+    if (t.dataset.component === 'Artwork') {
+      t.classList.remove('active');
+    } else {
+      t.classList.add('active');
+    }
+  });
+  resetSwingState();
+  updateComponentVisibility();
+  centerCameraOn(currentPanel);
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+  renderer.render(scene, camera);
+}
+animate();
+</script>
+
+</body>
+</html>
