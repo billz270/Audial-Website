@@ -124,7 +124,11 @@
       <button class="panel-btn active" data-panel="4x2V">4×2 V</button>
       <button class="panel-btn" data-panel="4x2H">4×2 H</button>
       <button class="panel-btn" data-panel="2x2">2×2</button>
-      <button class="panel-btn" data-panel="1x4V">1×4</button>
+      <button class="panel-btn" data-panel="1x4V">1×4 V</button>
+      <button class="panel-btn" data-panel="1x4H">1×4 H</button>
+      <button class="panel-btn" data-panel="2x1V">2×1 V</button>
+      <button class="panel-btn" data-panel="2x1H">2×1 H</button>
+      <button class="panel-btn" data-panel="1x1">1×1</button>
     </div>
 
     <h3>Show Components</h3>
@@ -230,15 +234,18 @@ controls.maxDistance = 15;
 
 // ============ STATE ============
 // Confirmed from .glb inspection — 1x4 is named "1x4V" in Blender
-const PANEL_KEYS = ['4x2V', '4x2H', '2x2', '1x4V'];
+const PANEL_KEYS = ['4x2V', '4x2H', '2x2', '1x4V', '1x4H', '2x1V', '2x1H', '1x1'];
 const COMPONENTS = ['Frame', 'Rockwool', 'Fiberglass Sheet', 'Back Support', 'Fiberglass Screen', 'Acoustic Fabric'];
 
-const panelMeshes = { '4x2V': {}, '4x2H': {}, '2x2': {}, '1x4V': {} };
+// Built from PANEL_KEYS so the two can never drift out of sync (a mismatch here
+// is what left unhandled configs permanently visible in the scene before).
+const panelMeshes = {};
+PANEL_KEYS.forEach((k) => { panelMeshes[k] = {}; });
 // Per-panel camera pull-back multiplier on the base fit distance. 2×2 is
 // near-square, so max-dimension fitting frames it larger than the elongated
 // panels (whose 4ft long axis pushes the camera back). Pull 2×2 back so it
 // loads at a size comparable to the others. Tune this value to taste.
-const PANEL_DISTANCE_FACTOR = { '2x2': 1.45 };
+const PANEL_DISTANCE_FACTOR = { '2x2': 1.45, '1x1': 1.45 };
 let currentPanel = '4x2V';
 let modelReady = false;
 let panelRoot = null;
@@ -342,7 +349,13 @@ loader.load(
           panelMeshes[cls.panelKey][cls.component] = child;
           console.log(`  → ${cls.panelKey} / ${cls.component}`);
         } else {
-          console.log(`  → UNCLASSIFIED`);
+          // Defense-in-depth: any mesh that isn't the Backdrop and isn't one of
+          // the known configs (e.g. an extra config baked into the .glb that this
+          // viewer doesn't surface yet) must be hidden. Otherwise it loads with
+          // the default visible=true and never gets turned off, lingering in the
+          // scene and overlapping whatever config the user selects.
+          child.visible = false;
+          console.log(`  → UNCLASSIFIED — hidden`);
         }
       }
     });
