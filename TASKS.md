@@ -1130,6 +1130,8 @@ Verified via Playwright headless renders: front-facing load on all 4 sizes, clea
 
 **Follow-up tweak — 2×2 default zoom.** The near-square 2×2 loaded noticeably larger than the three elongated panels because max-dimension camera fitting (`distance = maxDim * 2.5`) frames a square to fill both axes, while the 4ft long axis of the others pushes the camera back. Added a per-panel `PANEL_DISTANCE_FACTOR` map (`{ '2x2': 1.45 }`) applied in both `centerCameraOn` and `computeHomeCameraTransform`, so the 2×2 camera pulls back ~45% on load and on animation reset. Other three sizes fall through to `|| 1`, unchanged.
 
+**Follow-up fix — stray-panel ghosting / all 8 glb configs (committed `7f56384`).** After the `.glb` was re-exported with **8** panel configurations, the viewer still only listed **4** in `PANEL_KEYS` (`4x2V`, `4x2H`, `2x2`, `1x4V`). The other 4 (`1x4H`, `2x1V`, `2x1H`, `1x1`) were never classified, never added to `panelMeshes`, and so never hidden by `showOnlyPanel`'s hide-all loop — they loaded with the default `visible = true` and lingered permanently, overlapping whatever config the user selected (visible on size switching AND during the assembly animation). Fix: (1) added all 8 configs to `PANEL_KEYS` and 4 matching size buttons (relabeled the existing `1×4` button to `1×4 V`); (2) build `panelMeshes` from `PANEL_KEYS` so the two can't drift out of sync; (3) gave the square `1x1` the same `PANEL_DISTANCE_FACTOR` pull-back (`1.45`) as `2x2`; (4) defense-in-depth — hide any unclassified, non-Backdrop mesh at load so a future extra config baked into the `.glb` can't ghost again. The viewer now surfaces all 8 configs, each in isolation. (`design-references/assets/3d-models/panel-viewer.html`)
+
 ### Goal
 Transform the current "Play Assembly Animation" button behavior from a quick layer flash into a cinematic, deliberately-paced reveal. Camera moves to a locked home position, each layer fades in with the panel rotating to face the viewport, giving the viewer a proper "how it's built" experience.
 
@@ -1194,7 +1196,7 @@ Transform the current "Play Assembly Animation" button behavior from a quick lay
 ✅ User controls disabled during animation
 ✅ User controls restored after animation
 ✅ No breaking changes to existing toggle behavior
-✅ Works for all 4 panel configurations (4×2V, 4×2H, 2×2, 1×4V)
+✅ Works for all 8 panel configurations (4×2V, 4×2H, 2×2, 1×4V, 1×4H, 2×1V, 2×1H, 1×1) — originally 4, extended in follow-up fix `7f56384`
 
 ### Out of Scope
 - Sound effects during animation
