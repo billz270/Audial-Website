@@ -134,6 +134,14 @@
     touch-action:none;overflow:hidden;
   }
   .panel-3d-container.grabbing{cursor:grabbing}
+  /* DEV-32: 3D viewer overlay. Hidden until .view-3d is set on the container. */
+  .panel-3d-container{position:relative}
+  #viewer3dCanvas{display:none;position:absolute;inset:0;width:100%;height:100%;z-index:2}
+  .panel-3d-container.view-3d #viewer3dCanvas{display:block}
+  .panel-3d-container.view-3d #sceneWrap{display:none}
+  #viewer3dLoading{display:none;position:absolute;inset:0;z-index:3;align-items:center;justify-content:center;
+    background:var(--paper);color:var(--ink);font-family:'Archivo',sans-serif;font-weight:600;font-size:12px;
+    letter-spacing:0.1em;text-transform:uppercase}
   .panel-3d-container.image-mode{cursor:default}
 
   .scene-wrap{transform-style:preserve-3d;transition:transform 0.15s ease-out;position:relative;transform:perspective(1800px)}
@@ -583,6 +591,8 @@
     </div>
 
     <div class="panel-3d-container" id="panelContainer">
+      <canvas id="viewer3dCanvas"></canvas>
+      <div id="viewer3dLoading">Loading 3D…</div>
       <div class="scene-wrap" id="sceneWrap">
         <div class="panel-3d" id="panel3d">
           <div class="panel-back" id="panelBack"></div>
@@ -2272,6 +2282,227 @@ document.getElementById('checkoutSubmitBtn').addEventListener('click', async ()=
   document.addEventListener('click',function(e){if(!hn.contains(e.target)){hn.classList.remove('nav-open');hb.setAttribute('aria-expanded','false');}});
   document.querySelectorAll('.mobile-menu a,.mobile-menu button').forEach(function(el){el.addEventListener('click',function(){hn.classList.remove('nav-open');hb.setAttribute('aria-expanded','false');});});
 })();
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const GLB_URL = './design-references/assets/3d-models/Panels-web.glb';
+// Confirmed from .glb inspection — matches panel-viewer.html.
+const PANEL_KEYS = ['4x2V','4x2H','2x2','1x4V','1x4H','2x1V','2x1H','1x1'];
+const COMPONENTS = ['Frame','Rockwool','Fiberglass Sheet','Back Support','Fiberglass Screen','Acoustic Fabric'];
+// 2x2 and 1x1 are near-square; max-dimension fit frames them large, so pull the camera back.
+const PANEL_DISTANCE_FACTOR = { '2x2':1.45, '1x1':1.45 };
+// Configurator size -> .glb config key. Non-square sizes load a default orientation.
+// Custom has no .glb config (handled by show3D(false) elsewhere).
+const SIZE_TO_CONFIG = { '1x1':'1x1', '2x1':'2x1H', '2x2':'2x2', '4x2':'4x2H', '1x4':'1x4V' };
+
+const container  = document.getElementById('panelContainer');
+const canvas     = document.getElementById('viewer3dCanvas');
+const loadingEl  = document.getElementById('viewer3dLoading');
+
+// --- state ---
+let webglOK = webglAvailable();
+let modelReady = false;
+let pendingConfig = null;
+let currentFold = 'full';                 // default fabric wrap variant
+const panelMeshes = {};                   // panelMeshes[key][component] = mesh
+const fabricFolds = {};                   // fabricFolds[key][half|full] = mesh
+PANEL_KEYS.forEach(k => { panelMeshes[k] = {}; fabricFolds[k] = {}; });
+let scene, camera, renderer, controls;
+
+function webglAvailable(){
+  try {
+    const c = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
+  } catch(e){ return false; }
+}
+
+function initViewer(){
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf2f2f9);
+
+  camera = new THREE.PerspectiveCamera(35, 1, 0.1, 1000);
+  camera.position.set(3, 2, 4);
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  keyLight.position.set(5, 8, 5);
+  keyLight.castShadow = true;
+  keyLight.shadow.mapSize.set(2048, 2048);
+  scene.add(keyLight);
+  const fillLight = new THREE.DirectionalLight(0x93b5c6, 0.4);
+  fillLight.position.set(-5, 3, 2);
+  scene.add(fillLight);
+  const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+  rimLight.position.set(0, 2, -5);
+  scene.add(rimLight);
+
+  controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.enablePan = false;
+  controls.minDistance = 2;
+  controls.maxDistance = 15;
+
+  new ResizeObserver(resize).observe(container);
+
+  loadModel();
+  animate();
+}
+
+// Blender node names are clean; mesh names can carry .001/.002 suffixes.
+function getIdentifyingName(mesh){
+  if (mesh.parent && mesh.parent.name && mesh.parent.name !== 'Scene') return mesh.parent.name;
+  if (mesh.name) return mesh.name.replace(/\.\d+$/, '');
+  return '';
+}
+
+function classifyMesh(mesh){
+  const name = getIdentifyingName(mesh);
+  if (!name) return null;
+  const sortedKeys = [...PANEL_KEYS].sort((a,b) => b.length - a.length); // "4x2V" before "4x2"
+  for (const panelKey of sortedKeys){
+    for (const sep of [' ', '_']){
+      const prefix = panelKey + sep;
+      if (name.startsWith(prefix)){
+        const component = name.substring(prefix.length).trim().replace(/_/g, ' ');
+        if (COMPONENTS.includes(component)) return { panelKey, component };
+        // Fabric ships as two wrap variants; both map to the single Acoustic Fabric slot.
+        const fold = component.match(/^Acoustic Fabric (Half|Full) Fold$/);
+        if (fold) return { panelKey, component:'Acoustic Fabric', fold: fold[1].toLowerCase() };
+      }
+    }
+  }
+  return null;
+}
+
+function loadModel(){
+  new GLTFLoader().load(GLB_URL, (gltf) => {
+    const model = gltf.scene;
+    model.traverse((child) => {
+      if (!child.isMesh) return;
+      child.castShadow = true;
+      child.receiveShadow = true;
+      const idName = getIdentifyingName(child);
+      if (idName === 'Backdrop' || child.parent?.name === 'Backdrop'){ child.visible = false; return; }
+      const cls = classifyMesh(child);
+      if (cls){
+        if (child.material) child.material = child.material.clone(); // independent per-layer material
+        if (cls.fold){ fabricFolds[cls.panelKey][cls.fold] = child; child.visible = false; }
+        else { panelMeshes[cls.panelKey][cls.component] = child; child.visible = false; }
+      } else {
+        child.visible = false; // defense-in-depth: never leave an unknown mesh visible
+      }
+    });
+    model.rotation.y = Math.PI;  // bring the FRONT (fabric side) to face the +Z camera
+    scene.add(model);
+    applyFabricFold();
+    modelReady = true;
+    loadingEl.style.display = 'none';
+    if (pendingConfig){ showConfig(pendingConfig); pendingConfig = null; }
+  },
+  undefined,
+  (err) => {
+    console.error('[audial3D] model load failed:', err);
+    loadingEl.style.display = 'none';
+    webglOK = false;
+    window.audial3D.available = false;
+    show3D(false); // fall back to the CSS preview
+  });
+}
+
+// Promote the active fabric fold into each panel's Acoustic Fabric slot; hide the other.
+function applyFabricFold(){
+  for (const key of PANEL_KEYS){
+    const folds = fabricFolds[key];
+    if (!folds) continue;
+    const active = folds[currentFold] || folds.full || folds.half || null;
+    const inactive = active === folds.full ? folds.half : folds.full;
+    if (inactive) inactive.visible = false;
+    if (active) panelMeshes[key]['Acoustic Fabric'] = active;
+  }
+}
+
+function hideAllComponents(){
+  for (const key of PANEL_KEYS)
+    for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = false; }
+}
+
+function showConfig(key){
+  hideAllComponents();
+  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = true; }
+  centerCameraOn(key);
+}
+
+function centerCameraOn(key){
+  const box = new THREE.Box3();
+  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m && m.visible) box.expandByObject(m); }
+  if (box.isEmpty()) return;
+  const center = box.getCenter(new THREE.Vector3());
+  const size   = box.getSize(new THREE.Vector3());
+  const maxDim = Math.max(size.x, size.y, size.z);
+  const distance = maxDim * 2.5 * (PANEL_DISTANCE_FACTOR[key] || 1);
+  controls.target.copy(center);
+  camera.position.set(center.x + distance * 0.6, center.y + distance * 0.3, center.z + distance);
+  controls.update();
+}
+
+function resize(){
+  if (!renderer) return;
+  const w = container.clientWidth, h = container.clientHeight;
+  if (!w || !h) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+function animate(){
+  requestAnimationFrame(animate);
+  if (controls) controls.update();
+  if (renderer && scene && camera) renderer.render(scene, camera);
+}
+
+// ===== Public API used by the classic configurator script =====
+function show3D(on){
+  const use = !!on && webglOK;
+  container.classList.toggle('view-3d', use);
+  window.__viewer3dActive = use;   // read by the CSS-panel drag handler to yield to OrbitControls
+  if (use) requestAnimationFrame(resize);
+}
+
+function showForSize(size){
+  const key = SIZE_TO_CONFIG[size];
+  if (!key || !webglOK){ show3D(false); return; }  // custom/unknown or no WebGL -> CSS preview
+  show3D(true);
+  loadingEl.style.display = modelReady ? 'none' : 'flex';
+  if (modelReady) showConfig(key);
+  else pendingConfig = key;
+}
+
+window.audial3D = { available: webglOK, showForSize, show3D };
+
+if (!webglOK) {
+  console.warn('[audial3D] WebGL unavailable — CSS preview will be used.');
+} else {
+  initViewer();
+}
 </script>
 
 </body>
