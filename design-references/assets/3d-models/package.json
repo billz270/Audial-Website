@@ -1,0 +1,15 @@
+{
+  "name": "audial-glb-pipeline",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Strips Panels.glb (Blender master) into Panels-web.glb for the web.",
+  "scripts": {
+    "build": "node build-web-glb.mjs",
+    "build:force": "node build-web-glb.mjs --force"
+  },
+  "dependencies": {
+    "@gltf-transform/core": "^4.1.1",
+    "@gltf-transform/functions": "^4.1.1"
+  }
+}

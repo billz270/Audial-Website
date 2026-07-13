@@ -1,3 +1,7 @@
 .vercel
 .superpowers/
 docs/superpowers/
+
+# 3D pipeline: the Blender master is huge and local-only; the web build is committed.
+design-references/assets/3d-models/Panels.glb
+design-references/assets/3d-models/node_modules/
