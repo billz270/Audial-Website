@@ -998,6 +998,7 @@ sizeCards.forEach(card=>{
     panelActions.classList.add('visible');
     panelContainer.getBoundingClientRect(); // force layout so offsetWidth/offsetHeight are real
     updatePanelPreview();
+    if (window.audial3D) window.audial3D.showForSize(currentPanel.size); // DEV-32: catalog size -> 3D
     if (!currentPanel.image) showSizeTips(card.dataset.size);
   });
 });
@@ -1082,6 +1083,7 @@ $('pickerCreate').addEventListener('click', () => {
   }
 
   sceneZoom = 0.82;
+  if (window.audial3D) window.audial3D.show3D(false); // DEV-32: custom size uses the CSS preview
   showDesigner();
   panelActions.classList.add('visible');
   panelContainer.getBoundingClientRect();
@@ -1480,6 +1482,7 @@ function isImageTarget(t){return t === panelImage}
 function isUIControlTarget(t){return t === replaceBtn || (t && t.closest && t.closest('.upload-in-panel'))}
 
 panelContainer.addEventListener('pointerdown', e => {
+  if(window.__viewer3dActive) return; // DEV-32: OrbitControls owns the pointer in 3D mode
   if(isUIControlTarget(e.target)) return;
   if(isImageTarget(e.target) && currentPanel.image){
     if(!imageMode) enableImageMode();

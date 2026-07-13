@@ -69,10 +69,13 @@ export async function build({ silent = false } = {}) {
   const root = doc.getRoot();
 
   // One shared blank material for every fabric mesh — textured from the user's upload at runtime.
+  // doubleSided:true matches every other material in the master. The visible fabric surface is a
+  // back-face, so a single-sided material would be back-face-culled and render invisible.
   const fabricMat = doc.createMaterial('Fabric')
     .setBaseColorFactor([0.85, 0.85, 0.85, 1])
     .setRoughnessFactor(0.9)
-    .setMetallicFactor(0);
+    .setMetallicFactor(0)
+    .setDoubleSided(true);
 
   let reassigned = 0;
   for (const mesh of root.listMeshes()) {
