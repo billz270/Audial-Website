@@ -74,9 +74,19 @@
   .toggle-switch.active { background: var(--accent); }
   .toggle-switch.active::after { transform: translateX(14px); }
 
-  .panel-btn.disabled, .action-btn.disabled, .toggle-switch.disabled {
+  .panel-btn.disabled, .action-btn.disabled, .toggle-switch.disabled, .fold-btn.disabled {
     opacity: 0.4; pointer-events: none; cursor: not-allowed;
   }
+
+  .fold-select { display: flex; gap: 4px; }
+  .fold-btn {
+    padding: 3px 9px; font-family: inherit; font-size: 10px; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.05em;
+    background: var(--paper); color: var(--ink);
+    border: 1.5px solid var(--ink); cursor: pointer; transition: all 0.2s;
+  }
+  .fold-btn:hover { background: var(--ink); color: var(--paper); }
+  .fold-btn.active { background: var(--accent); color: var(--paper); border-color: var(--accent); }
 
   .info {
     position: absolute; bottom: 20px; left: 20px; font-size: 10px;
@@ -155,6 +165,13 @@
     <div class="toggle-row">
       <span>Acoustic Fabric</span>
       <div class="toggle-switch active" data-component="Acoustic Fabric"></div>
+    </div>
+    <div class="toggle-row">
+      <span>Fabric Fold</span>
+      <div class="fold-select">
+        <button class="fold-btn" data-fold="half">Half</button>
+        <button class="fold-btn active" data-fold="full">Full</button>
+      </div>
     </div>
     <div class="toggle-row" style="margin-bottom: 16px;">
       <span>Artwork</span>
@@ -240,13 +257,20 @@ const COMPONENTS = ['Frame', 'Rockwool', 'Fiberglass Sheet', 'Back Support', 'Fi
 // Built from PANEL_KEYS so the two can never drift out of sync (a mismatch here
 // is what left unhandled configs permanently visible in the scene before).
 const panelMeshes = {};
-PANEL_KEYS.forEach((k) => { panelMeshes[k] = {}; });
+// The .glb ships two fabric wrap variants per panel — "Acoustic Fabric Half
+// Fold" and "... Full Fold" (the half/full wrap options from the cart model).
+// They're alternates (never shown together), so both are stashed here and one
+// is promoted into panelMeshes[key]['Acoustic Fabric'] at runtime (see
+// applyFabricFold + currentFold).
+const fabricFolds = {};
+PANEL_KEYS.forEach((k) => { panelMeshes[k] = {}; fabricFolds[k] = {}; });
 // Per-panel camera pull-back multiplier on the base fit distance. 2×2 is
 // near-square, so max-dimension fitting frames it larger than the elongated
 // panels (whose 4ft long axis pushes the camera back). Pull 2×2 back so it
 // loads at a size comparable to the others. Tune this value to taste.
 const PANEL_DISTANCE_FACTOR = { '2x2': 1.45, '1x1': 1.45 };
 let currentPanel = '4x2V';
+let currentFold = 'full'; // active fabric wrap variant: 'half' | 'full'
 let modelReady = false;
 let panelRoot = null;
 let isAnimating = false;
@@ -308,6 +332,16 @@ function classifyMesh(mesh) {
         if (COMPONENTS.includes(component)) {
           return { panelKey, component };
         }
+        // Fabric ships as two wrap variants: "Acoustic Fabric Half Fold" and
+        // "Acoustic Fabric Full Fold". Both map to the single "Acoustic Fabric"
+        // component; the fold field records which variant so only the active
+        // one is shown. Without this, neither node matches COMPONENTS and both
+        // get hidden as "unclassified" — taking the artwork (a texture on the
+        // fabric mesh) with them.
+        const foldMatch = component.match(/^Acoustic Fabric (Half|Full) Fold$/);
+        if (foldMatch) {
+          return { panelKey, component: 'Acoustic Fabric', fold: foldMatch[1].toLowerCase() };
+        }
       }
     }
   }
@@ -346,8 +380,16 @@ loader.load(
           // the assembly fade-in). Cloning keeps per-layer fades independent;
           // the underlying texture maps are still shared by reference.
           if (child.material) child.material = child.material.clone();
-          panelMeshes[cls.panelKey][cls.component] = child;
-          console.log(`  → ${cls.panelKey} / ${cls.component}`);
+          if (cls.fold) {
+            // Stash both fabric folds; applyFabricFold() promotes the active
+            // one and keeps the other hidden so they never overlap/z-fight.
+            fabricFolds[cls.panelKey][cls.fold] = child;
+            child.visible = false;
+            console.log(`  → ${cls.panelKey} / Acoustic Fabric (${cls.fold} fold)`);
+          } else {
+            panelMeshes[cls.panelKey][cls.component] = child;
+            console.log(`  → ${cls.panelKey} / ${cls.component}`);
+          }
         } else {
           // Defense-in-depth: any mesh that isn't the Backdrop and isn't one of
           // the known configs (e.g. an extra config baked into the .glb that this
@@ -373,6 +415,7 @@ loader.load(
     panelRoot = model;
     modelReady = true;
 
+    applyFabricFold();
     cacheHomeCameraTransforms();
     showOnlyPanel('4x2V');
 
@@ -393,6 +436,20 @@ loader.load(
 );
 
 // ============ FUNCTIONS ============
+// Point every panel's "Acoustic Fabric" slot at the active fold and force the
+// inactive fold hidden, so the two wrap variants never render on top of each
+// other. Runs at load and whenever the fold switch changes currentFold.
+function applyFabricFold() {
+  for (const key of PANEL_KEYS) {
+    const folds = fabricFolds[key];
+    if (!folds) continue;
+    const active = folds[currentFold] || folds.full || folds.half || null;
+    const inactive = active === folds.full ? folds.half : folds.full;
+    if (inactive) inactive.visible = false;
+    if (active) panelMeshes[key]['Acoustic Fabric'] = active;
+  }
+}
+
 function showOnlyPanel(panelKey) {
   currentPanel = panelKey;
   // Hide EVERYTHING first
@@ -584,6 +641,7 @@ function setControlsDisabled(disabled) {
   document.getElementById('reset-btn').classList.toggle('disabled', disabled);
   document.querySelectorAll('.panel-btn').forEach(b => b.classList.toggle('disabled', disabled));
   document.querySelectorAll('[data-component]').forEach(t => t.classList.toggle('disabled', disabled));
+  document.querySelectorAll('.fold-btn').forEach(b => b.classList.toggle('disabled', disabled));
 }
 
 async function playAssemblyAnimation() {
@@ -658,6 +716,17 @@ document.querySelectorAll('[data-component]').forEach(toggle => {
     if (isAnimating) return;
     toggle.classList.toggle('active');
     updateComponentVisibility();
+  });
+});
+
+document.querySelectorAll('.fold-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (isAnimating || btn.dataset.fold === currentFold) return;
+    currentFold = btn.dataset.fold;
+    document.querySelectorAll('.fold-btn').forEach(b =>
+      b.classList.toggle('active', b.dataset.fold === currentFold));
+    applyFabricFold();          // swap the active fold, hide the other
+    updateComponentVisibility(); // re-show + re-apply artwork on the new fold
   });
 });
 

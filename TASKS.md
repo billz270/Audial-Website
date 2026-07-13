@@ -1132,6 +1132,8 @@ Verified via Playwright headless renders: front-facing load on all 4 sizes, clea
 
 **Follow-up fix — stray-panel ghosting / all 8 glb configs (committed `7f56384`).** After the `.glb` was re-exported with **8** panel configurations, the viewer still only listed **4** in `PANEL_KEYS` (`4x2V`, `4x2H`, `2x2`, `1x4V`). The other 4 (`1x4H`, `2x1V`, `2x1H`, `1x1`) were never classified, never added to `panelMeshes`, and so never hidden by `showOnlyPanel`'s hide-all loop — they loaded with the default `visible = true` and lingered permanently, overlapping whatever config the user selected (visible on size switching AND during the assembly animation). Fix: (1) added all 8 configs to `PANEL_KEYS` and 4 matching size buttons (relabeled the existing `1×4` button to `1×4 V`); (2) build `panelMeshes` from `PANEL_KEYS` so the two can't drift out of sync; (3) gave the square `1x1` the same `PANEL_DISTANCE_FACTOR` pull-back (`1.45`) as `2x2`; (4) defense-in-depth — hide any unclassified, non-Backdrop mesh at load so a future extra config baked into the `.glb` can't ghost again. The viewer now surfaces all 8 configs, each in isolation. (`design-references/assets/3d-models/panel-viewer.html`)
 
+**Follow-up fix — invisible Acoustic Fabric + missing artwork on all 8 panels.** The fabric layer (and therefore the artwork, which is a texture *on* the fabric mesh) never appeared on any config. Root cause: a node-name mismatch. The classifier's `COMPONENTS` list expected a node named exactly `"<key> Acoustic Fabric"`, but the `.glb` ships **two** fabric nodes per config — `"<key> Acoustic Fabric Half Fold"` and `"<key> Acoustic Fabric Full Fold"` (the `fabricWrap: 'half'|'full'` wrap variants from the cart model). Neither matched `COMPONENTS.includes(...)`, so `classifyMesh` returned `null` and the DEV-31 defense-in-depth line **actively hid both fabric meshes on every panel** — taking the artwork with them. Verified against the real `.glb` via a Node script that replays the classifier over the actual node names: previously all 16 fabric nodes fell into the "unclassified → hidden" bucket. Fix (user chose "add a Half/Full switch, default Full"): (1) `classifyMesh` now regex-matches `^Acoustic Fabric (Half|Full) Fold$` and maps both to the single `Acoustic Fabric` component, tagging a `fold` field; (2) the loader stashes both variants in a new `fabricFolds[key]` map (both hidden initially) instead of the single `panelMeshes` slot; (3) new `applyFabricFold()` promotes the active fold into `panelMeshes[key]['Acoustic Fabric']` and force-hides the inactive fold so the two never z-fight — called at load (before `cacheHomeCameraTransforms`, so bounding boxes are correct) and on every fold switch; (4) new "Fabric Fold" segmented switch (Half | Full, default Full) in the controls panel, styled like `.panel-btn`, disabled during the assembly animation via `setControlsDisabled`. Post-fix verification: all 8 panels resolve both folds + all core layers, zero unclassified nodes, module passes `node --check`. User-confirmed working in-browser. **Known asset gap (not code-fixable):** only 4 of the 8 configs (`4×2V`, `4×2H`, `2×2`, `1×4V`) have the artwork texture baked into the `.glb`; the other four show the fabric layer as plain grey and the Artwork toggle is a no-op for them until the `.glb` is re-exported from Blender with those textures applied. (`design-references/assets/3d-models/panel-viewer.html`)
+
 ### Goal
 Transform the current "Play Assembly Animation" button behavior from a quick layer flash into a cinematic, deliberately-paced reveal. Camera moves to a locked home position, each layer fades in with the panel rotating to face the viewport, giving the viewer a proper "how it's built" experience.
 
@@ -1206,82 +1208,321 @@ Transform the current "Play Assembly Animation" button behavior from a quick lay
 
 ---
 
-## Task #DEV-32: Integrate 3D Panel Viewer into Configurator Page
-- **Status:** TODO (depends on DEV-31 completion)
+## Task #DEV-32: Foundational Three.js Swap in Configurator
+- **Status:** TODO
 - **Priority:** HIGH
-- **File:** configurator.html, panel-viewer.html
+- **File:** configurator.html
+- **Depends on:** DEV-31 completion, panels-web.glb file ready
 
 ### Goal
-Replace the current CSS 3D panel preview in the configurator with the Three.js panel viewer. The 3D viewer becomes the primary product preview surface where users see their design in full 3D detail as they configure it.
+Replace the CSS 3D panel preview with the Three.js panel viewer inside the configurator's preview area — visually only. No configurator controls wired up yet. Foundation for all following DEV-32-series tasks.
 
 ### Behavior Spec
 
-**What replaces what:**
-- Remove the current CSS .panel-3d element and its associated wood-edge divs
-- Insert the Three.js canvas + rendering pipeline in the same preview area
-- The 3D viewer becomes the preview surface for the configurator
+**Use panels-web.glb (lightweight web version):**
+- Load the compressed panels-web.glb file, NOT the full Panels.glb from panel-viewer.html
+- Ensure it's cached properly (long cache headers via Vercel)
 
-**Panel size selection (existing → adapt):**
-- When user selects a size (1×1, 2×1, 2×2, 4×2, 1×4), the 3D viewer switches to that configuration
-- Current .glb has 4x2V, 4x2H, 2x2, 1x4V — may need to add 1x1, 2x1 variants in Blender later
-- For sizes not in the .glb yet: map to closest available or show placeholder until modeling is done
+**Three.js viewer inside preview area:**
+- Remove the existing CSS .panel-3d element and associated wood-edge divs
+- Insert Three.js canvas into the preview container (same dimensions)
+- Match existing lighting setup from panel-viewer.html
+- Camera positioned at same default 3/4 front angle
+- OrbitControls enabled (drag to rotate, scroll to zoom)
+- Anisotropic texture filtering for wood grain quality
 
-**Artwork upload (existing → adapt):**
-- When user uploads an image, apply as texture to the Acoustic Fabric mesh's material
-- Image applies to fabric's UV-mapped surface, replacing placeholder artwork
-- Handle image aspect ratio and centering
-
-**Wood varnish toggle (existing → adapt):**
-- Light/Dark toggle swaps the Pine Wood material's base color/texture
-- Real-time 3D preview
-
-**Fabric wrap toggle (existing → adapt):**
-- Halfway vs Full Wrap: may require different acoustic fabric geometry or scaling
-- Determine if new Blender models needed, or if texture stretching handles it
-
-**Component toggles (from panel-viewer.html):**
-- DO NOT include in customer-facing configurator
-- Customers don't need to toggle rockwool/back support visibility while designing
-- Keep only in internal panel-viewer.html for testing/demo purposes
-
-**Performance considerations:**
-- Loading a 1-3MB .glb on every configurator visit is a hit — ensure lazy loading, cache headers, and a loading state
-- Show a loading spinner while the model initializes
-- Fall back gracefully if WebGL is not supported
-
-**Cart thumbnails:**
-- Current cart shows small CSS 3D thumbnails of designed panels
-- Approach: capture a canvas screenshot at "Add to Cart" moment and save the image data as cart thumbnail
-- Lightweight — avoids rendering Three.js per cart item
-- Do NOT render Three.js thumbnails per cart item
-
-**Mobile experience:**
-- 3D on mobile can be laggy — test performance
-- Consider "View in 3D" toggle for mobile users to fall back to a static image if performance is poor
-- Touch controls (pinch to zoom, single-finger rotate) — Three.js OrbitControls handles by default
+**Loading state:**
+- Show a subtle loading indicator while panels-web.glb loads
+- Fall back gracefully if WebGL is unsupported (show a static message or placeholder image)
 
 ### Constraints
-- Do NOT break the existing configurator flow (size selection, upload, cart)
-- Do NOT include the component visibility toggles in customer-facing configurator
-- Preserve all existing cart/checkout functionality
-- The Play Assembly Animation feature from panel-viewer.html should NOT appear in the configurator — that's a marketing/demo feature, not a shopping feature
-- Maintain all styling per the design.md tier system (configurator is Tier 2-3)
+- Do NOT wire up any configurator controls yet (size, upload, wood, fabric — later tasks)
+- Do NOT include component toggle switches (that's DEV-33)
+- Do NOT include the Play Assembly Animation button
 
 ### Acceptance Criteria
-✅ CSS 3D panel replaced with Three.js viewer in configurator
-✅ Panel size selector properly switches the 3D configuration
-✅ User artwork upload applies to the Acoustic Fabric texture in real-time
-✅ Wood varnish (light/dark) toggle updates the 3D wood material
-✅ Fabric wrap toggle handled appropriately
-✅ Cart thumbnails work (via canvas screenshot capture)
+✅ Three.js viewer renders inside configurator preview area
+✅ Panel loads and displays at correct size and lighting
+✅ OrbitControls work (drag, zoom)
 ✅ Loading state shown while .glb loads
-✅ No breaking changes to cart/checkout flow
-✅ Component visibility toggles NOT included in customer-facing view
-✅ Mobile experience tested and functional
-✅ Design.md tier styling maintained
+✅ WebGL fallback shows appropriate message
+✅ No configurator functionality broken (upload, size buttons, cart still function even if not yet wired to 3D)
+
+---
+
+## Task #DEV-33: Panel Size Selector + Components Slider in Configurator
+- **Status:** TODO
+- **Priority:** HIGH
+- **File:** configurator.html
+- **Depends on:** DEV-32
+
+### Goal
+Two features in this task:
+1. Connect existing panel size buttons to switch the 3D configuration in the Three.js viewer
+2. Add a collapsible "Components" slider on the right side of the live preview, allowing users to toggle individual panel layers on/off (educational peek-inside feature)
+
+### Behavior Spec
+
+**Part 1 — Panel size selector wiring:**
+
+When user clicks a size button:
+- 3D viewer switches to matching panel configuration from panels-web.glb
+- Camera auto-centers on new panel (existing auto-camera logic from panel-viewer.html)
+- Smooth transition, not instant swap
+
+Size mapping:
+- 2×2 → 2×2 in .glb
+- 4×2 horizontal → 4x2H in .glb
+- 4×2 vertical → 4x2V in .glb (if user rotates 4×2)
+- 1×4 vertical → 1x4V in .glb
+- 1×1 and 2×1 — NOT in .glb yet:
+  - Option: map to closest available (e.g., 1×1 → 2×2, 2×1 → 2×2)
+  - Or: show placeholder message "3D preview coming soon" for these sizes
+  - Decide during implementation which is cleaner
+
+Orientation toggle:
+- Existing horizontal/vertical toggle should trigger correct .glb variant
+
+**Part 2 — Components slider (right side of live preview):**
+
+Collapsed state (default):
+- Vertical tab labeled "Components" on the right edge of the 3D preview area
+- Text is rotated 90° so it reads bottom-to-top or top-to-bottom
+- Small arrow icon (< or ›) next to the label indicating it can expand
+
+Expanded state (on click):
+- Slider panel slides in from the right, overlaying part of the preview area (or pushing it left — decide during implementation which feels cleaner)
+- Panel width: ~200-240px
+- Shows 6 toggle switches, one per component, in physical build order:
+  1. Frame
+  2. Rockwool
+  3. Fiberglass Sheet
+  4. Back Support
+  5. Fiberglass Screen
+  6. Acoustic Fabric
+- Each toggle: labeled + on/off switch (matching Audial's toggle switch styling)
+- Default state: all toggles ON (all layers visible)
+- Arrow icon flips direction (now points right, indicating collapse)
+- Clicking outside the slider or the arrow again collapses it
+
+Toggle behavior:
+- Toggling a component instantly shows/hides that mesh in the 3D viewer
+- No animation on toggle (instant, matching panel-viewer.html behavior)
+- Multiple toggles can be off simultaneously
+- Reuses classifier logic from panel-viewer.html
+
+Styling:
+- Match Audial design tokens (--ink, --primary-light, --accent, --paper)
+- Slider background: --paper with subtle border in --ink
+- Toggle switch styling consistent with existing configurator toggles
+
+### Constraints
+- Do NOT include the Play Assembly Animation button — that stays in panel-viewer.html only
+- Do NOT affect cart, upload, or other configurator flows yet
+- Slider should NOT interfere with OrbitControls when expanded (user should still be able to rotate the panel)
+
+### Acceptance Criteria
+✅ Clicking a size button switches the 3D viewer to that panel
+✅ Orientation toggle swaps between horizontal/vertical variants
+✅ Camera auto-centers on new panel
+✅ 1×1 and 2×1 handled cleanly (mapped or placeholder)
+✅ Components slider visible as a vertical tab on right edge of preview
+✅ Clicking the tab expands the slider with 6 component toggles
+✅ Each toggle shows/hides the corresponding layer instantly
+✅ Slider can be collapsed by clicking arrow or outside
+✅ All toggles default to ON when a new panel is loaded
+✅ Design tokens match Audial's system (--ink, --primary-light, --accent, --paper)
 
 ### Out of Scope
-- Play Assembly Animation button (marketing feature, stays in panel-viewer.html only)
-- New Blender models for 1×1 and 2×1 panels (separate task if needed)
-- Backend/database changes
-- Any changes to room-visualizer.html
+- Play Assembly Animation button (stays in panel-viewer.html only)
+- Any changes to configurator upload, wood, fabric flows (later tasks)
+
+---
+
+## Task #DEV-34: Artwork Upload → Acoustic Fabric Texture
+- **Status:** TODO
+- **Priority:** HIGH
+- **File:** configurator.html
+- **Depends on:** DEV-33
+
+### Goal
+When user uploads an image in the configurator, apply it as a texture to the Acoustic Fabric mesh's material in the Three.js viewer.
+
+### Behavior Spec
+
+**On image upload:**
+- Read the uploaded image (existing FileReader flow)
+- Create a THREE.Texture from the image
+- Apply as the map on the Acoustic Fabric mesh's material
+- Update material for real-time preview
+
+**Aspect ratio handling:**
+- Image should fit the fabric's UV surface correctly
+- Handle stretching, cropping, or centering based on original image aspect vs panel aspect
+- Match the current CSS preview's behavior (contain-fit within the panel bounds)
+
+**Image transforms:**
+- Existing image transform controls (position, scale, rotation, flip) — must translate to Three.js texture transforms
+- Real-time updates as user adjusts sliders
+
+### Constraints
+- Preserve existing upload validation (file size, format checks)
+
+### Acceptance Criteria
+✅ Uploaded image applies to Acoustic Fabric material in real-time
+✅ Aspect ratio handled correctly
+✅ Image transforms (position, scale, rotation, flip) reflect in 3D
+✅ Replace button clears the texture and shows placeholder
+✅ Works across all panel sizes
+
+---
+
+## Task #DEV-35: Wood Varnish Toggle in Three.js Viewer
+- **Status:** TODO
+- **Priority:** MEDIUM
+- **File:** configurator.html
+- **Depends on:** DEV-34
+
+### Goal
+Wire the existing Light/Dark wood varnish toggle to swap the Pine Wood material's base color/texture in the 3D viewer.
+
+### Behavior Spec
+
+**On toggle:**
+- Light varnish: apply lighter wood texture/color to Frame material
+- Dark varnish: apply darker wood texture/color to Frame material
+- Real-time update, no delay
+- Wood texture files should already exist in project — reuse them
+
+**Material handling:**
+- Swap the Frame's material.map (texture) or material.color
+- Preserve anisotropic filtering for grain quality
+- Match existing CSS preview's wood tones
+
+### Acceptance Criteria
+✅ Light/Dark toggle switches wood material in 3D
+✅ Change is real-time
+✅ Wood grain quality preserved (anisotropic filtering)
+✅ Works across all panel sizes
+
+---
+
+## Task #DEV-36: Fabric Wrap Toggle Investigation & Implementation
+- **Status:** TODO
+- **Priority:** MEDIUM
+- **File:** configurator.html, potentially Panels.glb / panels-web.glb
+- **Depends on:** DEV-35
+
+### Goal
+Investigate whether the Half Wrap vs Full Wrap toggle requires new Blender geometry or can be handled via texture/scaling. Then implement the solution.
+
+### Behavior Spec
+
+**Phase 1 — Investigation (before coding):**
+- Determine visual difference between Half Wrap and Full Wrap on the physical product
+- Check if current .glb Acoustic Fabric mesh can be scaled/stretched to represent both
+- If not: flag that new Blender models are needed (separate task)
+
+**Phase 2 — Implementation (based on investigation):**
+- If texture/scaling works: implement in configurator.html
+- If geometry needed: create new mesh variants in Blender, add to panels-web.glb, then wire up
+- Real-time toggle updates the 3D preview
+
+### Constraints
+- Do NOT block DEV-37 if investigation reveals Blender work is needed — mark this as pending and continue
+
+### Acceptance Criteria
+✅ Investigation complete, decision documented in CLAUDE.md
+✅ Toggle updates 3D fabric wrap in real-time (via texture OR new geometry)
+✅ Matches physical product's actual visual difference
+✅ Works across all panel sizes
+
+---
+
+## Task #DEV-37: Cart Thumbnails via Canvas Screenshot
+- **Status:** TODO
+- **Priority:** HIGH
+- **File:** configurator.html
+- **Depends on:** DEV-34 (image upload must work)
+
+### Goal
+Capture a screenshot of the Three.js canvas at "Add to Cart" moment and use it as the cart thumbnail. Lightweight, avoids rendering multiple Three.js instances.
+
+### Behavior Spec
+
+**On "Add to Cart" click:**
+- Capture current Three.js canvas as a base64 image data URL
+- Save this image data alongside the cart item in localStorage
+- Cart card renders this static image as the thumbnail
+
+**Capture quality:**
+- Reasonable resolution (e.g., 300×300 or 400×400) — enough for cart display
+- PNG format for transparency support
+- Compress if the base64 string gets too heavy for localStorage
+
+**localStorage size consideration:**
+- Each thumbnail adds ~100-300KB to cart entry
+- Combined with existing full-resolution artwork data URL, may push localStorage limits
+- Consider: reduce artwork resolution before storing, OR use smaller thumbnails
+
+### Constraints
+- Do NOT render Three.js in cart cards — too heavy
+
+### Acceptance Criteria
+✅ Canvas screenshot captured on Add to Cart
+✅ Thumbnail displays in cart correctly
+✅ Thumbnail persists across page refresh (localStorage)
+✅ localStorage size stays within safe limits
+✅ Room visualizer's "Your Designs" section shows thumbnails correctly (may need adaptation)
+
+---
+
+## Task #DEV-38: Mobile Performance Testing & Fallback (Final Task)
+- **Status:** TODO
+- **Priority:** MEDIUM
+- **File:** configurator.html
+- **Depends on:** DEV-32 through DEV-37
+
+### Goal
+Test 3D viewer performance on mobile devices. Add a "View in 3D" toggle for mobile users to fall back to a static image if performance is poor. This is the final task in the 3D integration series — after this, deploy to production.
+
+### Behavior Spec
+
+**Testing:**
+- Test on iPhone (Safari), Android (Chrome)
+- Check: initial load time, frame rate during rotation, memory usage
+- Note any crashes or degradation
+
+**If performance is acceptable:**
+- Leave 3D as default on mobile
+- Ensure touch controls work (pinch zoom, single-finger rotate)
+
+**If performance is poor:**
+- Add a "View in 3D" toggle button visible only on mobile
+- Default mobile view: static image (canvas screenshot or placeholder)
+- User taps toggle to load full 3D viewer
+
+**Loading strategy on mobile:**
+- Consider lazy-loading Three.js library and .glb only when user activates 3D mode
+- Reduces initial page weight for mobile users
+
+**Final production deployment:**
+- Once all tasks DEV-32 through DEV-38 are stable locally
+- Full end-to-end walkthrough: design → save → visualize → checkout
+- All panel sizes tested
+- Mobile tested
+- No console errors
+- Deploy to Vercel via `npx vercel --prod`
+
+### Constraints
+- Preserve existing configurator mobile flow
+
+### Acceptance Criteria
+✅ Performance tested on at least 2 mobile devices
+✅ Findings documented in CLAUDE.md
+✅ Toggle (if needed) works correctly
+✅ Touch controls (rotate, zoom) functional
+✅ No crashes or major lag
+✅ Final production deploy successful
+
+---
