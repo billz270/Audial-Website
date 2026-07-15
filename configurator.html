@@ -138,7 +138,9 @@
   .panel-3d-container{position:relative}
   #viewer3dCanvas{display:none;position:absolute;inset:0;width:100%;height:100%;z-index:2}
   .panel-3d-container.view-3d #viewer3dCanvas{display:block}
-  .panel-3d-container.view-3d #sceneWrap{display:none}
+  /* DEV-32 artwork: hide the CSS panel visually but keep it laid out so
+     panelFace.clientWidth/Height stay valid for the canvas-mirror math. */
+  .panel-3d-container.view-3d #sceneWrap{visibility:hidden;pointer-events:none}
   #viewer3dLoading{display:none;position:absolute;inset:0;z-index:3;align-items:center;justify-content:center;
     background:var(--paper);color:var(--ink);font-family:'Archivo',sans-serif;font-weight:600;font-size:12px;
     letter-spacing:0.1em;text-transform:uppercase}
