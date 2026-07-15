@@ -2347,6 +2347,8 @@ function ensureArtTexture(){
   artTexture = new THREE.CanvasTexture(artCanvas);
   artTexture.colorSpace = THREE.SRGBColorSpace;
   artTexture.flipY = false;                // GLTF UV convention
+  artTexture.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 8; // sharpen at grazing angles
+  artTexture.generateMipmaps = true;
   return artTexture;
 }
 
@@ -2465,6 +2467,26 @@ function splitFabricMesh(mesh){
            frontCount: frontTris.length, foldCount: foldTris.length };
 }
 
+// Rewrite a front quad's UVs to a canonical [0,1] layout derived from local geometry,
+// so ALL configs (horizontal/vertical) end up identically oriented. local +Y is screen-up
+// (model is spun 180° about Y); local +X is screen-LEFT after that spin.
+// Canonical: screen-top => t=0, screen-left => s=0 (with texture flipY=false, canvas row 0 = image top).
+function canonicalizeFrontUV(geo){
+  const pos = geo.attributes.position, uv = geo.attributes.uv;
+  if (!uv) return;
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for (let i=0;i<pos.count;i++){ const X=pos.getX(i),Y=pos.getY(i);
+    if(X<minX)minX=X; if(X>maxX)maxX=X; if(Y<minY)minY=Y; if(Y>maxY)maxY=Y; }
+  const midX=(minX+maxX)/2, midY=(minY+maxY)/2;
+  for (let i=0;i<pos.count;i++){
+    const X=pos.getX(i), Y=pos.getY(i);
+    const s = (X > midX) ? 0 : 1;   // local +X = screen-left => s=0
+    const t = (Y > midY) ? 0 : 1;   // local +Y = screen-top  => t=0
+    uv.setXY(i, s, t);
+  }
+  uv.needsUpdate = true;
+}
+
 function loadModel(){
   new GLTFLoader().load(GLB_URL, (gltf) => {
     const model = gltf.scene;
@@ -2493,6 +2515,7 @@ function loadModel(){
         const src = fabricFolds[key][fold];
         if (!src) continue;
         const { frontGeo, foldGeo } = splitFabricMesh(src);
+        canonicalizeFrontUV(frontGeo);          // normalize orientation across all configs
 
         const foldMat = src.material.clone();
         foldMat.map = null;                     // NO texture on folds => no bleed, ever
@@ -2595,12 +2618,16 @@ function renderFrontFaceCanvas(){
   if (!front) return;
 
   const face = document.getElementById('panelFace');
-  const W = Math.max(2, Math.round(face.clientWidth));
+  const W = Math.max(2, Math.round(face.clientWidth));    // panelFace px == transform coord space
   const H = Math.max(2, Math.round(face.clientHeight));
-  if (artCanvas.width !== W)  artCanvas.width  = W;
-  if (artCanvas.height !== H) artCanvas.height = H;
+  // Supersample toward ~1024px on the long side so narrow panels aren't soft. All drawing
+  // math stays in panelFace units; the SS base transform scales it up into the hi-res canvas.
+  const SS = Math.min(3, Math.max(1, 1024 / Math.max(W, H)));
+  const cw = Math.round(W * SS), ch = Math.round(H * SS);
+  if (artCanvas.width !== cw)  artCanvas.width  = cw;
+  if (artCanvas.height !== ch) artCanvas.height = ch;
 
-  artCtx.setTransform(1,0,0,1,0,0);
+  artCtx.setTransform(SS,0,0,SS,0,0);
   artCtx.clearRect(0,0,W,H);
   artCtx.fillStyle = '#ffffff';
   artCtx.fillRect(0,0,W,H);
@@ -2621,15 +2648,15 @@ function renderFrontFaceCanvas(){
     }
     const cssTx = imgPos.x - minX, cssTy = imgPos.y - minY;
 
-    artCtx.setTransform(1,0,0,1,0,0);
+    artCtx.setTransform(SS,0,0,SS,0,0);
     artCtx.translate(cssTx, cssTy);
     artCtx.scale(imgZoom, imgZoom);
     artCtx.rotate(rad);
     artCtx.scale(sx, sy);
     artCtx.drawImage(window.__artImageEl, 0, 0, imgNaturalW, imgNaturalH);
-    artCtx.setTransform(1,0,0,1,0,0);
+    artCtx.setTransform(SS,0,0,SS,0,0);
   } else {
-    drawUploadAffordance(W, H);            // Task 5
+    drawUploadAffordance(W, H);            // Task 5 (draws in panelFace units under the SS transform)
   }
 
   const tex = ensureArtTexture();
@@ -2643,9 +2670,9 @@ window.__dev32.renderFrontFaceCanvas = renderFrontFaceCanvas;
 function refreshArt(){ if (webglOK && modelReady) renderFrontFaceCanvas(); }
 function drawUploadAffordance(W, H){ /* Task 5 fills this in */ }
 
-// The front face is a back-face whose UV axes are rotated+flipped vs the canvas.
-// Derived correction: quarter=1 (90°) + flipU. Tunable live via window.__dev32.orient.
-window.__dev32.orient = window.__dev32.orient || { quarter: 1, flipU: true, flipV: false };
+// Front UVs are canonicalized at split time, so orientation is uniform across configs.
+// This just carries an optional global flip correction (screen-left sign / back-face mirror).
+window.__dev32.orient = window.__dev32.orient || { quarter: 0, flipU: false, flipV: false };
 function orientFrontTexture(tex){
   const o = window.__dev32.orient;
   tex.wrapS = THREE.RepeatWrapping;
