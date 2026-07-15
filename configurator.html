@@ -1264,6 +1264,9 @@ function handleImageUpload(file){
       currentPanel.fileSize = file.size;
       imgFlipH = false; imgFlipV = false; imgRotate = 0;
       panelImage.src = dataURL;
+      window.__artImageEl = window.__artImageEl || new Image();
+      window.__artImageEl.onload = () => { if (window.__viewer3dActive) window.audial3D.refreshArt(); };
+      window.__artImageEl.src = dataURL;
       panelImage.style.display = 'block';
       uploadInPanel.style.display = 'none';
       replaceBtn.style.display = 'block';
@@ -1382,6 +1385,9 @@ function applyImageTransform(){
   currentPanel.flipH = imgFlipH;
   currentPanel.flipV = imgFlipV;
   currentPanel.rotate = imgRotate;
+
+  // DEV-32: mirror this render onto the 3D front face (covers upload/zoom/flip/rotate/recenter/fit).
+  if (window.__viewer3dActive && window.audial3D && window.audial3D.refreshArt) window.audial3D.refreshArt();
 }
 
 function computeEffectiveImageBox(){
@@ -2331,6 +2337,19 @@ window.__dev32 = window.__dev32 || {};     // console debug hook (verification o
 Object.assign(window.__dev32, { foldMeshes, frontMeshes, panelMeshes });
 let scene, camera, renderer, controls;
 
+// Single offscreen canvas mirrored onto the active front mesh. One canvas, redraw + needsUpdate.
+const artCanvas = document.createElement('canvas');
+const artCtx = artCanvas.getContext('2d');
+window.__dev32.artCanvas = artCanvas;      // debug: inspect the mirror canvas directly
+let artTexture = null;                     // THREE.CanvasTexture, created lazily
+function ensureArtTexture(){
+  if (artTexture) return artTexture;
+  artTexture = new THREE.CanvasTexture(artCanvas);
+  artTexture.colorSpace = THREE.SRGBColorSpace;
+  artTexture.flipY = false;                // GLTF UV convention
+  return artTexture;
+}
+
 function webglAvailable(){
   try {
     const c = document.createElement('canvas');
@@ -2536,6 +2555,7 @@ function showConfig(key){
   const fab = panelMeshes[key]['Acoustic Fabric'];       // = the active front mesh
   if (fab && fab.userData.pairedFold) fab.userData.pairedFold.visible = true;
   centerCameraOn(key);
+  renderFrontFaceCanvas();
 }
 
 function centerCameraOn(key){
@@ -2566,6 +2586,77 @@ function animate(){
   if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
+// Mirror the CSS panel's artwork render into artCanvas, then onto the active front mesh.
+// Reads the classic script's global-lexical state by bare name (currentPanel, imgPos, imgZoom,
+// imgRotate, imgFlipH/V, imgNaturalW/H) so reassignments are tracked automatically.
+function renderFrontFaceCanvas(){
+  const key = SIZE_TO_CONFIG[currentPanel?.size];
+  const front = key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric'];
+  if (!front) return;
+
+  const face = document.getElementById('panelFace');
+  const W = Math.max(2, Math.round(face.clientWidth));
+  const H = Math.max(2, Math.round(face.clientHeight));
+  if (artCanvas.width !== W)  artCanvas.width  = W;
+  if (artCanvas.height !== H) artCanvas.height = H;
+
+  artCtx.setTransform(1,0,0,1,0,0);
+  artCtx.clearRect(0,0,W,H);
+  artCtx.fillStyle = '#ffffff';
+  artCtx.fillRect(0,0,W,H);
+
+  const hasArt = !!(currentPanel && currentPanel.image && window.__artImageEl && window.__artImageEl.complete);
+  if (hasArt){
+    // Recompute cssTx/cssTy exactly like applyImageTransform (bounding-box correction).
+    const r = imgRotate, fh = imgFlipH, fv = imgFlipV;
+    const rad = r * Math.PI/180, cos = Math.cos(rad), sin = Math.sin(rad);
+    const sx = fh ? -1 : 1, sy = fv ? -1 : 1;
+    const corners = [[0,0],[imgNaturalW,0],[0,imgNaturalH],[imgNaturalW,imgNaturalH]];
+    let minX=Infinity, minY=Infinity;
+    for (const [x,y] of corners){
+      const px=x*sx, py=y*sy;
+      const rx=px*cos-py*sin, ry=px*sin+py*cos;
+      const zx=rx*imgZoom, zy=ry*imgZoom;
+      if (zx<minX) minX=zx; if (zy<minY) minY=zy;
+    }
+    const cssTx = imgPos.x - minX, cssTy = imgPos.y - minY;
+
+    artCtx.setTransform(1,0,0,1,0,0);
+    artCtx.translate(cssTx, cssTy);
+    artCtx.scale(imgZoom, imgZoom);
+    artCtx.rotate(rad);
+    artCtx.scale(sx, sy);
+    artCtx.drawImage(window.__artImageEl, 0, 0, imgNaturalW, imgNaturalH);
+    artCtx.setTransform(1,0,0,1,0,0);
+  } else {
+    drawUploadAffordance(W, H);            // Task 5
+  }
+
+  const tex = ensureArtTexture();
+  orientFrontTexture(tex);                 // Task 4
+  front.material.map = tex;
+  front.material.needsUpdate = true;
+  tex.needsUpdate = true;
+}
+window.__dev32.renderFrontFaceCanvas = renderFrontFaceCanvas;
+
+function refreshArt(){ if (webglOK && modelReady) renderFrontFaceCanvas(); }
+function drawUploadAffordance(W, H){ /* Task 5 fills this in */ }
+
+// The front face is a back-face whose UV axes are rotated+flipped vs the canvas.
+// Derived correction: quarter=1 (90°) + flipU. Tunable live via window.__dev32.orient.
+window.__dev32.orient = window.__dev32.orient || { quarter: 1, flipU: true, flipV: false };
+function orientFrontTexture(tex){
+  const o = window.__dev32.orient;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.center.set(0.5, 0.5);
+  tex.rotation = ((o.quarter || 0) % 4) * Math.PI / 2;
+  tex.repeat.set(o.flipU ? -1 : 1, o.flipV ? -1 : 1);
+  tex.offset.set(0, 0);
+  tex.matrixAutoUpdate = true;
+}
+
 // ===== Public API used by the classic configurator script =====
 function show3D(on){
   const use = !!on && webglOK;
@@ -2583,7 +2674,7 @@ function showForSize(size){
   else pendingConfig = key;
 }
 
-window.audial3D = { available: webglOK, showForSize, show3D };
+window.audial3D = { available: webglOK, showForSize, show3D, refreshArt };
 
 if (!webglOK) {
   console.warn('[audial3D] WebGL unavailable — CSS preview will be used.');
