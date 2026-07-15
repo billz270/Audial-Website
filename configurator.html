@@ -1000,7 +1000,7 @@ sizeCards.forEach(card=>{
     panelActions.classList.add('visible');
     panelContainer.getBoundingClientRect(); // force layout so offsetWidth/offsetHeight are real
     updatePanelPreview();
-    if (window.audial3D) window.audial3D.showForSize(currentPanel.size); // DEV-32: catalog size -> 3D
+    if (window.audial3D) window.audial3D.showForSize(currentPanel.size, currentPanel.orientation); // DEV-32: catalog size -> 3D
     if (!currentPanel.image) showSizeTips(card.dataset.size);
   });
 });
@@ -1105,6 +1105,9 @@ document.querySelectorAll('.orient-btn').forEach(btn=>{
     btn.classList.add('active');
     currentPanel.orientation = btn.dataset.orient;
     updatePanelPreview();
+    // DEV-33: swap the 3D model to the matching orientation variant. Must follow updatePanelPreview
+    // so the art canvas is measured against the panelFace's new aspect.
+    if (window.audial3D) window.audial3D.showForSize(currentPanel.size, currentPanel.orientation);
     if(currentPanel.image) setTimeout(fitImageToPanel, 50);
     else showSizeTips(currentPanel.size, btn.dataset.orient);
   });
@@ -2318,9 +2321,26 @@ const PANEL_KEYS = ['4x2V','4x2H','2x2','1x4V','1x4H','2x1V','2x1H','1x1'];
 const COMPONENTS = ['Frame','Rockwool','Fiberglass Sheet','Back Support','Fiberglass Screen','Acoustic Fabric'];
 // 2x2 and 1x1 are near-square; max-dimension fit frames them large, so pull the camera back.
 const PANEL_DISTANCE_FACTOR = { '2x2':1.45, '1x1':1.45 };
-// Configurator size -> .glb config key. Non-square sizes load a default orientation.
-// Custom has no .glb config (handled by show3D(false) elsewhere).
-const SIZE_TO_CONFIG = { '1x1':'1x1', '2x1':'2x1H', '2x2':'2x2', '4x2':'4x2H', '1x4':'1x4V' };
+// Configurator size + orientation -> .glb config key. Squares carry a single key.
+// "horizontal" means wider-than-tall (same convention as effectiveDimsFt), so 1x4 horizontal is
+// the 4-ft-wide 1x4H. Custom has no .glb config (handled by show3D(false) elsewhere).
+const SIZE_TO_CONFIG = {
+  '1x1': '1x1',
+  '2x2': '2x2',
+  '2x1': { horizontal:'2x1H', vertical:'2x1V' },
+  '4x2': { horizontal:'4x2H', vertical:'4x2V' },
+  '1x4': { horizontal:'1x4H', vertical:'1x4V' }
+};
+function configKeyFor(size, orientation){
+  const entry = SIZE_TO_CONFIG[size];
+  if (!entry) return null;
+  if (typeof entry === 'string') return entry;
+  return entry[orientation === 'vertical' ? 'vertical' : 'horizontal'];
+}
+// The config the CSS panelFace is currently showing — the one the art canvas must land on.
+function activeConfigKey(){
+  return currentPanel ? configKeyFor(currentPanel.size, currentPanel.orientation) : null;
+}
 
 const container  = document.getElementById('panelContainer');
 const canvas     = document.getElementById('viewer3dCanvas');
@@ -2628,7 +2648,7 @@ function animate(){
 // Reads the classic script's global-lexical state by bare name (currentPanel, imgPos, imgZoom,
 // imgRotate, imgFlipH/V, imgNaturalW/H) so reassignments are tracked automatically.
 function renderFrontFaceCanvas(){
-  const key = SIZE_TO_CONFIG[currentPanel?.size];
+  const key = activeConfigKey();
   const front = key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric'];
   if (!front) return;
 
@@ -2685,7 +2705,7 @@ function renderFrontFaceCanvas(){
 window.__dev32.renderFrontFaceCanvas = renderFrontFaceCanvas;
 // debug: the front mesh currently receiving the art texture (verification only)
 window.__dev32.currentFront = () => {
-  const key = SIZE_TO_CONFIG[currentPanel?.size];
+  const key = activeConfigKey();
   return (key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric']) || null;
 };
 
@@ -2753,8 +2773,8 @@ function show3D(on){
   if (use) requestAnimationFrame(resize);
 }
 
-function showForSize(size){
-  const key = SIZE_TO_CONFIG[size];
+function showForSize(size, orientation){
+  const key = configKeyFor(size, orientation);
   if (!key || !webglOK){ show3D(false); return; }  // custom/unknown or no WebGL -> CSS preview
   show3D(true);
   loadingEl.style.display = modelReady ? 'none' : 'flex';

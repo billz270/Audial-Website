@@ -1251,7 +1251,7 @@ Replace the CSS 3D panel preview with the Three.js panel viewer inside the confi
 ---
 
 ## Task #DEV-33: Panel Size Selector + Components Slider in Configurator
-- **Status:** IN PROGRESS — Part 1 mostly done, Part 2 not started (verified against code 2026-07-15)
+- **Status:** IN PROGRESS — Part 1 DONE, Part 2 (Components slider) not started (2026-07-15)
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-32
@@ -1261,13 +1261,15 @@ Replace the CSS 3D panel preview with the Three.js panel viewer inside the confi
   (`showForSize`, `centerCameraOn`, `SIZE_TO_CONFIG` @ configurator.html:2323).
 - ✅ **1×1 and 2×1** — the spec's fallback options are moot; all 8 configs ship in `Panels-web.glb`,
   so every size maps to its own real config. No placeholder needed.
-- ❌ **Orientation toggle does NOT drive the model.** `SIZE_TO_CONFIG` hardcodes one config per size
-  (`'2x1':'2x1H'`, `'4x2':'4x2H'`, `'1x4':'1x4V'`). The `.glb` contains `2x1V`, `4x2V`, `1x4H` but
-  nothing ever selects them. `showForSize` is called only from the size-card handler
-  (configurator.html:1003), never from the orientation toggle.
-  **This has a live side effect:** toggling 4×2 to vertical flips the CSS `panelFace` to a tall
-  aspect while the model stays `4x2H`, so DEV-34's mirror canvas is stretched onto a quad of the
-  opposite aspect. Fixing this removes a real distortion path.
+- ✅ **Orientation toggle drives the model** (2026-07-15). `SIZE_TO_CONFIG` now maps each non-square
+  size to a `{horizontal, vertical}` pair (squares keep a single key); `configKeyFor(size, orientation)`
+  resolves it and `activeConfigKey()` is what `renderFrontFaceCanvas` / `__dev32.currentFront` use to
+  find the front mesh. `showForSize(size, orientation)` is called from both the size-card handler and
+  the orient-btn handler (after `updatePanelPreview`, so the art canvas measures the new face aspect).
+  All 8 configs are reachable; the DEV-34 distortion path (tall CSS face vs. horizontal model) is gone.
+  **Verified by driving the real page** (puppeteer + d3d11 GPU): every size × orientation loads its own
+  config with exactly one front mesh visible, face aspect matches canvas aspect, and with artwork
+  uploaded the mirror canvas is pixel-faithful to the CSS `panelFace` after a flip.
 - ❌ **Part 2 Components slider** — not started. No tab, no toggles.
 
 ### Goal
