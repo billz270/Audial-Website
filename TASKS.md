@@ -1251,7 +1251,8 @@ Replace the CSS 3D panel preview with the Three.js panel viewer inside the confi
 ---
 
 ## Task #DEV-33: Panel Size Selector + Components Slider in Configurator
-- **Status:** IN PROGRESS — Part 1 DONE, Part 2 (Components slider) not started (2026-07-15)
+- **Status:** DONE on desktop (2026-07-15) — Parts 1 + 2 built and verified. Mobile slide-up drawer
+  split out as its own task.
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-32
@@ -1270,7 +1271,25 @@ Replace the CSS 3D panel preview with the Three.js panel viewer inside the confi
   **Verified by driving the real page** (puppeteer + d3d11 GPU): every size × orientation loads its own
   config with exactly one front mesh visible, face aspect matches canvas aspect, and with artwork
   uploaded the mirror canvas is pixel-faithful to the CSS `panelFace` after a flip.
-- ❌ **Part 2 Components slider** — not started. No tab, no toggles.
+- ✅ **Part 2 Components slider** — DONE, desktop only (2026-07-15). Right-edge tab + 220px drawer
+  (`.components-slideout` = tab + drawer riding one transform; closed, the wrapper is shifted right
+  by the drawer width so it parks outside `#panelContainer`'s `overflow:hidden`). Overlays the
+  preview — the canvas never resizes, so the panel doesn't re-fit mid-inspection. 3D mode only
+  (`.view-3d`), so custom sizes and the WebGL fallback never show it.
+  - **7 rows, not 6** — the 6 mesh layers plus **Artwork**. Mesh rows drive `layerState` →
+    `showConfig`/`applyLayer` (Acoustic Fabric drags its paired fold along).
+  - **Artwork is a texture, not a mesh**, so its row feeds `renderFrontFaceCanvas`'s `hasArt` branch
+    instead of hiding anything. Off + art loaded → bare fabric and **no** affordance (the art exists;
+    inviting an upload would lie). No art at all → affordance. Fabric off → Artwork row greys out.
+  - **Dual-state Artwork row:** Upload button until art exists, then a normal toggle. Derived from
+    the same `artLoaded()` check the painter uses, so row and panel can't disagree; Clear falls back
+    to the button for free. **This button is currently the only working upload path in 3D** — the
+    fabric itself is not clickable until DEV-34 Task 6 lands the raycast.
+  - All toggles reset to ON on any config change (size *or* orientation), per the spec.
+  - Outside-click dismiss ignores drags >6px, else rotating the panel would slam the drawer shut.
+  - **Also fixed here (was a latent DEV-34 bug):** `clearArtBtn` never notified the viewer, so
+    cleared art lingered on the fabric. It now calls `refreshArt()`.
+- ⬜ **Mobile slide-up drawer** — deferred to its own task; the tab is hidden below 900px.
 
 ### Goal
 Two features in this task:

@@ -146,6 +146,71 @@
     letter-spacing:0.1em;text-transform:uppercase}
   .panel-3d-container.image-mode{cursor:default}
 
+  /* DEV-33: Components slide-out. Tab + drawer ride one transform: closed, the wrapper is shifted
+     right by exactly the drawer width so the drawer sits outside the container's overflow:hidden
+     and only the tab shows. 3D mode only — custom sizes and the WebGL fallback never see it. */
+  .components-slideout{
+    position:absolute;top:0;bottom:0;right:0;z-index:4;
+    display:flex;align-items:stretch;
+    transform:translateX(220px);
+    transition:transform 0.25s ease;
+    pointer-events:none;
+  }
+  .components-slideout.open{transform:translateX(0)}
+  .panel-3d-container:not(.view-3d) .components-slideout{display:none}
+  .components-tab,.components-drawer{pointer-events:auto}
+  .components-tab{
+    align-self:center;display:flex;align-items:center;gap:8px;
+    padding:16px 7px;background:var(--paper);
+    border:1.5px solid var(--ink);border-right:none;
+    font-family:inherit;font-size:10px;font-weight:700;
+    text-transform:uppercase;letter-spacing:0.15em;color:var(--ink);
+    cursor:pointer;transition:background 0.2s,color 0.2s;
+    writing-mode:vertical-rl;              /* reads top-to-bottom; SVG stays upright */
+  }
+  .components-tab:hover{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper)}
+  .components-tab svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2.5;transition:transform 0.25s ease}
+  .components-slideout.open .components-tab svg{transform:rotate(180deg)}
+  .components-drawer{
+    width:220px;background:var(--paper);border-left:1.5px solid var(--ink);
+    display:flex;flex-direction:column;cursor:default;overflow-y:auto;
+  }
+  .components-title{
+    padding:11px 12px;font-size:10px;font-weight:700;text-transform:uppercase;
+    letter-spacing:0.15em;color:var(--ink);border-bottom:1.5px solid var(--ink);flex:none;
+  }
+  .toggle-row{
+    display:flex;align-items:center;justify-content:space-between;gap:8px;
+    padding:9px 12px;border-bottom:1px solid rgba(9,61,83,0.15);flex:none;min-height:40px;
+  }
+  .toggle-row:last-child{border-bottom:none}
+  .toggle-label{font-size:11px;font-weight:600;color:var(--ink)}
+  .toggle-switch{
+    width:32px;height:18px;border-radius:9px;background:rgba(9,61,83,0.22);
+    position:relative;cursor:pointer;flex:none;transition:background 0.2s;
+  }
+  .toggle-switch::after{
+    content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
+    background:var(--paper);box-shadow:0 1px 2px rgba(0,23,31,0.35);transition:transform 0.2s;
+  }
+  .toggle-switch.active{background:var(--ink)}
+  .toggle-switch.active::after{transform:translateX(14px)}
+  .toggle-row.disabled{opacity:0.4;pointer-events:none}
+  /* Artwork row is dual-state: Upload button until artwork exists, then a normal toggle. */
+  .comp-upload-btn{
+    padding:5px 9px;background:var(--paper);border:1.5px solid var(--ink);
+    font-family:inherit;font-size:9px;font-weight:700;text-transform:uppercase;
+    letter-spacing:0.1em;color:var(--ink);cursor:pointer;transition:all 0.2s;
+  }
+  .comp-upload-btn:hover{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper);border-color:var(--primary)}
+  #artworkRow.no-art .toggle-switch{display:none}
+  #artworkRow:not(.no-art) .comp-upload-btn{display:none}
+  /* Desktop only for now. Mobile gets a slide-up drawer in its own task; a 220px side drawer
+     over a 420px-tall preview would swallow the panel. Own block, after the base rules. */
+  @media(max-width:900px){
+    .components-slideout{display:none}
+  }
+
   .scene-wrap{transform-style:preserve-3d;transition:transform 0.15s ease-out;position:relative;transform:perspective(1800px)}
   .panel-3d{transform-style:preserve-3d;transition:transform 0.12s ease-out;position:relative;will-change:transform}
 
@@ -618,6 +683,28 @@
             </div>
           </div>
           <div class="panel-shadow"></div>
+        </div>
+      </div>
+
+      <!-- DEV-33: Components peek-inside drawer. Rows are in physical build order. -->
+      <div class="components-slideout" id="componentsSlideout">
+        <button class="components-tab" id="componentsTab" aria-expanded="false">
+          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+          Components
+        </button>
+        <div class="components-drawer">
+          <div class="components-title">Components</div>
+          <div class="toggle-row"><span class="toggle-label">Frame</span><div class="toggle-switch active" data-component="Frame"></div></div>
+          <div class="toggle-row"><span class="toggle-label">Rockwool</span><div class="toggle-switch active" data-component="Rockwool"></div></div>
+          <div class="toggle-row"><span class="toggle-label">Fiberglass Sheet</span><div class="toggle-switch active" data-component="Fiberglass Sheet"></div></div>
+          <div class="toggle-row"><span class="toggle-label">Back Support</span><div class="toggle-switch active" data-component="Back Support"></div></div>
+          <div class="toggle-row"><span class="toggle-label">Fiberglass Screen</span><div class="toggle-switch active" data-component="Fiberglass Screen"></div></div>
+          <div class="toggle-row"><span class="toggle-label">Acoustic Fabric</span><div class="toggle-switch active" data-component="Acoustic Fabric"></div></div>
+          <div class="toggle-row no-art" id="artworkRow">
+            <span class="toggle-label">Artwork</span>
+            <button class="comp-upload-btn" id="compUploadBtn">Upload</button>
+            <div class="toggle-switch active" data-component="Artwork"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -1577,6 +1664,8 @@ $('clearArtBtn').addEventListener('click', e => {
   panelContainer.classList.remove('image-mode');
   modeIndicator.classList.remove('visible', 'image-mode');
   fileInput.value = '';
+  // Repaint the fabric bare and drop the Artwork row back to its Upload button.
+  if (window.audial3D && window.audial3D.refreshArt) window.audial3D.refreshArt();
 });
 
 // ============ IMAGE CONTROLS ============
@@ -2609,9 +2698,9 @@ function showConfig(key){
   hideAllComponents();
   for (const key2 of PANEL_KEYS)               // hide every fold mesh first (defense-in-depth)
     for (const f of ['half','full']){ const m = foldMeshes[key2][f]; if (m) m.visible = false; }
-  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = true; }
+  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = layerState[c]; }
   const fab = panelMeshes[key]['Acoustic Fabric'];       // = the active front mesh
-  if (fab && fab.userData.pairedFold) fab.userData.pairedFold.visible = true;
+  if (fab && fab.userData.pairedFold) fab.userData.pairedFold.visible = layerState['Acoustic Fabric'];
   centerCameraOn(key);
   renderFrontFaceCanvas();
 }
@@ -2662,7 +2751,10 @@ function renderFrontFaceCanvas(){
   if (artCanvas.width !== cw)  artCanvas.width  = cw;
   if (artCanvas.height !== ch) artCanvas.height = ch;
 
-  const hasArt = !!(currentPanel && currentPanel.image && window.__artImageEl && window.__artImageEl.complete);
+  // Artwork toggled off paints bare fabric — and NOT the upload affordance, since the art exists
+  // and inviting an upload would be a lie. The affordance is only for a genuinely empty panel.
+  const loaded = artLoaded();
+  const hasArt = loaded && layerState['Artwork'] !== false;
 
   artCtx.setTransform(SS,0,0,SS,0,0);
   artCtx.clearRect(0,0,W,H);
@@ -2691,7 +2783,7 @@ function renderFrontFaceCanvas(){
     artCtx.scale(sx, sy);
     artCtx.drawImage(window.__artImageEl, 0, 0, imgNaturalW, imgNaturalH);
     artCtx.setTransform(SS,0,0,SS,0,0);
-  } else {
+  } else if (!loaded) {
     drawUploadAffordance(W, H, front);     // Task 5 (draws in panelFace units under the SS transform)
   }
 
@@ -2709,7 +2801,10 @@ window.__dev32.currentFront = () => {
   return (key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric']) || null;
 };
 
-function refreshArt(){ if (webglOK && modelReady) renderFrontFaceCanvas(); }
+function refreshArt(){
+  if (webglOK && modelReady) renderFrontFaceCanvas();
+  syncArtworkRow();          // art may have just appeared or been cleared
+}
 
 // The mirror canvas is stretched across the fabric quad's whole 0..1 UV range, but the quad's
 // aspect is NOT the panelFace aspect — the fabric front is inset by the wrap (e.g. 4x2's quad is
@@ -2762,6 +2857,79 @@ function orientFrontTexture(tex){
   tex.matrixAutoUpdate = true;
 }
 
+// ===== DEV-33: Components drawer =====
+// Six of the seven rows hide a mesh. Artwork is the odd one out — it's a texture painted on the
+// fabric's front face, so its row feeds renderFrontFaceCanvas's hasArt branch instead.
+const DRAWER_ROWS = [...COMPONENTS, 'Artwork'];
+const layerState = {};
+function resetLayerState(){ for (const n of DRAWER_ROWS) layerState[n] = true; }
+resetLayerState();
+
+const slideout    = document.getElementById('componentsSlideout');
+const compTab     = document.getElementById('componentsTab');
+const artworkRow  = document.getElementById('artworkRow');
+const compUpload  = document.getElementById('compUploadBtn');
+
+function artLoaded(){
+  return !!(currentPanel && currentPanel.image && window.__artImageEl && window.__artImageEl.complete);
+}
+
+// The row's shape derives from the same art check the fabric painter uses, so the drawer and the
+// panel can't disagree. Fabric off => the art has no surface to sit on, so the row goes dead.
+function syncArtworkRow(){
+  if (!artworkRow) return;
+  artworkRow.classList.toggle('no-art', !artLoaded());
+  artworkRow.classList.toggle('disabled', !layerState['Acoustic Fabric']);
+}
+
+function syncDrawerUI(){
+  slideout.querySelectorAll('.toggle-switch').forEach(sw =>
+    sw.classList.toggle('active', !!layerState[sw.dataset.component]));
+  syncArtworkRow();
+}
+
+function applyLayer(name){
+  if (name === 'Artwork'){ renderFrontFaceCanvas(); return; }
+  const key = activeConfigKey();
+  if (!key) return;
+  const m = panelMeshes[key][name];
+  if (m) m.visible = layerState[name];
+  if (name === 'Acoustic Fabric'){
+    if (m && m.userData.pairedFold) m.userData.pairedFold.visible = layerState[name];
+    syncArtworkRow();
+  }
+}
+
+compTab.addEventListener('click', () => {
+  const open = slideout.classList.toggle('open');
+  compTab.setAttribute('aria-expanded', String(open));
+});
+// Collapse on an outside click — but only a real click, not a drag. Rotating the panel is an
+// outside press, and slamming the drawer shut mid-rotate would fight the whole point of it
+// (toggle a layer, turn the panel, toggle the next).
+let outsidePress = null;
+document.addEventListener('pointerdown', e => {
+  outsidePress = (slideout.classList.contains('open') && !slideout.contains(e.target))
+    ? { x: e.clientX, y: e.clientY } : null;
+});
+document.addEventListener('pointerup', e => {
+  if (!outsidePress) return;
+  const moved = Math.hypot(e.clientX - outsidePress.x, e.clientY - outsidePress.y);
+  outsidePress = null;
+  if (moved > 6) return;                    // that was a rotate, not a dismiss
+  slideout.classList.remove('open');
+  compTab.setAttribute('aria-expanded', 'false');
+});
+slideout.querySelectorAll('.toggle-switch').forEach(sw => {
+  sw.addEventListener('click', () => {
+    const name = sw.dataset.component;
+    layerState[name] = !layerState[name];
+    sw.classList.toggle('active', layerState[name]);
+    applyLayer(name);
+  });
+});
+compUpload.addEventListener('click', () => document.getElementById('fileInput').click());
+
 // ===== Public API used by the classic configurator script =====
 function show3D(on){
   const use = !!on && webglOK;
@@ -2777,6 +2945,8 @@ function showForSize(size, orientation){
   const key = configKeyFor(size, orientation);
   if (!key || !webglOK){ show3D(false); return; }  // custom/unknown or no WebGL -> CSS preview
   show3D(true);
+  resetLayerState();          // a newly loaded panel always starts whole
+  syncDrawerUI();
   loadingEl.style.display = modelReady ? 'none' : 'flex';
   if (modelReady) showConfig(key);
   else pendingConfig = key;
