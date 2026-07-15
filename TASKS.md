@@ -1251,8 +1251,7 @@ Replace the CSS 3D panel preview with the Three.js panel viewer inside the confi
 ---
 
 ## Task #DEV-33: Panel Size Selector + Components Slider in Configurator
-- **Status:** DONE on desktop (2026-07-15) — Parts 1 + 2 built and verified. Mobile slide-up drawer
-  split out as its own task.
+- **Status:** DONE (2026-07-15) — Parts 1 + 2 built and verified on desktop and mobile.
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-32
@@ -1289,7 +1288,21 @@ Replace the CSS 3D panel preview with the Three.js panel viewer inside the confi
   - Outside-click dismiss ignores drags >6px, else rotating the panel would slam the drawer shut.
   - **Also fixed here (was a latent DEV-34 bug):** `clearArtBtn` never notified the viewer, so
     cleared art lingered on the fabric. It now calls `refreshArt()`.
-- ⬜ **Mobile slide-up drawer** — deferred to its own task; the tab is hidden below 900px.
+- ✅ **Mobile slide-up drawer** — DONE (2026-07-15). Same tab + drawer, re-laid as a bottom sheet
+  below 900px: wrapper stacks into a column and parks below the container, leaving the 34px tab.
+  Rows go **2-up** and the title is dropped (the tab already says it), so the sheet is ~145px, not 280.
+  - **Mobile pushes, desktop overlays** — deliberately different. An overlay sheet buried the very
+    panel it explains (280px of a 420px preview), so on mobile the canvas takes an explicit px height
+    down to the drawer top and the camera re-frames into that band. Desktop keeps the pure overlay
+    (no resize, no re-frame) — verified the desktop canvas is byte-identical before/after opening.
+  - **Canvas-sizing trap (cost two wrong fixes):** `#viewer3dCanvas` is `inset:0` + `height:100%`, so
+    (a) setting `bottom` alone does nothing — height wins; and (b) `height:auto` on a `<canvas>`
+    resolves to its **drawing-buffer** size, which the renderer just set to the full height, so that
+    reproduces the bug too. It must be an explicit px height. `resize()` now measures the **canvas**,
+    not the container.
+  - Band is measured off the **drawer**, not the whole slideout, so the canvas runs behind the
+    floating tab and no strip of bare container backdrop shows either side of it.
+  - `#artworkRow` spans the full last row (7 rows don't divide by 2) and gives Upload room.
 
 ### Goal
 Two features in this task:

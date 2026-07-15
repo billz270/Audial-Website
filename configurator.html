@@ -205,10 +205,34 @@
   .comp-upload-btn:hover{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper);border-color:var(--primary)}
   #artworkRow.no-art .toggle-switch{display:none}
   #artworkRow:not(.no-art) .comp-upload-btn{display:none}
-  /* Desktop only for now. Mobile gets a slide-up drawer in its own task; a 220px side drawer
-     over a 420px-tall preview would swallow the panel. Own block, after the base rules. */
+  /* Mobile: same tab + drawer, re-laid as a bottom sheet. A 220px side drawer would swallow a
+     420px-tall preview, so the axis flips: the wrapper stacks into a column and parks below the
+     container with only the tab showing. The rows go 2-up and the title is dropped (the tab already
+     says "Components") to keep the sheet short — see .sheet-open, which hands the covered band back
+     to the canvas so the panel stays visible while you toggle it. Own block, after the base rules. */
   @media(max-width:900px){
-    .components-slideout{display:none}
+    .components-slideout{
+      top:auto;left:0;right:0;bottom:0;
+      flex-direction:column;align-items:stretch;
+      transform:translateY(calc(100% - 34px));   /* 34px = tab height, the only part left showing */
+    }
+    .components-slideout.open{transform:translateY(0)}
+    .components-tab{
+      align-self:center;writing-mode:horizontal-tb;
+      height:34px;padding:0 16px;gap:7px;
+      border:1.5px solid var(--ink);border-bottom:none;
+    }
+    .components-tab svg{transform:rotate(90deg)}                        /* points up = pull me open */
+    .components-slideout.open .components-tab svg{transform:rotate(-90deg)}
+    .components-drawer{width:auto;border-left:none;border-top:1.5px solid var(--ink)}
+    .components-title{display:none}
+    .components-rows{display:grid;grid-template-columns:1fr 1fr}
+    .toggle-row{min-height:36px;padding:7px 10px;border-bottom:1px solid rgba(9,61,83,0.15)}
+    .toggle-row:nth-child(odd){border-right:1px solid rgba(9,61,83,0.15)}
+    /* 7 rows don't divide by 2 — Artwork spans the last row so nothing sits half-empty,
+       and it gives the Upload button room to breathe. */
+    #artworkRow{grid-column:1/-1;border-right:none;border-bottom:none}
+    .toggle-label{font-size:10px}
   }
 
   .scene-wrap{transform-style:preserve-3d;transition:transform 0.15s ease-out;position:relative;transform:perspective(1800px)}
@@ -694,6 +718,7 @@
         </button>
         <div class="components-drawer">
           <div class="components-title">Components</div>
+          <div class="components-rows">
           <div class="toggle-row"><span class="toggle-label">Frame</span><div class="toggle-switch active" data-component="Frame"></div></div>
           <div class="toggle-row"><span class="toggle-label">Rockwool</span><div class="toggle-switch active" data-component="Rockwool"></div></div>
           <div class="toggle-row"><span class="toggle-label">Fiberglass Sheet</span><div class="toggle-switch active" data-component="Fiberglass Sheet"></div></div>
@@ -704,6 +729,7 @@
             <span class="toggle-label">Artwork</span>
             <button class="comp-upload-btn" id="compUploadBtn">Upload</button>
             <div class="toggle-switch active" data-component="Artwork"></div>
+          </div>
           </div>
         </div>
       </div>
@@ -2720,7 +2746,9 @@ function centerCameraOn(key){
 
 function resize(){
   if (!renderer) return;
-  const w = container.clientWidth, h = container.clientHeight;
+  // Measure the canvas, not the container: on mobile the open sheet shortens the canvas's box and
+  // the render must match that band, not the full container.
+  const w = canvas.clientWidth, h = canvas.clientHeight;
   if (!w || !h) return;
   renderer.setSize(w, h, false);
   camera.aspect = w / h;
@@ -2866,6 +2894,7 @@ function resetLayerState(){ for (const n of DRAWER_ROWS) layerState[n] = true; }
 resetLayerState();
 
 const slideout    = document.getElementById('componentsSlideout');
+const drawerEl    = slideout.querySelector('.components-drawer');
 const compTab     = document.getElementById('componentsTab');
 const artworkRow  = document.getElementById('artworkRow');
 const compUpload  = document.getElementById('compUploadBtn');
@@ -2900,10 +2929,35 @@ function applyLayer(name){
   }
 }
 
-compTab.addEventListener('click', () => {
-  const open = slideout.classList.toggle('open');
+// Desktop overlays: there's dead backdrop to spend, and a fixed panel is what makes toggling
+// readable. A phone has no such room — an overlay sheet would bury the very panel it explains — so
+// there the canvas gives up the covered band and the camera re-frames into what's left.
+const mobileMQ = window.matchMedia('(max-width:900px)');
+function syncSheetViewport(){
+  const shrink = mobileMQ.matches && slideout.classList.contains('open');
+  // Must be an explicit px height. The canvas is inset:0 + height:100%, so a `bottom` offset alone
+  // is ignored (height wins), and `height:auto` on a <canvas> resolves to its drawing-buffer size
+  // — which the renderer just set to the full height — so that reproduces the bug too.
+  // Measure the drawer, not the whole slideout: the canvas runs on behind the floating tab, so no
+  // strip of bare container backdrop shows either side of it.
+  const band = container.clientHeight - drawerEl.offsetHeight;
+  canvas.style.height = (shrink && band > 80) ? band + 'px' : '';
+  if (!webglOK) return;
+  requestAnimationFrame(() => {
+    resize();
+    const key = activeConfigKey();
+    if (key && modelReady && mobileMQ.matches) centerCameraOn(key);
+  });
+}
+mobileMQ.addEventListener('change', syncSheetViewport);
+
+function setSheetOpen(open){
+  slideout.classList.toggle('open', open);
   compTab.setAttribute('aria-expanded', String(open));
-});
+  syncSheetViewport();
+}
+
+compTab.addEventListener('click', () => setSheetOpen(!slideout.classList.contains('open')));
 // Collapse on an outside click — but only a real click, not a drag. Rotating the panel is an
 // outside press, and slamming the drawer shut mid-rotate would fight the whole point of it
 // (toggle a layer, turn the panel, toggle the next).
@@ -2917,8 +2971,7 @@ document.addEventListener('pointerup', e => {
   const moved = Math.hypot(e.clientX - outsidePress.x, e.clientY - outsidePress.y);
   outsidePress = null;
   if (moved > 6) return;                    // that was a rotate, not a dismiss
-  slideout.classList.remove('open');
-  compTab.setAttribute('aria-expanded', 'false');
+  setSheetOpen(false);
 });
 slideout.querySelectorAll('.toggle-switch').forEach(sw => {
   sw.addEventListener('click', () => {
