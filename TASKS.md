@@ -1209,7 +1209,7 @@ Transform the current "Play Assembly Animation" button behavior from a quick lay
 ---
 
 ## Task #DEV-32: Foundational Three.js Swap in Configurator
-- **Status:** TODO
+- **Status:** DONE (committed `57a24b7`..`e03f140`; status was stale, verified against code 2026-07-15)
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-31 completion, panels-web.glb file ready
@@ -1251,10 +1251,24 @@ Replace the CSS 3D panel preview with the Three.js panel viewer inside the confi
 ---
 
 ## Task #DEV-33: Panel Size Selector + Components Slider in Configurator
-- **Status:** TODO
+- **Status:** IN PROGRESS — Part 1 mostly done, Part 2 not started (verified against code 2026-07-15)
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-32
+
+### ⚠️ Resume here — actual state (verified against code, not assumed)
+- ✅ **Part 1 size wiring** — size buttons switch the 3D config and the camera auto-centers
+  (`showForSize`, `centerCameraOn`, `SIZE_TO_CONFIG` @ configurator.html:2323).
+- ✅ **1×1 and 2×1** — the spec's fallback options are moot; all 8 configs ship in `Panels-web.glb`,
+  so every size maps to its own real config. No placeholder needed.
+- ❌ **Orientation toggle does NOT drive the model.** `SIZE_TO_CONFIG` hardcodes one config per size
+  (`'2x1':'2x1H'`, `'4x2':'4x2H'`, `'1x4':'1x4V'`). The `.glb` contains `2x1V`, `4x2V`, `1x4H` but
+  nothing ever selects them. `showForSize` is called only from the size-card handler
+  (configurator.html:1003), never from the orientation toggle.
+  **This has a live side effect:** toggling 4×2 to vertical flips the CSS `panelFace` to a tall
+  aspect while the model stays `4x2H`, so DEV-34's mirror canvas is stretched onto a quad of the
+  opposite aspect. Fixing this removes a real distortion path.
+- ❌ **Part 2 Components slider** — not started. No tab, no toggles.
 
 ### Goal
 Two features in this task:
@@ -1340,10 +1354,48 @@ Styling:
 ---
 
 ## Task #DEV-34: Artwork Upload → Acoustic Fabric Texture
-- **Status:** TODO
+- **Status:** IN PROGRESS — started ahead of DEV-33 (see note below)
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-33
+
+### ⚠️ Resume here — actual state (2026-07-15)
+Work was started on this **before DEV-33 was finished**. Nothing needs reverting; DEV-33 just has to
+be caught up. Detailed step plan lives in
+`docs/superpowers/plans/2026-07-15-dev32-artwork-onto-fabric.md` (its "Task 1–10" are sub-steps of
+DEV-34 — NOT TASKS.md tasks; that name collision caused confusion, read it carefully).
+
+**Note:** the branch `dev-32-artwork-onto-fabric` and all its commits are labelled `DEV-32`, but the
+work is DEV-34. DEV-32 is the foundational swap and is already done.
+
+Built and committed (through `9b0b5a2`):
+- Runtime front/fold fabric split; canonical front UVs; canvas-mirror texture pipeline.
+- `drawUploadAffordance` — "+ UPLOAD ARTWORK" hint. `AFFORD_SCALE` (=1.5) is the single size knob;
+  offsets/fonts are fractions of `s` so it scales as a unit. Text alpha 0.75 resting.
+- `frontAspectComp()` — the fabric quad's aspect is NOT the panelFace aspect (the front is inset by
+  the wrap: 4×2 quad is 1.90 not 2.0; 1×4 canvas 0.247 vs quad 0.283). **Applied to the affordance
+  only** — the `hasArt` branch will inherit the stretch and needs a decision: match the quad
+  (physically right) or the CSS preview (canvas-mirror parity).
+- `ensureArtTexture()` now disposes/rebuilds when `artCanvas` dimensions change. Reusing one
+  CanvasTexture across a resize left a stale mip chain that anisotropy rendered as ghost copies of
+  the text at wrong scales. This was the "repeated text" bug — fixed and confirmed by the founder.
+- `__dev32.currentFront()` debug hook (the raycast step will want it).
+
+Verified by measurement, so don't re-litigate:
+- Front face is **NOT mirrored**. All 5 configs share identical world orientation
+  (`+X→[-1,0,0]`, `+Y→[0,1,0]`, `+Z→[0,0,-1]`), so per-config divergence is impossible.
+  `FRONT_MIRROR_U` = **false**. (An earlier "1×4V is mirrored" claim was read off a ghost-corrupted
+  render and was wrong.)
+- UVs span exactly 1.0 with `repeat:[1,1]` — the texture never tiles.
+
+Not yet done:
+- **Click-to-upload / edit / hover raycast** (plan Task 6). `frontHover` is declared and read but
+  **never assigned**, so the hover-brighten is dead code and the fabric is not clickable. Upload can
+  still be exercised via console: `document.getElementById('fileInput').click()`.
+- **Cleanup (plan Task 4, agreed but not applied):** switch `orientFrontTexture`'s wrap from
+  `RepeatWrapping` → `ClampToEdgeWrapping` (makes tiling structurally impossible; source UVs are
+  ragged, e.g. 4×2H ships `v=[0,1.017]`), and delete the speculative `__dev32.orient`
+  quarter/flipU/flipV knobs in favour of one documented `FRONT_MIRROR_U = false`. No visual change.
 
 ### Goal
 When user uploads an image in the configurator, apply it as a texture to the Acoustic Fabric mesh's material in the Three.js viewer.
