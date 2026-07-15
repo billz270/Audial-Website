@@ -1388,16 +1388,44 @@ Styling:
 ---
 
 ## Task #DEV-34: Artwork Upload → Acoustic Fabric Texture
-- **Status:** IN PROGRESS — started ahead of DEV-33 (see note below)
+- **Status:** DONE (2026-07-16) — all 10 plan sub-tasks built and verified end-to-end.
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-33
 
-### ⚠️ Resume here — actual state (2026-07-15)
-Work was started on this **before DEV-33 was finished**. Nothing needs reverting; DEV-33 just has to
-be caught up. Detailed step plan lives in
-`docs/superpowers/plans/2026-07-15-dev32-artwork-onto-fabric.md` (its "Task 1–10" are sub-steps of
-DEV-34 — NOT TASKS.md tasks; that name collision caused confusion, read it carefully).
+### Final state (2026-07-16)
+Step plan: `docs/superpowers/plans/2026-07-15-dev32-artwork-onto-fabric.md` (its "Task 1–10" are
+sub-steps of DEV-34 — NOT TASKS.md tasks; that name collision caused confusion twice).
+
+**Closing legs (Tasks 4/6/7/8/9/10):**
+- **Task 6 — front-face raycast.** The fabric is live: bare → click opens the file picker; loaded art
+  → click enters edit (orbit off, `#imgCtrlGroup` shown via the classic `enableImageMode`); click off
+  the face exits. Hover brightens the affordance + pointer cursor. `CLICK_SLOP=6px` separates a click
+  from an orbit drag. **Art hidden by the Artwork toggle is inert** — no edit, no picker (it would
+  contradict the art that exists).
+- **Task 7 — reposition-drag.** While editing, dragging the face pans the art via `imgPos` +
+  `clampImagePosition` + `applyImageTransform`. `DRAG_GAIN=1.0` (face shows ~1:1).
+- **Task 8 — parity.** Toolbar zoom/flip/rotate/Fit already routed through `applyImageTransform`;
+  verified each drives the 3D face. Added **`#imgReplaceBtn`** to the toolbar — the in-panel
+  `replaceBtn` lives inside `panelFace`, which is `visibility:hidden` in 3D, so it was unreachable
+  there. Clear → repaints affordance + exits edit. **Fixed the Edit-a-saved-panel gap:**
+  `loadPanelToEditor` now calls `showForSize` *and* sets `window.__artImageEl.src` — the mirror draws
+  from `__artImageEl`, so setting `panelImage.src` alone left the fabric showing the previous art.
+- **Task 4 — cleanup.** `FRONT_MIRROR_U = false` (measured: all configs share identical world
+  orientation, so the front is not mirrored). `ClampToEdgeWrapping` on both axes makes tiling
+  structurally impossible — source UVs are ragged (4×2H ships `v=[0,1.017]`). Speculative
+  `__dev32.orient` quarter/flipU/flipV knobs deleted.
+- **Edit-mode can't get stranded:** `refreshArt` exits edit if the art vanishes, `applyLayer` exits if
+  Artwork/Fabric is toggled off mid-edit, `showForSize` exits on any new panel. Each restores orbit.
+
+**Task 9 regression — all verified by driving the real page (puppeteer, d3d11 GPU), 26 checks:**
+hover/cursor, click-to-upload, click-to-edit, drag-reposition, click-off-exits, every toolbar button,
+Replace, Clear, Artwork-off inertness, Fabric-off mid-edit, all 5 catalog sizes carrying art onto
+their own config, ClampToEdge/no-tiling, custom → CSS, cart round-trip, Edit-a-saved-panel restoring
+`4x2V` + art, and model-load failure → CSS fallback that still uploads.
+
+**Note:** the branch `dev-32-artwork-onto-fabric` and its commits are labelled `DEV-32`, but the
+work is DEV-34. DEV-32 is the foundational swap and was already done.
 
 **Note:** the branch `dev-32-artwork-onto-fabric` and all its commits are labelled `DEV-32`, but the
 work is DEV-34. DEV-32 is the foundational swap and is already done.

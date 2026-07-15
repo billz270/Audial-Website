@@ -774,6 +774,9 @@
           </button>
           <button class="ctrl-btn" id="imgResetCropBtn" title="Recenter (keep zoom)">◎</button>
           <button class="ctrl-btn" id="imgFitBtn" title="Fit image (reset everything)">Fit</button>
+          <!-- The in-panel Replace lives inside panelFace, which is hidden in 3D mode; this toolbar
+               sits outside the viewer, so it's the only Replace reachable while editing in 3D. -->
+          <button class="ctrl-btn" id="imgReplaceBtn" title="Replace image">Replace</button>
         </div>
       </div>
     </div>
@@ -1337,6 +1340,13 @@ uploadInPanel.addEventListener('drop',e=>{
   e.preventDefault();uploadInPanel.classList.remove('dragover');
   const f = e.dataTransfer.files[0];
   if(f && f.type.startsWith('image/')) handleImageUpload(f);
+});
+
+// Toolbar Replace — same synchronous-gesture rules as the in-panel one below.
+$('imgReplaceBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  fileInput.value = '';
+  fileInput.click();
 });
 
 replaceBtn.addEventListener('pointerdown', e => { e.stopPropagation(); });
@@ -2091,6 +2101,14 @@ function loadPanelToEditor(panel){
   replaceBtn.style.display = 'block';
   clearArtGroup.style.display = 'flex';
 
+  // DEV-34: point the viewer at this panel's config, and hand the mirror its own decoded image —
+  // renderFrontFaceCanvas draws from __artImageEl, so setting panelImage.src alone leaves the
+  // fabric showing whatever was there before. The setTimeout below repaints once the transform lands.
+  if (window.audial3D) window.audial3D.showForSize(currentPanel.size, currentPanel.orientation);
+  window.__artImageEl = window.__artImageEl || new Image();
+  window.__artImageEl.onload = () => { if (window.__viewer3dActive) window.audial3D.refreshArt(); };
+  window.__artImageEl.src = panel.image;
+
   setTimeout(()=>{
     panelImage.style.width = imgNaturalW + 'px';
     panelImage.style.height = imgNaturalH + 'px';
@@ -2830,6 +2848,8 @@ window.__dev32.currentFront = () => {
 };
 
 function refreshArt(){
+  // Clear/reset can pull the art out from under edit mode; don't strand orbit disabled.
+  if (editing && !artDisplayed()) exitEdit();
   if (webglOK && modelReady) renderFrontFaceCanvas();
   syncArtworkRow();          // art may have just appeared or been cleared
 }
@@ -2871,19 +2891,120 @@ function drawUploadAffordance(W, H, front){
   artCtx.restore();
 }
 
-// Front UVs are canonicalized at split time, so orientation is uniform across configs.
-// This just carries an optional global flip correction (screen-left sign / back-face mirror).
-window.__dev32.orient = window.__dev32.orient || { quarter: 0, flipU: false, flipV: false };
+// Front UVs are canonicalized at split time, so orientation is uniform across every config — this
+// is one constant, not a per-config knob. Measured, not guessed: all configs share identical world
+// orientation (+X→[-1,0,0], +Y→[0,1,0], +Z→[0,0,-1]), so the front face is NOT mirrored.
+// ClampToEdge makes tiling structurally impossible: the source UVs are ragged (4x2H ships
+// v=[0,1.017]) and RepeatWrapping would wrap that overhang back around as a sliver.
+const FRONT_MIRROR_U = false;
 function orientFrontTexture(tex){
-  const o = window.__dev32.orient;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
   tex.center.set(0.5, 0.5);
-  tex.rotation = ((o.quarter || 0) % 4) * Math.PI / 2;
-  tex.repeat.set(o.flipU ? -1 : 1, o.flipV ? -1 : 1);
-  tex.offset.set(0, 0);
+  tex.rotation = 0;
+  if (FRONT_MIRROR_U){ tex.wrapS = THREE.RepeatWrapping; tex.repeat.x = -1; tex.offset.x = 1; }
+  else                { tex.wrapS = THREE.ClampToEdgeWrapping; tex.repeat.x = 1; tex.offset.x = 0; }
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.repeat.y = 1; tex.offset.y = 0;
   tex.matrixAutoUpdate = true;
 }
+
+// ===== DEV-34 Tasks 6+7: front-face raycast — click to upload / click to edit / hover / drag =====
+// Reads the classic script's globals by bare name (currentPanel, imgPos, …). They're top-level
+// `let`s, so they live in the global LEXICAL scope, not on window — `window.imgPos` is undefined.
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let editing = false;
+window.__dev32.isEditing = () => editing;
+// debug probes (verification only) — these read the classic script's global-lexical state, which
+// isn't reachable from a test as window.*.
+window.__dev32.imgPosProbe  = () => ({ x: imgPos.x, y: imgPos.y });
+window.__dev32.zoomProbe    = () => imgZoom;
+window.__dev32.flipProbe    = () => ({ h: imgFlipH, v: imgFlipV });
+window.__dev32.rotProbe     = () => imgRotate;
+window.__dev32.orbitEnabled = () => !!(controls && controls.enabled);
+
+function frontHit(ev){
+  if (!camera) return null;
+  const key = activeConfigKey();
+  const front = key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric'];
+  if (!front || !front.visible) return null;
+  const rect = canvas.getBoundingClientRect();
+  ndc.x =  ((ev.clientX - rect.left) / rect.width)  * 2 - 1;
+  ndc.y = -((ev.clientY - rect.top)  / rect.height) * 2 + 1;
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObject(front, false);
+  return hits.length ? hits[0] : null;
+}
+function hasArtNow(){ return !!(currentPanel && currentPanel.image); }
+// What the face is actually showing decides what a click means. Art hidden via the Artwork toggle
+// is inert: there's nothing to edit, and offering an upload would contradict the art that exists.
+function artDisplayed(){ return hasArtNow() && layerState['Artwork'] !== false; }
+function affordanceShown(){ return !hasArtNow(); }
+
+function enterEdit(){
+  if (editing) return;
+  editing = true;
+  if (controls) controls.enabled = false;      // orbit off while editing
+  enableImageMode();                           // shows #imgCtrlGroup, "◆ Editing artwork"
+}
+function exitEdit(){
+  if (!editing) return;
+  editing = false;
+  if (controls) controls.enabled = true;
+  enablePanMode();
+  if (frontHover){ frontHover = false; refreshArt(); }
+}
+window.__dev32.exitEdit = exitEdit;
+
+const CLICK_SLOP = 6;      // px; a pointerup under this counts as a click, not a drag
+const DRAG_GAIN  = 1.0;    // screen-px → panelFace-px; the front face shows near 1:1
+let downXY = null, dragging = null;
+
+canvas.addEventListener('pointerdown', e => {
+  downXY = { x:e.clientX, y:e.clientY };
+  if (editing && frontHit(e)){
+    dragging = { x:e.clientX, y:e.clientY };
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+  }
+});
+canvas.addEventListener('pointermove', e => {
+  if (dragging){
+    const face = document.getElementById('panelFace');
+    const rect = canvas.getBoundingClientRect();
+    const scale = (face.clientWidth / rect.width) * DRAG_GAIN;   // panelFace px per screen px
+    imgPos.x += (e.clientX - dragging.x) * scale;
+    imgPos.y += (e.clientY - dragging.y) * scale;
+    dragging = { x:e.clientX, y:e.clientY };
+    clampImagePosition();
+    applyImageTransform();      // repaints the front face through the existing hook
+    return;
+  }
+  const live = affordanceShown() || artDisplayed();
+  const over = live && !!frontHit(e);
+  canvas.style.cursor = over ? 'pointer' : '';
+  // Only the bare-fabric affordance brightens; loaded art has nothing to brighten.
+  const wantHover = over && affordanceShown();
+  if (wantHover !== frontHover){ frontHover = wantHover; renderFrontFaceCanvas(); }
+});
+canvas.addEventListener('pointerup', e => {
+  if (dragging){ dragging = null; try { canvas.releasePointerCapture(e.pointerId); } catch(_){} }
+  if (!downXY) return;
+  const moved = Math.hypot(e.clientX - downXY.x, e.clientY - downXY.y);
+  downXY = null;
+  if (moved > CLICK_SLOP) return;              // that was an orbit/reposition drag
+  if (frontHit(e)){
+    if (artDisplayed()) enterEdit();
+    else if (affordanceShown()){
+      const fi = document.getElementById('fileInput');
+      fi.value = '';                           // re-selecting the same file must still fire change
+      fi.click();                              // synchronous: the gesture chain must not be broken
+    }
+  } else if (editing){
+    exitEdit();                                // tapping off the face exits edit
+  }
+});
+canvas.addEventListener('pointerleave', () => {
+  if (frontHover){ frontHover = false; renderFrontFaceCanvas(); }
+});
 
 // ===== DEV-33: Components drawer =====
 // Six of the seven rows hide a mesh. Artwork is the odd one out — it's a texture painted on the
@@ -2918,13 +3039,18 @@ function syncDrawerUI(){
 }
 
 function applyLayer(name){
-  if (name === 'Artwork'){ renderFrontFaceCanvas(); return; }
+  if (name === 'Artwork'){
+    if (editing && !artDisplayed()) exitEdit();   // nothing left on the face to edit
+    renderFrontFaceCanvas();
+    return;
+  }
   const key = activeConfigKey();
   if (!key) return;
   const m = panelMeshes[key][name];
   if (m) m.visible = layerState[name];
   if (name === 'Acoustic Fabric'){
     if (m && m.userData.pairedFold) m.userData.pairedFold.visible = layerState[name];
+    if (editing && !layerState[name]) exitEdit();  // the surface being edited just went away
     syncArtworkRow();
   }
 }
@@ -2998,6 +3124,7 @@ function showForSize(size, orientation){
   const key = configKeyFor(size, orientation);
   if (!key || !webglOK){ show3D(false); return; }  // custom/unknown or no WebGL -> CSS preview
   show3D(true);
+  exitEdit();                 // a new panel is not the one you were editing
   resetLayerState();          // a newly loaded panel always starts whole
   syncDrawerUI();
   loadingEl.style.display = modelReady ? 'none' : 'flex';
