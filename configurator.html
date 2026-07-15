@@ -2323,7 +2323,12 @@ let pendingConfig = null;
 let currentFold = 'full';                 // default fabric wrap variant
 const panelMeshes = {};                   // panelMeshes[key][component] = mesh
 const fabricFolds = {};                   // fabricFolds[key][half|full] = mesh
-PANEL_KEYS.forEach(k => { panelMeshes[k] = {}; fabricFolds[k] = {}; });
+const foldMeshes = {};                     // foldMeshes[key][half|full] = solid neutral fold mesh
+const frontMeshes = {};                    // frontMeshes[key][half|full] = art-bearing front mesh
+PANEL_KEYS.forEach(k => { panelMeshes[k] = {}; fabricFolds[k] = {}; foldMeshes[k] = {}; frontMeshes[k] = {}; });
+let fabricBaseMat = null;                  // captured base Fabric material (for neutral fold clone)
+window.__dev32 = window.__dev32 || {};     // console debug hook (verification only)
+Object.assign(window.__dev32, { foldMeshes, frontMeshes, panelMeshes });
 let scene, camera, renderer, controls;
 
 function webglAvailable(){
@@ -2398,6 +2403,49 @@ function classifyMesh(mesh){
   return null;
 }
 
+// Split a fabric mesh into {front, fold} by per-triangle LOCAL normal.
+// Front = triangles whose local normal points toward +Z (the clean planar quad at max local Z).
+// TUNE: FRONT_NORMAL_MIN — raise toward 0.9 if fold flaps leak into the front set;
+//        lower toward 0.5 if part of the flat front is missing. 0.7 is the spec's start.
+const FRONT_NORMAL_MIN = 0.7;
+function splitFabricMesh(mesh){
+  const geo = mesh.geometry;
+  const pos = geo.attributes.position;
+  const nor = geo.attributes.normal;
+  const uv  = geo.attributes.uv;            // GLTFLoader names the UV attribute "uv"
+  const idx = geo.index ? geo.index.array : null;
+  const triCount = idx ? idx.length / 3 : pos.count / 3;
+  const vi = (t, k) => idx ? idx[t*3+k] : t*3+k;
+
+  const frontTris = [], foldTris = [];
+  const nA = new THREE.Vector3(), nB = new THREE.Vector3(), nC = new THREE.Vector3();
+  for (let t = 0; t < triCount; t++){
+    const a = vi(t,0), b = vi(t,1), c = vi(t,2);
+    nA.fromBufferAttribute(nor, a); nB.fromBufferAttribute(nor, b); nC.fromBufferAttribute(nor, c);
+    const nz = (nA.z + nB.z + nC.z) / 3;     // average local Z of the triangle normal
+    (nz > FRONT_NORMAL_MIN ? frontTris : foldTris).push([a,b,c]);
+  }
+
+  const build = (tris) => {
+    const g = new THREE.BufferGeometry();
+    const P = [], N = [], U = [];
+    for (const [a,b,c] of tris){
+      for (const v of [a,b,c]){
+        P.push(pos.getX(v), pos.getY(v), pos.getZ(v));
+        N.push(nor.getX(v), nor.getY(v), nor.getZ(v));
+        if (uv) U.push(uv.getX(v), uv.getY(v));
+      }
+    }
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    g.setAttribute('normal',   new THREE.Float32BufferAttribute(N, 3));
+    if (uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+    return g;
+  };
+
+  return { frontGeo: build(frontTris), foldGeo: build(foldTris),
+           frontCount: frontTris.length, foldCount: foldTris.length };
+}
+
 function loadModel(){
   new GLTFLoader().load(GLB_URL, (gltf) => {
     const model = gltf.scene;
@@ -2410,12 +2458,40 @@ function loadModel(){
       const cls = classifyMesh(child);
       if (cls){
         if (child.material) child.material = child.material.clone(); // independent per-layer material
-        if (cls.fold){ fabricFolds[cls.panelKey][cls.fold] = child; child.visible = false; }
+        if (cls.fold){
+          fabricFolds[cls.panelKey][cls.fold] = child;
+          child.visible = false;
+          if (!fabricBaseMat) fabricBaseMat = child.material; // already cloned above
+        }
         else { panelMeshes[cls.panelKey][cls.component] = child; child.visible = false; }
       } else {
         child.visible = false; // defense-in-depth: never leave an unknown mesh visible
       }
     });
+    // Split every fabric fold into front (art) + fold (neutral). Runs once at load.
+    for (const key of PANEL_KEYS){
+      for (const fold of ['half','full']){
+        const src = fabricFolds[key][fold];
+        if (!src) continue;
+        const { frontGeo, foldGeo } = splitFabricMesh(src);
+
+        const foldMat = src.material.clone();
+        foldMat.map = null;                     // NO texture on folds => no bleed, ever
+        foldMat.side = THREE.DoubleSide;
+        foldMat.needsUpdate = true;
+
+        const front = new THREE.Mesh(frontGeo, src.material.clone());
+        const foldM = new THREE.Mesh(foldGeo, foldMat);
+        front.name = `${key} Front ${fold}`;
+        foldM.name = `${key} FoldOnly ${fold}`;
+        front.visible = false; foldM.visible = false;
+        src.parent.add(front); src.parent.add(foldM);
+        src.visible = false;                     // retire the combined mesh (kept, hidden)
+
+        frontMeshes[key][fold] = front;
+        foldMeshes[key][fold]  = foldM;
+      }
+    }
     model.rotation.y = Math.PI;  // bring the FRONT (fabric side) to face the +Z camera
     scene.add(model);
     applyFabricFold();
@@ -2433,15 +2509,17 @@ function loadModel(){
   });
 }
 
-// Promote the active fabric fold into each panel's Acoustic Fabric slot; hide the other.
+// Promote the active fold's front mesh into the Acoustic Fabric slot; pair its fold mesh; hide the other variant.
 function applyFabricFold(){
   for (const key of PANEL_KEYS){
-    const folds = fabricFolds[key];
-    if (!folds) continue;
-    const active = folds[currentFold] || folds.full || folds.half || null;
-    const inactive = active === folds.full ? folds.half : folds.full;
-    if (inactive) inactive.visible = false;
-    if (active) panelMeshes[key]['Acoustic Fabric'] = active;
+    const front = frontMeshes[key][currentFold];
+    const fold  = foldMeshes[key][currentFold];
+    const other = currentFold === 'full' ? 'half' : 'full';
+    const otherFront = frontMeshes[key][other];
+    const otherFold  = foldMeshes[key][other];
+    if (otherFront) otherFront.visible = false;
+    if (otherFold)  otherFold.visible  = false;
+    if (front){ panelMeshes[key]['Acoustic Fabric'] = front; front.userData.pairedFold = fold; }
   }
 }
 
@@ -2452,7 +2530,11 @@ function hideAllComponents(){
 
 function showConfig(key){
   hideAllComponents();
+  for (const key2 of PANEL_KEYS)               // hide every fold mesh first (defense-in-depth)
+    for (const f of ['half','full']){ const m = foldMeshes[key2][f]; if (m) m.visible = false; }
   for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = true; }
+  const fab = panelMeshes[key]['Acoustic Fabric'];       // = the active front mesh
+  if (fab && fab.userData.pairedFold) fab.userData.pairedFold.visible = true;
   centerCameraOn(key);
 }
 
