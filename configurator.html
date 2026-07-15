@@ -1203,10 +1203,14 @@ function applyRotation(){
   // — likely due to CSS rotateX/Y conventions combined with our perspective setup.)
   // eps prevents flicker right at zero.
   const eps = 0.5;
-  sideLeft.style.visibility   = (panYaw   >  eps) ? 'visible' : 'hidden';
-  sideRight.style.visibility  = (panYaw   < -eps) ? 'visible' : 'hidden';
-  sideBottom.style.visibility = (panPitch >  eps) ? 'visible' : 'hidden';
-  sideTop.style.visibility    = (panPitch < -eps) ? 'visible' : 'hidden';
+  // DEV-32: in 3D mode #sceneWrap is visibility:hidden to stay measurable, but an inline
+  // visibility:visible on a child overrides a hidden parent — these strips would paint on top
+  // of the 3D canvas. Keep them hidden while the viewer owns the container.
+  const v3d = window.__viewer3dActive;
+  sideLeft.style.visibility   = (!v3d && panYaw   >  eps) ? 'visible' : 'hidden';
+  sideRight.style.visibility  = (!v3d && panYaw   < -eps) ? 'visible' : 'hidden';
+  sideBottom.style.visibility = (!v3d && panPitch >  eps) ? 'visible' : 'hidden';
+  sideTop.style.visibility    = (!v3d && panPitch < -eps) ? 'visible' : 'hidden';
 }
 
 // ============ UPLOAD ============
@@ -2341,14 +2345,24 @@ let scene, camera, renderer, controls;
 const artCanvas = document.createElement('canvas');
 const artCtx = artCanvas.getContext('2d');
 window.__dev32.artCanvas = artCanvas;      // debug: inspect the mirror canvas directly
+let frontHover = false;                     // pointer over the front face (brightens the affordance)
+let fabricColorCSS = '#8a8a8a';             // neutral fabric color, captured from the glb at load
 let artTexture = null;                     // THREE.CanvasTexture, created lazily
+// artCanvas is resized per panel size (1x1 663x663, 4x2 1024x510, 1x4 253x1024). A CanvasTexture
+// caches a GL texture + mipmap chain sized to the canvas at first upload; reusing it across a
+// resize can leave a stale chain, and anisotropic sampling at grazing angles then pulls that old
+// content in — ghost copies of the mark at the wrong scale. Rebuild whenever the size changes.
 function ensureArtTexture(){
-  if (artTexture) return artTexture;
+  if (artTexture && artTexture.__srcW === artCanvas.width && artTexture.__srcH === artCanvas.height)
+    return artTexture;
+  if (artTexture) artTexture.dispose();
   artTexture = new THREE.CanvasTexture(artCanvas);
   artTexture.colorSpace = THREE.SRGBColorSpace;
   artTexture.flipY = false;                // GLTF UV convention
   artTexture.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 8; // sharpen at grazing angles
   artTexture.generateMipmaps = true;
+  artTexture.__srcW = artCanvas.width;
+  artTexture.__srcH = artCanvas.height;
   return artTexture;
 }
 
@@ -2509,6 +2523,7 @@ function loadModel(){
         child.visible = false; // defense-in-depth: never leave an unknown mesh visible
       }
     });
+    if (fabricBaseMat && fabricBaseMat.color) fabricColorCSS = '#' + fabricBaseMat.color.getHexString();
     // Split every fabric fold into front (art) + fold (neutral). Runs once at load.
     for (const key of PANEL_KEYS){
       for (const fold of ['half','full']){
@@ -2627,12 +2642,13 @@ function renderFrontFaceCanvas(){
   if (artCanvas.width !== cw)  artCanvas.width  = cw;
   if (artCanvas.height !== ch) artCanvas.height = ch;
 
+  const hasArt = !!(currentPanel && currentPanel.image && window.__artImageEl && window.__artImageEl.complete);
+
   artCtx.setTransform(SS,0,0,SS,0,0);
   artCtx.clearRect(0,0,W,H);
-  artCtx.fillStyle = '#ffffff';
+  artCtx.fillStyle = hasArt ? '#ffffff' : fabricColorCSS;  // white backs transparent art; else fabric-neutral
   artCtx.fillRect(0,0,W,H);
 
-  const hasArt = !!(currentPanel && currentPanel.image && window.__artImageEl && window.__artImageEl.complete);
   if (hasArt){
     // Recompute cssTx/cssTy exactly like applyImageTransform (bounding-box correction).
     const r = imgRotate, fh = imgFlipH, fv = imgFlipV;
@@ -2656,19 +2672,61 @@ function renderFrontFaceCanvas(){
     artCtx.drawImage(window.__artImageEl, 0, 0, imgNaturalW, imgNaturalH);
     artCtx.setTransform(SS,0,0,SS,0,0);
   } else {
-    drawUploadAffordance(W, H);            // Task 5 (draws in panelFace units under the SS transform)
+    drawUploadAffordance(W, H, front);     // Task 5 (draws in panelFace units under the SS transform)
   }
 
   const tex = ensureArtTexture();
   orientFrontTexture(tex);                 // Task 4
   front.material.map = tex;
+  if (front.material.color) front.material.color.setRGB(1,1,1);  // don't tint the artwork/affordance
   front.material.needsUpdate = true;
   tex.needsUpdate = true;
 }
 window.__dev32.renderFrontFaceCanvas = renderFrontFaceCanvas;
+// debug: the front mesh currently receiving the art texture (verification only)
+window.__dev32.currentFront = () => {
+  const key = SIZE_TO_CONFIG[currentPanel?.size];
+  return (key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric']) || null;
+};
 
 function refreshArt(){ if (webglOK && modelReady) renderFrontFaceCanvas(); }
-function drawUploadAffordance(W, H){ /* Task 5 fills this in */ }
+
+// The mirror canvas is stretched across the fabric quad's whole 0..1 UV range, but the quad's
+// aspect is NOT the panelFace aspect — the fabric front is inset by the wrap (e.g. 4x2's quad is
+// 1.90, not 2.0; 1x4's is 0.283 vs the canvas's 0.247). Anything drawn here is stretched by
+// quadAspect/canvasAspect, so pre-squeeze x by the inverse to land undistorted on every config.
+function frontAspectComp(W, H, front){
+  const geo = front && front.geometry;
+  if (!geo) return 1;
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  const quadAspect = (bb.max.x - bb.min.x) / (bb.max.y - bb.min.y);
+  if (!isFinite(quadAspect) || quadAspect <= 0) return 1;
+  return (W / H) / quadAspect;
+}
+
+// Box-less "＋ UPLOAD ARTWORK" hint painted on the bare fabric; brightens on hover.
+// Draws in panelFace units (the SS base transform is already applied by the caller).
+// TUNE: AFFORD_SCALE — overall size of the mark. Every offset and font below is a fraction of
+// `s`, so this scales the whole thing as a unit and keeps the tuned proportions intact.
+// At 1.5 the label is ~64% of the panel's short side; raise for bigger, lower for smaller.
+const AFFORD_SCALE = 1.5;
+function drawUploadAffordance(W, H, front){
+  const s = Math.min(W, H) * AFFORD_SCALE;
+  artCtx.save();
+  artCtx.translate(W/2, H/2);
+  artCtx.scale(frontAspectComp(W, H, front), 1);   // undo the canvas->quad stretch
+  artCtx.fillStyle = '#093d53';                    // --ink
+  artCtx.textAlign = 'center';
+  artCtx.textBaseline = 'middle';
+  artCtx.globalAlpha = frontHover ? 0.68 : 0.5;    // brighten on hover; no box, no border
+  artCtx.font = `300 ${Math.round(s*0.13)}px Archivo, sans-serif`;
+  artCtx.fillText('+', 0, -s*0.033);
+  artCtx.globalAlpha = frontHover ? 0.9 : 0.75;    // text carries more weight than the mark
+  artCtx.font = `600 ${Math.round(s*0.05)}px Archivo, sans-serif`;
+  artCtx.fillText('UPLOAD ARTWORK', 0, s*0.041);
+  artCtx.restore();
+}
 
 // Front UVs are canonicalized at split time, so orientation is uniform across configs.
 // This just carries an optional global flip correction (screen-left sign / back-face mirror).
@@ -2689,6 +2747,9 @@ function show3D(on){
   const use = !!on && webglOK;
   container.classList.toggle('view-3d', use);
   window.__viewer3dActive = use;   // read by the CSS-panel drag handler to yield to OrbitControls
+  // Re-run the CSS panel's side-strip pass for the new mode: their inline visibility would
+  // otherwise survive the switch and paint over (or stay missing from) the CSS preview.
+  if (typeof window.applyRotation === 'function') window.applyRotation();
   if (use) requestAnimationFrame(resize);
 }
 
