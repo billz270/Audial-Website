@@ -1389,6 +1389,7 @@ Styling:
 
 ## Task #DEV-34: Artwork Upload → Acoustic Fabric Texture
 - **Status:** DONE (2026-07-16) — all 10 plan sub-tasks built and verified end-to-end.
+  Final open item (artwork aspect on the fabric quad) closed 2026-07-16.
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-33
@@ -1427,17 +1428,13 @@ their own config, ClampToEdge/no-tiling, custom → CSS, cart round-trip, Edit-a
 **Note:** the branch `dev-32-artwork-onto-fabric` and its commits are labelled `DEV-32`, but the
 work is DEV-34. DEV-32 is the foundational swap and was already done.
 
-**Note:** the branch `dev-32-artwork-onto-fabric` and all its commits are labelled `DEV-32`, but the
-work is DEV-34. DEV-32 is the foundational swap and is already done.
-
 Built and committed (through `9b0b5a2`):
 - Runtime front/fold fabric split; canonical front UVs; canvas-mirror texture pipeline.
 - `drawUploadAffordance` — "+ UPLOAD ARTWORK" hint. `AFFORD_SCALE` (=1.5) is the single size knob;
   offsets/fonts are fractions of `s` so it scales as a unit. Text alpha 0.75 resting.
 - `frontAspectComp()` — the fabric quad's aspect is NOT the panelFace aspect (the front is inset by
   the wrap: 4×2 quad is 1.90 not 2.0; 1×4 canvas 0.247 vs quad 0.283). **Applied to the affordance
-  only** — the `hasArt` branch will inherit the stretch and needs a decision: match the quad
-  (physically right) or the CSS preview (canvas-mirror parity).
+  only.** See "Open item" below — the `hasArt` branch inherits the stretch, pending a call.
 - `ensureArtTexture()` now disposes/rebuilds when `artCanvas` dimensions change. Reusing one
   CanvasTexture across a resize left a stale mip chain that anisotropy rendered as ghost copies of
   the text at wrong scales. This was the "repeated text" bug — fixed and confirmed by the founder.
@@ -1450,14 +1447,42 @@ Verified by measurement, so don't re-litigate:
   render and was wrong.)
 - UVs span exactly 1.0 with `repeat:[1,1]` — the texture never tiles.
 
-Not yet done:
-- **Click-to-upload / edit / hover raycast** (plan Task 6). `frontHover` is declared and read but
-  **never assigned**, so the hover-brighten is dead code and the fabric is not clickable. Upload can
-  still be exercised via console: `document.getElementById('fileInput').click()`.
-- **Cleanup (plan Task 4, agreed but not applied):** switch `orientFrontTexture`'s wrap from
-  `RepeatWrapping` → `ClampToEdgeWrapping` (makes tiling structurally impossible; source UVs are
-  ragged, e.g. 4×2H ships `v=[0,1.017]`), and delete the speculative `__dev32.orient`
-  quarter/flipU/flipV knobs in favour of one documented `FRONT_MIRROR_U = false`. No visual change.
+### Artwork aspect on the fabric quad — RESOLVED 2026-07-16
+Art was landing on the fabric stretched, because the mirror canvas carried the **panelFace** aspect
+while being stretched across the **quad's** 0..1 UV range. Measured, don't re-derive:
+
+**Every front quad is `0.300 × nominal_ft + 0.055` world, on both axes.** The flat fabric front is
+the panel's full *outer* face — the additive constant is the frame the fabric wraps over. Because
+it's the same constant on both axes, it's a big slice of a 1ft side and a small one of a 4ft side,
+so **every quad's aspect sits nearer 1.0 than its nominal**. That's why wide panels shrink and tall
+panels grow — one cause, not two. (An earlier "these contradict" reading was wrong.)
+
+| Config | Canvas (nominal) | Quad (real front) | Art error, pre-fix |
+|---|---|---|---|
+| 1×1 | 1.000 | 0.996 | −0.4% |
+| 2×2 | 1.000 | 0.992 | −0.8% |
+| 4×2 H/V | 2.007 / 0.498 | 1.900 / 0.526 | ∓5.4% |
+| 2×1 H/V | 2.014 / 0.497 | 1.845 / 0.542 | ∓9.0% |
+| 1×4 H/V | 4.043 / 0.247 | 3.529 / 0.283 | ∓13% |
+
+**Fix:** the canvas now carries the **quad's** aspect, and the WxH design rect maps onto it with one
+uniform **cover** scale (`renderFrontFaceCanvas`). Art stays undistorted and always reaches the
+edges; overflow spills off the long axis as bleed — which is physically right, the fabric must cover
+the frame. `frontAspectComp` → `frontQuadAspect`; the correction moved from per-draw onto the canvas,
+so `drawUploadAffordance` no longer corrects (that would double-correct).
+
+Note `fitImageToPanel` already cover-fits the upload to the face (`imgZoom` 1.113 on 1×4V), so the
+whole pipeline is cover end-to-end.
+
+**Verified** by driving the real page: upload a square marker through `#fileInput`, measure its
+rendered aspect on the quad. All 8 configs pass <2% (quantisation on a ~50px marker). Confirmed the
+test detects the bug by re-running against stashed code: 1×4V failed at 13.5%, 4×2 at 5.4%, squares
+passed — matching the table above.
+
+**Known, deliberate:** the 3D face and the CSS `panelFace` no longer agree pixel-for-pixel — they
+model genuinely different shapes. If the CSS preview ever needs to show the true crop, the real fix
+is to give `panelFace` the front-face aspect, which touches `savedPanelWidth/Height`, cart
+thumbnails and the visualizer's `computeArtTransform`. Not needed while 3D is the primary designer.
 
 ### Goal
 When user uploads an image in the configurator, apply it as a texture to the Acoustic Fabric mesh's material in the Three.js viewer.
@@ -1522,34 +1547,45 @@ Wire the existing Light/Dark wood varnish toggle to swap the Pine Wood material'
 ---
 
 ## Task #DEV-36: Fabric Wrap Toggle Investigation & Implementation
-- **Status:** TODO
+- **Status:** TODO — but **Phase 1 investigation is already answered** (verified in code 2026-07-16)
 - **Priority:** MEDIUM
-- **File:** configurator.html, potentially Panels.glb / panels-web.glb
+- **File:** configurator.html
 - **Depends on:** DEV-35
 
-### Goal
-Investigate whether the Half Wrap vs Full Wrap toggle requires new Blender geometry or can be handled via texture/scaling. Then implement the solution.
+### Phase 1 — resolved, no Blender work needed
+The `.glb` already ships **both** wrap variants per config as real geometry —
+`"<key> Acoustic Fabric Half Fold"` and `"<key> Acoustic Fabric Full Fold"` — and the configurator
+already loads and classifies both (`frontMeshes[key][half|full]`, `foldMeshes[key][half|full]`,
+configurator.html:2489). No texture/scaling hack, no new Blender models.
+
+`applyFabricFold()` (configurator.html:2723) already does the whole job: it promotes the active
+fold's front mesh into the `Acoustic Fabric` slot, pairs its fold mesh, and hides the inactive
+variant so the two can't z-fight. `showConfig` already re-hides every fold defensively.
+
+### What's actually left — just the wiring
+`currentFold` (configurator.html:2486) is hard-coded to `'full'` and **nothing ever reassigns it**.
+The existing Half/Full wrap buttons (`.fopt[data-option="wrap"]`, configurator.html:1777) only drive
+the CSS scene classes (`wrap-full-scene` / `wrap-half-scene`) — they never reach the 3D viewer, and
+`window.audial3D` (configurator.html:3135) exposes no fold setter.
+
+So the work is:
+- Expose a `setFold(fold)` on the `window.audial3D` API that sets `currentFold`, calls
+  `applyFabricFold()`, then re-runs `showConfig(activeConfigKey())` so the swap lands.
+- Call it from the wrap-button handler alongside the existing CSS class toggles.
+- Seed `currentFold` from `currentPanel.fabricWrap` on load / `loadPanelToEditor`, so an edited
+  saved panel restores its wrap (same class of bug as the DEV-34 `__artImageEl` gap).
+- Note the default mismatch: `currentFold = 'full'` but `currentPanel.fabricWrap` defaults to
+  `'half'` (configurator.html:1060). These must agree or the first render lies.
 
 ### Behavior Spec
-
-**Phase 1 — Investigation (before coding):**
-- Determine visual difference between Half Wrap and Full Wrap on the physical product
-- Check if current .glb Acoustic Fabric mesh can be scaled/stretched to represent both
-- If not: flag that new Blender models are needed (separate task)
-
-**Phase 2 — Implementation (based on investigation):**
-- If texture/scaling works: implement in configurator.html
-- If geometry needed: create new mesh variants in Blender, add to panels-web.glb, then wire up
-- Real-time toggle updates the 3D preview
-
-### Constraints
-- Do NOT block DEV-37 if investigation reveals Blender work is needed — mark this as pending and continue
+- Real-time toggle updates the 3D preview, instant (no animation), matching component-toggle feel.
 
 ### Acceptance Criteria
-✅ Investigation complete, decision documented in CLAUDE.md
-✅ Toggle updates 3D fabric wrap in real-time (via texture OR new geometry)
-✅ Matches physical product's actual visual difference
-✅ Works across all panel sizes
+✅ Investigation complete — resolved above: geometry already exists, wiring only
+✅ Half/Full buttons update the 3D fabric wrap in real-time
+✅ `currentFold` default agrees with `currentPanel.fabricWrap` default
+✅ Editing a saved panel restores its wrap in 3D
+✅ Works across all panel sizes and both orientations
 
 ---
 

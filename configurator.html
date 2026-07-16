@@ -2790,22 +2790,44 @@ function renderFrontFaceCanvas(){
   const face = document.getElementById('panelFace');
   const W = Math.max(2, Math.round(face.clientWidth));    // panelFace px == transform coord space
   const H = Math.max(2, Math.round(face.clientHeight));
-  // Supersample toward ~1024px on the long side so narrow panels aren't soft. All drawing
-  // math stays in panelFace units; the SS base transform scales it up into the hi-res canvas.
-  const SS = Math.min(3, Math.max(1, 1024 / Math.max(W, H)));
-  const cw = Math.round(W * SS), ch = Math.round(H * SS);
+
+  // This canvas is stretched across the fabric quad's whole 0..1 UV range, so it must carry the
+  // QUAD's aspect — not the panelFace's — or everything drawn lands stretched (up to 14.6% on 1x4).
+  // The two shapes genuinely differ: the flat fabric front is the panel's full OUTER face, measuring
+  // 0.300*ft + 0.055 world on BOTH axes. That constant is a big slice of a 1ft side and a small one
+  // of a 4ft side, so every quad's aspect sits nearer 1.0 than its nominal (4x2: 2.007→1.900;
+  // 1x4V: 0.247→0.283; squares are within 1% and were never visibly wrong).
+  //
+  // So map the WxH design rect onto the quad with ONE uniform COVER scale: the art stays undistorted
+  // and always reaches the edges, and the overflow spills off the long axis as bleed — which is what
+  // physically happens, since the fabric has to cover the frame it wraps over. Art only ever lands on
+  // this front quad; the folds are a separate mesh with map=null and stay solid.
+  const qa   = frontQuadAspect(front) || (W / H);   // fall back to no-op if unmeasurable
+  const wide = qa >= (W / H);                       // is the quad wider than the design rect?
+  const LW = wide ? H * qa : W;                     // logical canvas: panelFace units, quad aspect
+  const LH = wide ? H : W / qa;
+  const s  = wide ? qa / (W / H) : (W / H) / qa;    // >=1, uniform on both axes => no distortion
+  const ox = (LW - s * W) / 2, oy = (LH - s * H) / 2;   // centre the design rect; negative => cropped
+
+  // Supersample toward ~1024px on the long side so narrow panels aren't soft. All drawing math
+  // stays in panelFace units; this base transform carries both the cover fit and the SS scale-up.
+  const SS = Math.min(3, Math.max(1, 1024 / Math.max(LW, LH)));
+  const cw = Math.max(2, Math.round(LW * SS)), ch = Math.max(2, Math.round(LH * SS));
   if (artCanvas.width !== cw)  artCanvas.width  = cw;
   if (artCanvas.height !== ch) artCanvas.height = ch;
+  const base = () => artCtx.setTransform(SS * s, 0, 0, SS * s, SS * ox, SS * oy);
 
   // Artwork toggled off paints bare fabric — and NOT the upload affordance, since the art exists
   // and inviting an upload would be a lie. The affordance is only for a genuinely empty panel.
   const loaded = artLoaded();
   const hasArt = loaded && layerState['Artwork'] !== false;
 
-  artCtx.setTransform(SS,0,0,SS,0,0);
-  artCtx.clearRect(0,0,W,H);
+  // Fill in raw canvas px, not design-rect units: the cover fit guarantees the rect covers the
+  // canvas, but rounding could still leave a hairline at the edge.
+  artCtx.setTransform(1,0,0,1,0,0);
+  artCtx.clearRect(0,0,cw,ch);
   artCtx.fillStyle = hasArt ? '#ffffff' : fabricColorCSS;  // white backs transparent art; else fabric-neutral
-  artCtx.fillRect(0,0,W,H);
+  artCtx.fillRect(0,0,cw,ch);
 
   if (hasArt){
     // Recompute cssTx/cssTy exactly like applyImageTransform (bounding-box correction).
@@ -2822,15 +2844,15 @@ function renderFrontFaceCanvas(){
     }
     const cssTx = imgPos.x - minX, cssTy = imgPos.y - minY;
 
-    artCtx.setTransform(SS,0,0,SS,0,0);
+    base();
     artCtx.translate(cssTx, cssTy);
     artCtx.scale(imgZoom, imgZoom);
     artCtx.rotate(rad);
     artCtx.scale(sx, sy);
     artCtx.drawImage(window.__artImageEl, 0, 0, imgNaturalW, imgNaturalH);
-    artCtx.setTransform(SS,0,0,SS,0,0);
   } else if (!loaded) {
-    drawUploadAffordance(W, H, front);     // Task 5 (draws in panelFace units under the SS transform)
+    base();
+    drawUploadAffordance(W, H);            // Task 5 (draws in panelFace units under the base transform)
   }
 
   const tex = ensureArtTexture();
@@ -2854,31 +2876,28 @@ function refreshArt(){
   syncArtworkRow();          // art may have just appeared or been cleared
 }
 
-// The mirror canvas is stretched across the fabric quad's whole 0..1 UV range, but the quad's
-// aspect is NOT the panelFace aspect — the fabric front is inset by the wrap (e.g. 4x2's quad is
-// 1.90, not 2.0; 1x4's is 0.283 vs the canvas's 0.247). Anything drawn here is stretched by
-// quadAspect/canvasAspect, so pre-squeeze x by the inverse to land undistorted on every config.
-function frontAspectComp(W, H, front){
+// Aspect of the flat fabric front, measured off the geometry. Local == world on all 8 configs
+// (verified: every front shares +X→[-1,0,0], +Y→[0,1,0]), so the local bbox is safe to read.
+// Returns 0 if unmeasurable, so callers can fall back rather than divide by garbage.
+function frontQuadAspect(front){
   const geo = front && front.geometry;
-  if (!geo) return 1;
+  if (!geo) return 0;
   if (!geo.boundingBox) geo.computeBoundingBox();
   const bb = geo.boundingBox;
-  const quadAspect = (bb.max.x - bb.min.x) / (bb.max.y - bb.min.y);
-  if (!isFinite(quadAspect) || quadAspect <= 0) return 1;
-  return (W / H) / quadAspect;
+  const a = (bb.max.x - bb.min.x) / (bb.max.y - bb.min.y);
+  return (isFinite(a) && a > 0) ? a : 0;
 }
 
 // Box-less "＋ UPLOAD ARTWORK" hint painted on the bare fabric; brightens on hover.
-// Draws in panelFace units (the SS base transform is already applied by the caller).
+// Draws in panelFace units (the caller's base transform already carries the cover fit + SS).
 // TUNE: AFFORD_SCALE — overall size of the mark. Every offset and font below is a fraction of
 // `s`, so this scales the whole thing as a unit and keeps the tuned proportions intact.
 // At 1.5 the label is ~64% of the panel's short side; raise for bigger, lower for smaller.
 const AFFORD_SCALE = 1.5;
-function drawUploadAffordance(W, H, front){
+function drawUploadAffordance(W, H){
   const s = Math.min(W, H) * AFFORD_SCALE;
   artCtx.save();
   artCtx.translate(W/2, H/2);
-  artCtx.scale(frontAspectComp(W, H, front), 1);   // undo the canvas->quad stretch
   artCtx.fillStyle = '#093d53';                    // --ink
   artCtx.textAlign = 'center';
   artCtx.textBaseline = 'middle';
