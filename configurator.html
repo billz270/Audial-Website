@@ -774,6 +774,9 @@
           </button>
           <button class="ctrl-btn" id="imgResetCropBtn" title="Recenter (keep zoom)">◎</button>
           <button class="ctrl-btn" id="imgFitBtn" title="Fit image (reset everything)">Fit</button>
+          <!-- The in-panel Replace lives inside panelFace, which is hidden in 3D mode; this toolbar
+               sits outside the viewer, so it's the only Replace reachable while editing in 3D. -->
+          <button class="ctrl-btn" id="imgReplaceBtn" title="Replace image">Replace</button>
         </div>
       </div>
     </div>
@@ -1337,6 +1340,13 @@ uploadInPanel.addEventListener('drop',e=>{
   e.preventDefault();uploadInPanel.classList.remove('dragover');
   const f = e.dataTransfer.files[0];
   if(f && f.type.startsWith('image/')) handleImageUpload(f);
+});
+
+// Toolbar Replace — same synchronous-gesture rules as the in-panel one below.
+$('imgReplaceBtn').addEventListener('click', e => {
+  e.stopPropagation();
+  fileInput.value = '';
+  fileInput.click();
 });
 
 replaceBtn.addEventListener('pointerdown', e => { e.stopPropagation(); });
@@ -2091,6 +2101,14 @@ function loadPanelToEditor(panel){
   replaceBtn.style.display = 'block';
   clearArtGroup.style.display = 'flex';
 
+  // DEV-34: point the viewer at this panel's config, and hand the mirror its own decoded image —
+  // renderFrontFaceCanvas draws from __artImageEl, so setting panelImage.src alone leaves the
+  // fabric showing whatever was there before. The setTimeout below repaints once the transform lands.
+  if (window.audial3D) window.audial3D.showForSize(currentPanel.size, currentPanel.orientation);
+  window.__artImageEl = window.__artImageEl || new Image();
+  window.__artImageEl.onload = () => { if (window.__viewer3dActive) window.audial3D.refreshArt(); };
+  window.__artImageEl.src = panel.image;
+
   setTimeout(()=>{
     panelImage.style.width = imgNaturalW + 'px';
     panelImage.style.height = imgNaturalH + 'px';
@@ -2772,22 +2790,44 @@ function renderFrontFaceCanvas(){
   const face = document.getElementById('panelFace');
   const W = Math.max(2, Math.round(face.clientWidth));    // panelFace px == transform coord space
   const H = Math.max(2, Math.round(face.clientHeight));
-  // Supersample toward ~1024px on the long side so narrow panels aren't soft. All drawing
-  // math stays in panelFace units; the SS base transform scales it up into the hi-res canvas.
-  const SS = Math.min(3, Math.max(1, 1024 / Math.max(W, H)));
-  const cw = Math.round(W * SS), ch = Math.round(H * SS);
+
+  // This canvas is stretched across the fabric quad's whole 0..1 UV range, so it must carry the
+  // QUAD's aspect — not the panelFace's — or everything drawn lands stretched (up to 14.6% on 1x4).
+  // The two shapes genuinely differ: the flat fabric front is the panel's full OUTER face, measuring
+  // 0.300*ft + 0.055 world on BOTH axes. That constant is a big slice of a 1ft side and a small one
+  // of a 4ft side, so every quad's aspect sits nearer 1.0 than its nominal (4x2: 2.007→1.900;
+  // 1x4V: 0.247→0.283; squares are within 1% and were never visibly wrong).
+  //
+  // So map the WxH design rect onto the quad with ONE uniform COVER scale: the art stays undistorted
+  // and always reaches the edges, and the overflow spills off the long axis as bleed — which is what
+  // physically happens, since the fabric has to cover the frame it wraps over. Art only ever lands on
+  // this front quad; the folds are a separate mesh with map=null and stay solid.
+  const qa   = frontQuadAspect(front) || (W / H);   // fall back to no-op if unmeasurable
+  const wide = qa >= (W / H);                       // is the quad wider than the design rect?
+  const LW = wide ? H * qa : W;                     // logical canvas: panelFace units, quad aspect
+  const LH = wide ? H : W / qa;
+  const s  = wide ? qa / (W / H) : (W / H) / qa;    // >=1, uniform on both axes => no distortion
+  const ox = (LW - s * W) / 2, oy = (LH - s * H) / 2;   // centre the design rect; negative => cropped
+
+  // Supersample toward ~1024px on the long side so narrow panels aren't soft. All drawing math
+  // stays in panelFace units; this base transform carries both the cover fit and the SS scale-up.
+  const SS = Math.min(3, Math.max(1, 1024 / Math.max(LW, LH)));
+  const cw = Math.max(2, Math.round(LW * SS)), ch = Math.max(2, Math.round(LH * SS));
   if (artCanvas.width !== cw)  artCanvas.width  = cw;
   if (artCanvas.height !== ch) artCanvas.height = ch;
+  const base = () => artCtx.setTransform(SS * s, 0, 0, SS * s, SS * ox, SS * oy);
 
   // Artwork toggled off paints bare fabric — and NOT the upload affordance, since the art exists
   // and inviting an upload would be a lie. The affordance is only for a genuinely empty panel.
   const loaded = artLoaded();
   const hasArt = loaded && layerState['Artwork'] !== false;
 
-  artCtx.setTransform(SS,0,0,SS,0,0);
-  artCtx.clearRect(0,0,W,H);
+  // Fill in raw canvas px, not design-rect units: the cover fit guarantees the rect covers the
+  // canvas, but rounding could still leave a hairline at the edge.
+  artCtx.setTransform(1,0,0,1,0,0);
+  artCtx.clearRect(0,0,cw,ch);
   artCtx.fillStyle = hasArt ? '#ffffff' : fabricColorCSS;  // white backs transparent art; else fabric-neutral
-  artCtx.fillRect(0,0,W,H);
+  artCtx.fillRect(0,0,cw,ch);
 
   if (hasArt){
     // Recompute cssTx/cssTy exactly like applyImageTransform (bounding-box correction).
@@ -2804,15 +2844,15 @@ function renderFrontFaceCanvas(){
     }
     const cssTx = imgPos.x - minX, cssTy = imgPos.y - minY;
 
-    artCtx.setTransform(SS,0,0,SS,0,0);
+    base();
     artCtx.translate(cssTx, cssTy);
     artCtx.scale(imgZoom, imgZoom);
     artCtx.rotate(rad);
     artCtx.scale(sx, sy);
     artCtx.drawImage(window.__artImageEl, 0, 0, imgNaturalW, imgNaturalH);
-    artCtx.setTransform(SS,0,0,SS,0,0);
   } else if (!loaded) {
-    drawUploadAffordance(W, H, front);     // Task 5 (draws in panelFace units under the SS transform)
+    base();
+    drawUploadAffordance(W, H);            // Task 5 (draws in panelFace units under the base transform)
   }
 
   const tex = ensureArtTexture();
@@ -2830,35 +2870,34 @@ window.__dev32.currentFront = () => {
 };
 
 function refreshArt(){
+  // Clear/reset can pull the art out from under edit mode; don't strand orbit disabled.
+  if (editing && !artDisplayed()) exitEdit();
   if (webglOK && modelReady) renderFrontFaceCanvas();
   syncArtworkRow();          // art may have just appeared or been cleared
 }
 
-// The mirror canvas is stretched across the fabric quad's whole 0..1 UV range, but the quad's
-// aspect is NOT the panelFace aspect — the fabric front is inset by the wrap (e.g. 4x2's quad is
-// 1.90, not 2.0; 1x4's is 0.283 vs the canvas's 0.247). Anything drawn here is stretched by
-// quadAspect/canvasAspect, so pre-squeeze x by the inverse to land undistorted on every config.
-function frontAspectComp(W, H, front){
+// Aspect of the flat fabric front, measured off the geometry. Local == world on all 8 configs
+// (verified: every front shares +X→[-1,0,0], +Y→[0,1,0]), so the local bbox is safe to read.
+// Returns 0 if unmeasurable, so callers can fall back rather than divide by garbage.
+function frontQuadAspect(front){
   const geo = front && front.geometry;
-  if (!geo) return 1;
+  if (!geo) return 0;
   if (!geo.boundingBox) geo.computeBoundingBox();
   const bb = geo.boundingBox;
-  const quadAspect = (bb.max.x - bb.min.x) / (bb.max.y - bb.min.y);
-  if (!isFinite(quadAspect) || quadAspect <= 0) return 1;
-  return (W / H) / quadAspect;
+  const a = (bb.max.x - bb.min.x) / (bb.max.y - bb.min.y);
+  return (isFinite(a) && a > 0) ? a : 0;
 }
 
 // Box-less "＋ UPLOAD ARTWORK" hint painted on the bare fabric; brightens on hover.
-// Draws in panelFace units (the SS base transform is already applied by the caller).
+// Draws in panelFace units (the caller's base transform already carries the cover fit + SS).
 // TUNE: AFFORD_SCALE — overall size of the mark. Every offset and font below is a fraction of
 // `s`, so this scales the whole thing as a unit and keeps the tuned proportions intact.
 // At 1.5 the label is ~64% of the panel's short side; raise for bigger, lower for smaller.
 const AFFORD_SCALE = 1.5;
-function drawUploadAffordance(W, H, front){
+function drawUploadAffordance(W, H){
   const s = Math.min(W, H) * AFFORD_SCALE;
   artCtx.save();
   artCtx.translate(W/2, H/2);
-  artCtx.scale(frontAspectComp(W, H, front), 1);   // undo the canvas->quad stretch
   artCtx.fillStyle = '#093d53';                    // --ink
   artCtx.textAlign = 'center';
   artCtx.textBaseline = 'middle';
@@ -2871,19 +2910,120 @@ function drawUploadAffordance(W, H, front){
   artCtx.restore();
 }
 
-// Front UVs are canonicalized at split time, so orientation is uniform across configs.
-// This just carries an optional global flip correction (screen-left sign / back-face mirror).
-window.__dev32.orient = window.__dev32.orient || { quarter: 0, flipU: false, flipV: false };
+// Front UVs are canonicalized at split time, so orientation is uniform across every config — this
+// is one constant, not a per-config knob. Measured, not guessed: all configs share identical world
+// orientation (+X→[-1,0,0], +Y→[0,1,0], +Z→[0,0,-1]), so the front face is NOT mirrored.
+// ClampToEdge makes tiling structurally impossible: the source UVs are ragged (4x2H ships
+// v=[0,1.017]) and RepeatWrapping would wrap that overhang back around as a sliver.
+const FRONT_MIRROR_U = false;
 function orientFrontTexture(tex){
-  const o = window.__dev32.orient;
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
   tex.center.set(0.5, 0.5);
-  tex.rotation = ((o.quarter || 0) % 4) * Math.PI / 2;
-  tex.repeat.set(o.flipU ? -1 : 1, o.flipV ? -1 : 1);
-  tex.offset.set(0, 0);
+  tex.rotation = 0;
+  if (FRONT_MIRROR_U){ tex.wrapS = THREE.RepeatWrapping; tex.repeat.x = -1; tex.offset.x = 1; }
+  else                { tex.wrapS = THREE.ClampToEdgeWrapping; tex.repeat.x = 1; tex.offset.x = 0; }
+  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.repeat.y = 1; tex.offset.y = 0;
   tex.matrixAutoUpdate = true;
 }
+
+// ===== DEV-34 Tasks 6+7: front-face raycast — click to upload / click to edit / hover / drag =====
+// Reads the classic script's globals by bare name (currentPanel, imgPos, …). They're top-level
+// `let`s, so they live in the global LEXICAL scope, not on window — `window.imgPos` is undefined.
+const raycaster = new THREE.Raycaster();
+const ndc = new THREE.Vector2();
+let editing = false;
+window.__dev32.isEditing = () => editing;
+// debug probes (verification only) — these read the classic script's global-lexical state, which
+// isn't reachable from a test as window.*.
+window.__dev32.imgPosProbe  = () => ({ x: imgPos.x, y: imgPos.y });
+window.__dev32.zoomProbe    = () => imgZoom;
+window.__dev32.flipProbe    = () => ({ h: imgFlipH, v: imgFlipV });
+window.__dev32.rotProbe     = () => imgRotate;
+window.__dev32.orbitEnabled = () => !!(controls && controls.enabled);
+
+function frontHit(ev){
+  if (!camera) return null;
+  const key = activeConfigKey();
+  const front = key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric'];
+  if (!front || !front.visible) return null;
+  const rect = canvas.getBoundingClientRect();
+  ndc.x =  ((ev.clientX - rect.left) / rect.width)  * 2 - 1;
+  ndc.y = -((ev.clientY - rect.top)  / rect.height) * 2 + 1;
+  raycaster.setFromCamera(ndc, camera);
+  const hits = raycaster.intersectObject(front, false);
+  return hits.length ? hits[0] : null;
+}
+function hasArtNow(){ return !!(currentPanel && currentPanel.image); }
+// What the face is actually showing decides what a click means. Art hidden via the Artwork toggle
+// is inert: there's nothing to edit, and offering an upload would contradict the art that exists.
+function artDisplayed(){ return hasArtNow() && layerState['Artwork'] !== false; }
+function affordanceShown(){ return !hasArtNow(); }
+
+function enterEdit(){
+  if (editing) return;
+  editing = true;
+  if (controls) controls.enabled = false;      // orbit off while editing
+  enableImageMode();                           // shows #imgCtrlGroup, "◆ Editing artwork"
+}
+function exitEdit(){
+  if (!editing) return;
+  editing = false;
+  if (controls) controls.enabled = true;
+  enablePanMode();
+  if (frontHover){ frontHover = false; refreshArt(); }
+}
+window.__dev32.exitEdit = exitEdit;
+
+const CLICK_SLOP = 6;      // px; a pointerup under this counts as a click, not a drag
+const DRAG_GAIN  = 1.0;    // screen-px → panelFace-px; the front face shows near 1:1
+let downXY = null, dragging = null;
+
+canvas.addEventListener('pointerdown', e => {
+  downXY = { x:e.clientX, y:e.clientY };
+  if (editing && frontHit(e)){
+    dragging = { x:e.clientX, y:e.clientY };
+    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
+  }
+});
+canvas.addEventListener('pointermove', e => {
+  if (dragging){
+    const face = document.getElementById('panelFace');
+    const rect = canvas.getBoundingClientRect();
+    const scale = (face.clientWidth / rect.width) * DRAG_GAIN;   // panelFace px per screen px
+    imgPos.x += (e.clientX - dragging.x) * scale;
+    imgPos.y += (e.clientY - dragging.y) * scale;
+    dragging = { x:e.clientX, y:e.clientY };
+    clampImagePosition();
+    applyImageTransform();      // repaints the front face through the existing hook
+    return;
+  }
+  const live = affordanceShown() || artDisplayed();
+  const over = live && !!frontHit(e);
+  canvas.style.cursor = over ? 'pointer' : '';
+  // Only the bare-fabric affordance brightens; loaded art has nothing to brighten.
+  const wantHover = over && affordanceShown();
+  if (wantHover !== frontHover){ frontHover = wantHover; renderFrontFaceCanvas(); }
+});
+canvas.addEventListener('pointerup', e => {
+  if (dragging){ dragging = null; try { canvas.releasePointerCapture(e.pointerId); } catch(_){} }
+  if (!downXY) return;
+  const moved = Math.hypot(e.clientX - downXY.x, e.clientY - downXY.y);
+  downXY = null;
+  if (moved > CLICK_SLOP) return;              // that was an orbit/reposition drag
+  if (frontHit(e)){
+    if (artDisplayed()) enterEdit();
+    else if (affordanceShown()){
+      const fi = document.getElementById('fileInput');
+      fi.value = '';                           // re-selecting the same file must still fire change
+      fi.click();                              // synchronous: the gesture chain must not be broken
+    }
+  } else if (editing){
+    exitEdit();                                // tapping off the face exits edit
+  }
+});
+canvas.addEventListener('pointerleave', () => {
+  if (frontHover){ frontHover = false; renderFrontFaceCanvas(); }
+});
 
 // ===== DEV-33: Components drawer =====
 // Six of the seven rows hide a mesh. Artwork is the odd one out — it's a texture painted on the
@@ -2918,13 +3058,18 @@ function syncDrawerUI(){
 }
 
 function applyLayer(name){
-  if (name === 'Artwork'){ renderFrontFaceCanvas(); return; }
+  if (name === 'Artwork'){
+    if (editing && !artDisplayed()) exitEdit();   // nothing left on the face to edit
+    renderFrontFaceCanvas();
+    return;
+  }
   const key = activeConfigKey();
   if (!key) return;
   const m = panelMeshes[key][name];
   if (m) m.visible = layerState[name];
   if (name === 'Acoustic Fabric'){
     if (m && m.userData.pairedFold) m.userData.pairedFold.visible = layerState[name];
+    if (editing && !layerState[name]) exitEdit();  // the surface being edited just went away
     syncArtworkRow();
   }
 }
@@ -2998,6 +3143,7 @@ function showForSize(size, orientation){
   const key = configKeyFor(size, orientation);
   if (!key || !webglOK){ show3D(false); return; }  // custom/unknown or no WebGL -> CSS preview
   show3D(true);
+  exitEdit();                 // a new panel is not the one you were editing
   resetLayerState();          // a newly loaded panel always starts whole
   syncDrawerUI();
   loadingEl.style.display = modelReady ? 'none' : 'flex';

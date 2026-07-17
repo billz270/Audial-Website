@@ -31,6 +31,19 @@ No new files. `Panels-web.glb` is unchanged (runtime split, no Blender round-tri
 
 ---
 
+> **STATUS: COMPLETE (2026-07-16).** All 10 tasks are built, verified end-to-end against the real
+> page, and committed (through `785a1c6`). Deviations from the plan as written, and why:
+> - `SIZE_TO_CONFIG[currentPanel?.size]` in Tasks 6/7 became **`activeConfigKey()`** — DEV-33 made
+>   the config lookup orientation-aware, so the plan's size-only lookup would pick the wrong mesh.
+> - The plan's `window.currentPanel` / `window.imgPos` are **wrong**: those are top-level `let`s in
+>   the classic script, so they live in the global *lexical* scope and are NOT on `window`. The
+>   module reads them by bare name. (`enableImageMode` etc. are function declarations, so `window.*`
+>   does work for those — but bare names are used throughout for consistency.)
+> - Task 6 gained an **Artwork-toggle guard**: art hidden via the DEV-33 drawer is inert.
+> - Task 8 gained **`#imgReplaceBtn`** (the in-panel Replace is inside the 3D-hidden `panelFace`) and
+>   the **`loadPanelToEditor`** fix (it must also set `__artImageEl.src`, not just `panelImage.src`).
+> - Task 4's `FRONT_MIRROR_U` resolved to **false**.
+
 ## Task 1: Keep the CSS panel measurable in 3D mode
 
 The legacy `fitImageToPanel()` / `clampImagePosition()` / `recenterImage()` read `panelFace.clientWidth/clientHeight`. Today `.view-3d #sceneWrap{display:none}` zeroes those. Switch to a layout-preserving hide so the canvas mirror can use the true panel pixel space.
@@ -38,7 +51,7 @@ The legacy `fitImageToPanel()` / `clampImagePosition()` / `recenterImage()` read
 **Files:**
 - Modify: `configurator.html:141` (the `.view-3d #sceneWrap` CSS rule)
 
-- [ ] **Step 1: Change the hide rule**
+- [x] **Step 1: Change the hide rule**
 
 Replace line 141:
 
@@ -54,7 +67,7 @@ with:
   .panel-3d-container.view-3d #sceneWrap{visibility:hidden;pointer-events:none}
 ```
 
-- [ ] **Step 2: Verify in browser**
+- [x] **Step 2: Verify in browser**
 
 Hard-refresh, pick a catalog size (e.g. 2×1) to enter 3D. In the console run:
 
@@ -64,7 +77,7 @@ document.getElementById('panelFace').clientWidth
 
 Expected: a **non-zero** number (the panel's rendered width in px). Before this change it was `0`. The 3D view still looks identical (blank fabric orbit); the CSS panel is invisible underneath.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add configurator.html
@@ -80,7 +93,7 @@ On glb load, split every fabric fold mesh into a front-face mesh (art target) an
 **Files:**
 - Modify: `configurator.html` 3D module — add split helpers; call from `loadModel()` (~line 2400–2419); extend state (~line 2322).
 
-- [ ] **Step 1: Add fold-mesh state and a debug hook**
+- [x] **Step 1: Add fold-mesh state and a debug hook**
 
 After line 2323 (`const fabricFolds = {};`), add:
 
@@ -93,7 +106,7 @@ window.__dev32 = window.__dev32 || {};     // console debug hook (verification o
 Object.assign(window.__dev32, { foldMeshes, frontMeshes, panelMeshes });
 ```
 
-- [ ] **Step 2: Add the geometry-split helper**
+- [x] **Step 2: Add the geometry-split helper**
 
 Add this function inside the module (e.g. just above `loadModel`):
 
@@ -143,7 +156,7 @@ function splitFabricMesh(mesh){
 }
 ```
 
-- [ ] **Step 3: Capture the base fabric material and split on load**
+- [x] **Step 3: Capture the base fabric material and split on load**
 
 In `loadModel()`'s `traverse`, replace the fabric-fold branch (currently, at ~line 2411):
 
@@ -190,7 +203,7 @@ Then, immediately **after** the `model.traverse(...)` block and before `scene.ad
     }
 ```
 
-- [ ] **Step 4: Route the active fold's meshes into the render slots**
+- [x] **Step 4: Route the active fold's meshes into the render slots**
 
 Replace `applyFabricFold()` (~lines 2435–2444) with a version that promotes both the front and fold meshes:
 
@@ -210,7 +223,7 @@ function applyFabricFold(){
 }
 ```
 
-- [ ] **Step 5: Show/hide the paired fold with the fabric in showConfig**
+- [x] **Step 5: Show/hide the paired fold with the fabric in showConfig**
 
 In `showConfig(key)` (~lines 2451–2455), after the component-show loop, also show the active fold mesh:
 
@@ -226,7 +239,7 @@ function showConfig(key){
 }
 ```
 
-- [ ] **Step 6: Verify split & no-bleed in browser**
+- [x] **Step 6: Verify split & no-bleed in browser**
 
 Hard-refresh. For **each** catalog size (1×1, 2×1, 2×2, 4×2, 1×4):
 - The panel still renders and orbits normally.
@@ -235,7 +248,7 @@ Hard-refresh. For **each** catalog size (1×1, 2×1, 2×2, 4×2, 1×4):
 
 ⟳ TUNE check: rotate the panel and inspect the wrap edges. The flat front should be one clean surface; the folds should be a separate solid patch. If the front looks torn or the folds show a seam of front-material, adjust `FRONT_NORMAL_MIN` (Step 2) and re-verify.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add configurator.html
@@ -252,7 +265,7 @@ Create one offscreen canvas + `CanvasTexture`, draw the artwork into it using th
 - Modify: `configurator.html` 3D module — add canvas/texture + `renderFrontFaceCanvas()`.
 - Modify: `configurator.html` classic script — one call at the end of `applyImageTransform()` (~line 1382) and one after upload (~line 1270).
 
-- [ ] **Step 1: Create the shared canvas + texture in the module**
+- [x] **Step 1: Create the shared canvas + texture in the module**
 
 Add near the module state (after Task 2's state block):
 
@@ -270,7 +283,7 @@ function ensureArtTexture(){
 }
 ```
 
-- [ ] **Step 2: Implement `renderFrontFaceCanvas()` (the mirror)**
+- [x] **Step 2: Implement `renderFrontFaceCanvas()` (the mirror)**
 
 This reproduces `applyImageTransform()` into the 2D canvas, sized to the CSS `panelFace` pixel space so it matches the CSS render 1:1. Add to the module and expose on `__dev32`:
 
@@ -330,7 +343,7 @@ function renderFrontFaceCanvas(){
 window.__dev32.renderFrontFaceCanvas = renderFrontFaceCanvas;
 ```
 
-- [ ] **Step 3: Add a decoded `<img>` the canvas can draw from**
+- [x] **Step 3: Add a decoded `<img>` the canvas can draw from**
 
 The classic script sets `panelImage.src`, but drawing needs a decoded `HTMLImageElement`. In `handleImageUpload`, after `panelImage.src = dataURL;` (line 1264), add:
 
@@ -340,7 +353,7 @@ The classic script sets `panelImage.src`, but drawing needs a decoded `HTMLImage
       window.__artImageEl.src = dataURL;
 ```
 
-- [ ] **Step 4: Expose a `refreshArt` entry point and stub the affordance/orient helpers**
+- [x] **Step 4: Expose a `refreshArt` entry point and stub the affordance/orient helpers**
 
 In the module, extend the public API and add temporary stubs (real bodies land in Tasks 4–5):
 
@@ -356,7 +369,7 @@ And update the export line (~line 2502):
 window.audial3D = { available: webglOK, showForSize, show3D, refreshArt };
 ```
 
-- [ ] **Step 5: Hook the mirror into `applyImageTransform()`**
+- [x] **Step 5: Hook the mirror into `applyImageTransform()`**
 
 At the very end of `applyImageTransform()` (after line 1382, before the closing brace), add:
 
@@ -366,7 +379,7 @@ At the very end of `applyImageTransform()` (after line 1382, before the closing 
 
 This single hook covers upload, zoom, flip, rotate, recenter, and fit — they all call `applyImageTransform()`.
 
-- [ ] **Step 6: Paint the front face whenever a config is shown**
+- [x] **Step 6: Paint the front face whenever a config is shown**
 
 In `showConfig(key)` (Task 2), add a final line so the current art (or affordance) appears immediately on size change:
 
@@ -375,14 +388,14 @@ In `showConfig(key)` (Task 2), add a final line so the current art (or affordanc
   renderFrontFaceCanvas();
 ```
 
-- [ ] **Step 7: Verify art lands on the front, no bleed**
+- [x] **Step 7: Verify art lands on the front, no bleed**
 
 Hard-refresh, pick 2×1, upload an image via the sidebar/legacy upload (the CSS `#uploadInPanel` still works — it is measurable, just invisible; you can also temporarily call `document.getElementById('fileInput').click()` from the console). Expected:
 - The image appears on the flat front face, fit-to-face, un-warped.
 - The folds remain solid neutral — **zero** art on them, in both Half and Full (switch `__dev32` fold by setting `currentFold` is internal; for now confirm the default `full`).
 - Console `__dev32.renderFrontFaceCanvas()` re-renders without error.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add configurator.html
@@ -398,7 +411,7 @@ The front face is a `DoubleSide` back-face, so its U axis may be mirrored. Confi
 **Files:**
 - Modify: `configurator.html` 3D module — body of `orientFrontTexture()`.
 
-- [ ] **Step 1: Implement orient with a mirror toggle**
+- [x] **Step 1: Implement orient with a mirror toggle**
 
 Replace the stub:
 
@@ -419,7 +432,7 @@ function orientFrontTexture(tex){
 }
 ```
 
-- [ ] **Step 2: Verify with text**
+- [x] **Step 2: Verify with text**
 
 Upload an image that contains readable text (or an obviously asymmetric image). Hard-refresh, view it on the front face.
 - If text reads normally → leave `FRONT_MIRROR_U = false`.
@@ -427,7 +440,7 @@ Upload an image that contains readable text (or an obviously asymmetric image). 
 
 Record the final value in the commit message.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add configurator.html
@@ -443,7 +456,7 @@ Paint a faint, centered, box-less hint on the bare fabric that brightens on hove
 **Files:**
 - Modify: `configurator.html` 3D module — body of `drawUploadAffordance()` + a `hover` flag.
 
-- [ ] **Step 1: Add a hover flag and implement the affordance**
+- [x] **Step 1: Add a hover flag and implement the affordance**
 
 Add state near the module top: `let frontHover = false;`. Replace the stub:
 
@@ -466,11 +479,11 @@ function drawUploadAffordance(W, H){
 }
 ```
 
-- [ ] **Step 2: Verify appearance**
+- [x] **Step 2: Verify appearance**
 
 Hard-refresh, pick a size with no art loaded. Expected: a faint navy "＋ / UPLOAD ARTWORK" centered on the fabric, no box or bracket. (Hover brightening is wired in Task 6; for now confirm the resting look and legibility against the neutral fabric.) ⟳ TUNE alpha values if it is too faint or too heavy.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add configurator.html
@@ -486,7 +499,7 @@ Make the fabric front face clickable: bare → open the file picker; loaded art 
 **Files:**
 - Modify: `configurator.html` 3D module — add raycaster + canvas pointer handlers + edit-mode entry.
 
-- [ ] **Step 1: Add raycaster + edit state**
+- [x] **Step 1: Add raycaster + edit state**
 
 Add near module state:
 
@@ -510,7 +523,7 @@ function frontHit(ev){
 function hasArtNow(){ return !!(window.currentPanel && window.currentPanel.image); }
 ```
 
-- [ ] **Step 2: Enter/exit edit helpers (drive the existing CSS-mode functions)**
+- [x] **Step 2: Enter/exit edit helpers (drive the existing CSS-mode functions)**
 
 The classic script owns `enableImageMode()` / `enablePanMode()` (they toggle `#imgCtrlGroup`, the mode indicator, and `imageMode`). Reuse them so the toolbar and indicator behave exactly as the CSS flow:
 
@@ -532,7 +545,7 @@ window.__dev32.exitEdit = exitEdit;
 
 > `enableImageMode`/`enablePanMode` are function declarations in the classic script, so they are already global (`window.enableImageMode`). Confirm in console: `typeof window.enableImageMode === 'function'`.
 
-- [ ] **Step 3: Canvas pointer handlers (click discrimination + hover)**
+- [x] **Step 3: Canvas pointer handlers (click discrimination + hover)**
 
 Add after `controls` is created in `initViewer()`:
 
@@ -561,7 +574,7 @@ canvas.addEventListener('pointermove', e => {
 });
 ```
 
-- [ ] **Step 4: Verify**
+- [x] **Step 4: Verify**
 
 Hard-refresh, pick a size (no art):
 - Move the mouse over the fabric → hint brightens and cursor is a pointer; off it → dims.
@@ -569,7 +582,7 @@ Hard-refresh, pick a size (no art):
 - Click the loaded art → mode indicator reads "◆ Editing artwork", the `#imgCtrlGroup` toolbar appears, and dragging no longer orbits (orbit disabled). Console `__dev32.isEditing()` → `true`.
 - Click off the panel (empty background) → `__dev32.isEditing()` → `false`, orbit works again.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add configurator.html
@@ -585,7 +598,7 @@ While editing, dragging on the front face moves the artwork (updates `imgPos`), 
 **Files:**
 - Modify: `configurator.html` 3D module — drag handlers active only while `editing`.
 
-- [ ] **Step 1: Add the reposition drag**
+- [x] **Step 1: Add the reposition drag**
 
 Add in `initViewer()` after the Task-6 handlers:
 
@@ -619,11 +632,11 @@ canvas.addEventListener('pointerup', e => {
 
 > `clampImagePosition` and `applyImageTransform` are function declarations in the classic script → already global. `applyImageTransform` re-invokes `renderFrontFaceCanvas()` through the Task-3 hook, so no extra redraw call is needed.
 
-- [ ] **Step 2: Verify**
+- [x] **Step 2: Verify**
 
 With art loaded, click to enter edit, then drag on the front face. Expected: the artwork pans under the drag and stays clamped inside the panel (matching the CSS behavior). Orbit does not fire. ⟳ TUNE `DRAG_GAIN` if the art moves faster/slower than the cursor.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add configurator.html
@@ -639,7 +652,7 @@ Confirm the `#imgCtrlGroup` buttons, Replace, and Clear all drive the 3D front f
 **Files:**
 - Modify: `configurator.html` classic script — add a `refreshArt()` call to any image op that does NOT route through `applyImageTransform` (Clear/reset, Replace-after-load).
 
-- [ ] **Step 1: Ensure Clear repaints the affordance**
+- [x] **Step 1: Ensure Clear repaints the affordance**
 
 Find the clear-artwork handler (the `#clearArtBtn` / partial reset around line 1553–1564, which hides the image and restores the upload prompt). At the end of that handler, add:
 
@@ -647,7 +660,7 @@ Find the clear-artwork handler (the `#clearArtBtn` / partial reset around line 1
   if (window.__viewer3dActive && window.audial3D) window.audial3D.refreshArt(); // repaint affordance
 ```
 
-- [ ] **Step 2: Verify each control**
+- [x] **Step 2: Verify each control**
 
 With art loaded and edit mode on, exercise every `#imgCtrlGroup` button and confirm the 3D front face updates identically to how the CSS panel would:
 - Zoom − / + → art scales about center.
@@ -658,7 +671,7 @@ With art loaded and edit mode on, exercise every `#imgCtrlGroup` button and conf
 - **Replace** → file picker opens, new image lands on the front face.
 - **Clear** → art removed, "＋ UPLOAD ARTWORK" affordance returns.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add configurator.html
@@ -674,7 +687,7 @@ No new code expected — a structured sweep to confirm the "visual swap only" pr
 **Files:**
 - Modify (only if a regression is found): `configurator.html`
 
-- [ ] **Step 1: Catalog-size sweep**
+- [x] **Step 1: Catalog-size sweep**
 
 For **each** of 1×1, 2×1, 2×2, 4×2, 1×4:
 - Upload → art on front, fit-to-face, no fold bleed.
@@ -682,20 +695,20 @@ For **each** of 1×1, 2×1, 2×2, 4×2, 1×4:
 - File / Dims / Size / DPI chips populate exactly as before (unchanged).
 - Size-tips sidebar appears on size select and hides on upload (unchanged).
 
-- [ ] **Step 2: Fold-variant sweep**
+- [x] **Step 2: Fold-variant sweep**
 
 Confirm no bleed on **both** Half and Full. (If a fold-wrap toggle is not yet wired to the model in this leg, verify via console: set `currentFold='half'`, call `__dev32.renderFrontFaceCanvas()` and `showConfig` for the active key, and confirm the half-fold mesh is also art-free.)
 
-- [ ] **Step 3: Fallback & custom sweep**
+- [x] **Step 3: Fallback & custom sweep**
 
 - Custom size → CSS panel (no 3D), full editing works as before.
 - Simulate load failure (temporarily point `GLB_URL` at a bad path, hard-refresh) → CSS panel fallback still supports upload/edit. Restore `GLB_URL`.
 
-- [ ] **Step 4: Cart round-trip**
+- [x] **Step 4: Cart round-trip**
 
 Upload + edit a panel, add to cart, reload the page → the cart item and its preview reflect the same transform (the cart is unchanged source of truth). Confirm `renderCartCardPreview` output matches.
 
-- [ ] **Step 5: Commit any fixes**
+- [x] **Step 5: Commit any fixes**
 
 ```bash
 git add configurator.html
@@ -714,15 +727,15 @@ Update the living docs so the next session has context.
 - Modify: `CLAUDE.md` (Recently resolved section)
 - Modify: `C:\Users\rohan\.claude\projects\C--Users-rohan-Claude-Code-Audial-Website\memory\dev-32-3d-configurator.md` and `MEMORY.md`
 
-- [ ] **Step 1: Add a CLAUDE.md "Recently resolved" entry**
+- [x] **Step 1: Add a CLAUDE.md "Recently resolved" entry**
 
 Summarize: canvas-mirror artwork on the fabric front face; runtime front/fold split for no-bleed (both variants); single `applyImageTransform` hook for parity; front-face raycast for upload/edit/reposition; final tuned values (`FRONT_NORMAL_MIN`, `FRONT_MIRROR_U`, `DRAG_GAIN`); files touched (`configurator.html`).
 
-- [ ] **Step 2: Update the DEV-32 memory file**
+- [x] **Step 2: Update the DEV-32 memory file**
 
 Move "upload-to-fabric" from the deferred list to done; record the tuned values and the `visibility:hidden` sceneWrap decision as durable learnings.
 
-- [ ] **Step 3: Commit**
+- [x] **Step 3: Commit**
 
 ```bash
 git add CLAUDE.md
