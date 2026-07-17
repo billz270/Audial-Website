@@ -138,7 +138,9 @@
   .panel-3d-container{position:relative}
   #viewer3dCanvas{display:none;position:absolute;inset:0;width:100%;height:100%;z-index:2}
   .panel-3d-container.view-3d #viewer3dCanvas{display:block}
-  .panel-3d-container.view-3d #sceneWrap{display:none}
+  /* DEV-32 artwork: hide the CSS panel visually but keep it laid out so
+     panelFace.clientWidth/Height stay valid for the canvas-mirror math. */
+  .panel-3d-container.view-3d #sceneWrap{visibility:hidden;pointer-events:none}
   #viewer3dLoading{display:none;position:absolute;inset:0;z-index:3;align-items:center;justify-content:center;
     background:var(--paper);color:var(--ink);font-family:'Archivo',sans-serif;font-weight:600;font-size:12px;
     letter-spacing:0.1em;text-transform:uppercase}
@@ -1201,10 +1203,14 @@ function applyRotation(){
   // — likely due to CSS rotateX/Y conventions combined with our perspective setup.)
   // eps prevents flicker right at zero.
   const eps = 0.5;
-  sideLeft.style.visibility   = (panYaw   >  eps) ? 'visible' : 'hidden';
-  sideRight.style.visibility  = (panYaw   < -eps) ? 'visible' : 'hidden';
-  sideBottom.style.visibility = (panPitch >  eps) ? 'visible' : 'hidden';
-  sideTop.style.visibility    = (panPitch < -eps) ? 'visible' : 'hidden';
+  // DEV-32: in 3D mode #sceneWrap is visibility:hidden to stay measurable, but an inline
+  // visibility:visible on a child overrides a hidden parent — these strips would paint on top
+  // of the 3D canvas. Keep them hidden while the viewer owns the container.
+  const v3d = window.__viewer3dActive;
+  sideLeft.style.visibility   = (!v3d && panYaw   >  eps) ? 'visible' : 'hidden';
+  sideRight.style.visibility  = (!v3d && panYaw   < -eps) ? 'visible' : 'hidden';
+  sideBottom.style.visibility = (!v3d && panPitch >  eps) ? 'visible' : 'hidden';
+  sideTop.style.visibility    = (!v3d && panPitch < -eps) ? 'visible' : 'hidden';
 }
 
 // ============ UPLOAD ============
@@ -1262,6 +1268,9 @@ function handleImageUpload(file){
       currentPanel.fileSize = file.size;
       imgFlipH = false; imgFlipV = false; imgRotate = 0;
       panelImage.src = dataURL;
+      window.__artImageEl = window.__artImageEl || new Image();
+      window.__artImageEl.onload = () => { if (window.__viewer3dActive) window.audial3D.refreshArt(); };
+      window.__artImageEl.src = dataURL;
       panelImage.style.display = 'block';
       uploadInPanel.style.display = 'none';
       replaceBtn.style.display = 'block';
@@ -1380,6 +1389,9 @@ function applyImageTransform(){
   currentPanel.flipH = imgFlipH;
   currentPanel.flipV = imgFlipV;
   currentPanel.rotate = imgRotate;
+
+  // DEV-32: mirror this render onto the 3D front face (covers upload/zoom/flip/rotate/recenter/fit).
+  if (window.__viewer3dActive && window.audial3D && window.audial3D.refreshArt) window.audial3D.refreshArt();
 }
 
 function computeEffectiveImageBox(){
@@ -2321,8 +2333,38 @@ let pendingConfig = null;
 let currentFold = 'full';                 // default fabric wrap variant
 const panelMeshes = {};                   // panelMeshes[key][component] = mesh
 const fabricFolds = {};                   // fabricFolds[key][half|full] = mesh
-PANEL_KEYS.forEach(k => { panelMeshes[k] = {}; fabricFolds[k] = {}; });
+const foldMeshes = {};                     // foldMeshes[key][half|full] = solid neutral fold mesh
+const frontMeshes = {};                    // frontMeshes[key][half|full] = art-bearing front mesh
+PANEL_KEYS.forEach(k => { panelMeshes[k] = {}; fabricFolds[k] = {}; foldMeshes[k] = {}; frontMeshes[k] = {}; });
+let fabricBaseMat = null;                  // captured base Fabric material (for neutral fold clone)
+window.__dev32 = window.__dev32 || {};     // console debug hook (verification only)
+Object.assign(window.__dev32, { foldMeshes, frontMeshes, panelMeshes });
 let scene, camera, renderer, controls;
+
+// Single offscreen canvas mirrored onto the active front mesh. One canvas, redraw + needsUpdate.
+const artCanvas = document.createElement('canvas');
+const artCtx = artCanvas.getContext('2d');
+window.__dev32.artCanvas = artCanvas;      // debug: inspect the mirror canvas directly
+let frontHover = false;                     // pointer over the front face (brightens the affordance)
+let fabricColorCSS = '#8a8a8a';             // neutral fabric color, captured from the glb at load
+let artTexture = null;                     // THREE.CanvasTexture, created lazily
+// artCanvas is resized per panel size (1x1 663x663, 4x2 1024x510, 1x4 253x1024). A CanvasTexture
+// caches a GL texture + mipmap chain sized to the canvas at first upload; reusing it across a
+// resize can leave a stale chain, and anisotropic sampling at grazing angles then pulls that old
+// content in — ghost copies of the mark at the wrong scale. Rebuild whenever the size changes.
+function ensureArtTexture(){
+  if (artTexture && artTexture.__srcW === artCanvas.width && artTexture.__srcH === artCanvas.height)
+    return artTexture;
+  if (artTexture) artTexture.dispose();
+  artTexture = new THREE.CanvasTexture(artCanvas);
+  artTexture.colorSpace = THREE.SRGBColorSpace;
+  artTexture.flipY = false;                // GLTF UV convention
+  artTexture.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 8; // sharpen at grazing angles
+  artTexture.generateMipmaps = true;
+  artTexture.__srcW = artCanvas.width;
+  artTexture.__srcH = artCanvas.height;
+  return artTexture;
+}
 
 function webglAvailable(){
   try {
@@ -2396,6 +2438,69 @@ function classifyMesh(mesh){
   return null;
 }
 
+// Split a fabric mesh into {front, fold} by per-triangle LOCAL normal.
+// Front = triangles whose local normal points toward +Z (the clean planar quad at max local Z).
+// TUNE: FRONT_NORMAL_MIN — raise toward 0.9 if fold flaps leak into the front set;
+//        lower toward 0.5 if part of the flat front is missing. 0.7 is the spec's start.
+const FRONT_NORMAL_MIN = 0.7;
+function splitFabricMesh(mesh){
+  const geo = mesh.geometry;
+  const pos = geo.attributes.position;
+  const nor = geo.attributes.normal;
+  const uv  = geo.attributes.uv;            // GLTFLoader names the UV attribute "uv"
+  const idx = geo.index ? geo.index.array : null;
+  const triCount = idx ? idx.length / 3 : pos.count / 3;
+  const vi = (t, k) => idx ? idx[t*3+k] : t*3+k;
+
+  const frontTris = [], foldTris = [];
+  const nA = new THREE.Vector3(), nB = new THREE.Vector3(), nC = new THREE.Vector3();
+  for (let t = 0; t < triCount; t++){
+    const a = vi(t,0), b = vi(t,1), c = vi(t,2);
+    nA.fromBufferAttribute(nor, a); nB.fromBufferAttribute(nor, b); nC.fromBufferAttribute(nor, c);
+    const nz = (nA.z + nB.z + nC.z) / 3;     // average local Z of the triangle normal
+    (nz > FRONT_NORMAL_MIN ? frontTris : foldTris).push([a,b,c]);
+  }
+
+  const build = (tris) => {
+    const g = new THREE.BufferGeometry();
+    const P = [], N = [], U = [];
+    for (const [a,b,c] of tris){
+      for (const v of [a,b,c]){
+        P.push(pos.getX(v), pos.getY(v), pos.getZ(v));
+        N.push(nor.getX(v), nor.getY(v), nor.getZ(v));
+        if (uv) U.push(uv.getX(v), uv.getY(v));
+      }
+    }
+    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
+    g.setAttribute('normal',   new THREE.Float32BufferAttribute(N, 3));
+    if (uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
+    return g;
+  };
+
+  return { frontGeo: build(frontTris), foldGeo: build(foldTris),
+           frontCount: frontTris.length, foldCount: foldTris.length };
+}
+
+// Rewrite a front quad's UVs to a canonical [0,1] layout derived from local geometry,
+// so ALL configs (horizontal/vertical) end up identically oriented. local +Y is screen-up
+// (model is spun 180° about Y); local +X is screen-LEFT after that spin.
+// Canonical: screen-top => t=0, screen-left => s=0 (with texture flipY=false, canvas row 0 = image top).
+function canonicalizeFrontUV(geo){
+  const pos = geo.attributes.position, uv = geo.attributes.uv;
+  if (!uv) return;
+  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
+  for (let i=0;i<pos.count;i++){ const X=pos.getX(i),Y=pos.getY(i);
+    if(X<minX)minX=X; if(X>maxX)maxX=X; if(Y<minY)minY=Y; if(Y>maxY)maxY=Y; }
+  const midX=(minX+maxX)/2, midY=(minY+maxY)/2;
+  for (let i=0;i<pos.count;i++){
+    const X=pos.getX(i), Y=pos.getY(i);
+    const s = (X > midX) ? 0 : 1;   // local +X = screen-left => s=0
+    const t = (Y > midY) ? 0 : 1;   // local +Y = screen-top  => t=0
+    uv.setXY(i, s, t);
+  }
+  uv.needsUpdate = true;
+}
+
 function loadModel(){
   new GLTFLoader().load(GLB_URL, (gltf) => {
     const model = gltf.scene;
@@ -2408,12 +2513,42 @@ function loadModel(){
       const cls = classifyMesh(child);
       if (cls){
         if (child.material) child.material = child.material.clone(); // independent per-layer material
-        if (cls.fold){ fabricFolds[cls.panelKey][cls.fold] = child; child.visible = false; }
+        if (cls.fold){
+          fabricFolds[cls.panelKey][cls.fold] = child;
+          child.visible = false;
+          if (!fabricBaseMat) fabricBaseMat = child.material; // already cloned above
+        }
         else { panelMeshes[cls.panelKey][cls.component] = child; child.visible = false; }
       } else {
         child.visible = false; // defense-in-depth: never leave an unknown mesh visible
       }
     });
+    if (fabricBaseMat && fabricBaseMat.color) fabricColorCSS = '#' + fabricBaseMat.color.getHexString();
+    // Split every fabric fold into front (art) + fold (neutral). Runs once at load.
+    for (const key of PANEL_KEYS){
+      for (const fold of ['half','full']){
+        const src = fabricFolds[key][fold];
+        if (!src) continue;
+        const { frontGeo, foldGeo } = splitFabricMesh(src);
+        canonicalizeFrontUV(frontGeo);          // normalize orientation across all configs
+
+        const foldMat = src.material.clone();
+        foldMat.map = null;                     // NO texture on folds => no bleed, ever
+        foldMat.side = THREE.DoubleSide;
+        foldMat.needsUpdate = true;
+
+        const front = new THREE.Mesh(frontGeo, src.material.clone());
+        const foldM = new THREE.Mesh(foldGeo, foldMat);
+        front.name = `${key} Front ${fold}`;
+        foldM.name = `${key} FoldOnly ${fold}`;
+        front.visible = false; foldM.visible = false;
+        src.parent.add(front); src.parent.add(foldM);
+        src.visible = false;                     // retire the combined mesh (kept, hidden)
+
+        frontMeshes[key][fold] = front;
+        foldMeshes[key][fold]  = foldM;
+      }
+    }
     model.rotation.y = Math.PI;  // bring the FRONT (fabric side) to face the +Z camera
     scene.add(model);
     applyFabricFold();
@@ -2431,15 +2566,17 @@ function loadModel(){
   });
 }
 
-// Promote the active fabric fold into each panel's Acoustic Fabric slot; hide the other.
+// Promote the active fold's front mesh into the Acoustic Fabric slot; pair its fold mesh; hide the other variant.
 function applyFabricFold(){
   for (const key of PANEL_KEYS){
-    const folds = fabricFolds[key];
-    if (!folds) continue;
-    const active = folds[currentFold] || folds.full || folds.half || null;
-    const inactive = active === folds.full ? folds.half : folds.full;
-    if (inactive) inactive.visible = false;
-    if (active) panelMeshes[key]['Acoustic Fabric'] = active;
+    const front = frontMeshes[key][currentFold];
+    const fold  = foldMeshes[key][currentFold];
+    const other = currentFold === 'full' ? 'half' : 'full';
+    const otherFront = frontMeshes[key][other];
+    const otherFold  = foldMeshes[key][other];
+    if (otherFront) otherFront.visible = false;
+    if (otherFold)  otherFold.visible  = false;
+    if (front){ panelMeshes[key]['Acoustic Fabric'] = front; front.userData.pairedFold = fold; }
   }
 }
 
@@ -2450,8 +2587,13 @@ function hideAllComponents(){
 
 function showConfig(key){
   hideAllComponents();
+  for (const key2 of PANEL_KEYS)               // hide every fold mesh first (defense-in-depth)
+    for (const f of ['half','full']){ const m = foldMeshes[key2][f]; if (m) m.visible = false; }
   for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = true; }
+  const fab = panelMeshes[key]['Acoustic Fabric'];       // = the active front mesh
+  if (fab && fab.userData.pairedFold) fab.userData.pairedFold.visible = true;
   centerCameraOn(key);
+  renderFrontFaceCanvas();
 }
 
 function centerCameraOn(key){
@@ -2482,11 +2624,132 @@ function animate(){
   if (renderer && scene && camera) renderer.render(scene, camera);
 }
 
+// Mirror the CSS panel's artwork render into artCanvas, then onto the active front mesh.
+// Reads the classic script's global-lexical state by bare name (currentPanel, imgPos, imgZoom,
+// imgRotate, imgFlipH/V, imgNaturalW/H) so reassignments are tracked automatically.
+function renderFrontFaceCanvas(){
+  const key = SIZE_TO_CONFIG[currentPanel?.size];
+  const front = key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric'];
+  if (!front) return;
+
+  const face = document.getElementById('panelFace');
+  const W = Math.max(2, Math.round(face.clientWidth));    // panelFace px == transform coord space
+  const H = Math.max(2, Math.round(face.clientHeight));
+  // Supersample toward ~1024px on the long side so narrow panels aren't soft. All drawing
+  // math stays in panelFace units; the SS base transform scales it up into the hi-res canvas.
+  const SS = Math.min(3, Math.max(1, 1024 / Math.max(W, H)));
+  const cw = Math.round(W * SS), ch = Math.round(H * SS);
+  if (artCanvas.width !== cw)  artCanvas.width  = cw;
+  if (artCanvas.height !== ch) artCanvas.height = ch;
+
+  const hasArt = !!(currentPanel && currentPanel.image && window.__artImageEl && window.__artImageEl.complete);
+
+  artCtx.setTransform(SS,0,0,SS,0,0);
+  artCtx.clearRect(0,0,W,H);
+  artCtx.fillStyle = hasArt ? '#ffffff' : fabricColorCSS;  // white backs transparent art; else fabric-neutral
+  artCtx.fillRect(0,0,W,H);
+
+  if (hasArt){
+    // Recompute cssTx/cssTy exactly like applyImageTransform (bounding-box correction).
+    const r = imgRotate, fh = imgFlipH, fv = imgFlipV;
+    const rad = r * Math.PI/180, cos = Math.cos(rad), sin = Math.sin(rad);
+    const sx = fh ? -1 : 1, sy = fv ? -1 : 1;
+    const corners = [[0,0],[imgNaturalW,0],[0,imgNaturalH],[imgNaturalW,imgNaturalH]];
+    let minX=Infinity, minY=Infinity;
+    for (const [x,y] of corners){
+      const px=x*sx, py=y*sy;
+      const rx=px*cos-py*sin, ry=px*sin+py*cos;
+      const zx=rx*imgZoom, zy=ry*imgZoom;
+      if (zx<minX) minX=zx; if (zy<minY) minY=zy;
+    }
+    const cssTx = imgPos.x - minX, cssTy = imgPos.y - minY;
+
+    artCtx.setTransform(SS,0,0,SS,0,0);
+    artCtx.translate(cssTx, cssTy);
+    artCtx.scale(imgZoom, imgZoom);
+    artCtx.rotate(rad);
+    artCtx.scale(sx, sy);
+    artCtx.drawImage(window.__artImageEl, 0, 0, imgNaturalW, imgNaturalH);
+    artCtx.setTransform(SS,0,0,SS,0,0);
+  } else {
+    drawUploadAffordance(W, H, front);     // Task 5 (draws in panelFace units under the SS transform)
+  }
+
+  const tex = ensureArtTexture();
+  orientFrontTexture(tex);                 // Task 4
+  front.material.map = tex;
+  if (front.material.color) front.material.color.setRGB(1,1,1);  // don't tint the artwork/affordance
+  front.material.needsUpdate = true;
+  tex.needsUpdate = true;
+}
+window.__dev32.renderFrontFaceCanvas = renderFrontFaceCanvas;
+// debug: the front mesh currently receiving the art texture (verification only)
+window.__dev32.currentFront = () => {
+  const key = SIZE_TO_CONFIG[currentPanel?.size];
+  return (key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric']) || null;
+};
+
+function refreshArt(){ if (webglOK && modelReady) renderFrontFaceCanvas(); }
+
+// The mirror canvas is stretched across the fabric quad's whole 0..1 UV range, but the quad's
+// aspect is NOT the panelFace aspect — the fabric front is inset by the wrap (e.g. 4x2's quad is
+// 1.90, not 2.0; 1x4's is 0.283 vs the canvas's 0.247). Anything drawn here is stretched by
+// quadAspect/canvasAspect, so pre-squeeze x by the inverse to land undistorted on every config.
+function frontAspectComp(W, H, front){
+  const geo = front && front.geometry;
+  if (!geo) return 1;
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  const quadAspect = (bb.max.x - bb.min.x) / (bb.max.y - bb.min.y);
+  if (!isFinite(quadAspect) || quadAspect <= 0) return 1;
+  return (W / H) / quadAspect;
+}
+
+// Box-less "＋ UPLOAD ARTWORK" hint painted on the bare fabric; brightens on hover.
+// Draws in panelFace units (the SS base transform is already applied by the caller).
+// TUNE: AFFORD_SCALE — overall size of the mark. Every offset and font below is a fraction of
+// `s`, so this scales the whole thing as a unit and keeps the tuned proportions intact.
+// At 1.5 the label is ~64% of the panel's short side; raise for bigger, lower for smaller.
+const AFFORD_SCALE = 1.5;
+function drawUploadAffordance(W, H, front){
+  const s = Math.min(W, H) * AFFORD_SCALE;
+  artCtx.save();
+  artCtx.translate(W/2, H/2);
+  artCtx.scale(frontAspectComp(W, H, front), 1);   // undo the canvas->quad stretch
+  artCtx.fillStyle = '#093d53';                    // --ink
+  artCtx.textAlign = 'center';
+  artCtx.textBaseline = 'middle';
+  artCtx.globalAlpha = frontHover ? 0.68 : 0.5;    // brighten on hover; no box, no border
+  artCtx.font = `300 ${Math.round(s*0.13)}px Archivo, sans-serif`;
+  artCtx.fillText('+', 0, -s*0.033);
+  artCtx.globalAlpha = frontHover ? 0.9 : 0.75;    // text carries more weight than the mark
+  artCtx.font = `600 ${Math.round(s*0.05)}px Archivo, sans-serif`;
+  artCtx.fillText('UPLOAD ARTWORK', 0, s*0.041);
+  artCtx.restore();
+}
+
+// Front UVs are canonicalized at split time, so orientation is uniform across configs.
+// This just carries an optional global flip correction (screen-left sign / back-face mirror).
+window.__dev32.orient = window.__dev32.orient || { quarter: 0, flipU: false, flipV: false };
+function orientFrontTexture(tex){
+  const o = window.__dev32.orient;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.center.set(0.5, 0.5);
+  tex.rotation = ((o.quarter || 0) % 4) * Math.PI / 2;
+  tex.repeat.set(o.flipU ? -1 : 1, o.flipV ? -1 : 1);
+  tex.offset.set(0, 0);
+  tex.matrixAutoUpdate = true;
+}
+
 // ===== Public API used by the classic configurator script =====
 function show3D(on){
   const use = !!on && webglOK;
   container.classList.toggle('view-3d', use);
   window.__viewer3dActive = use;   // read by the CSS-panel drag handler to yield to OrbitControls
+  // Re-run the CSS panel's side-strip pass for the new mode: their inline visibility would
+  // otherwise survive the switch and paint over (or stay missing from) the CSS preview.
+  if (typeof window.applyRotation === 'function') window.applyRotation();
   if (use) requestAnimationFrame(resize);
 }
 
@@ -2499,7 +2762,7 @@ function showForSize(size){
   else pendingConfig = key;
 }
 
-window.audial3D = { available: webglOK, showForSize, show3D };
+window.audial3D = { available: webglOK, showForSize, show3D, refreshArt };
 
 if (!webglOK) {
   console.warn('[audial3D] WebGL unavailable — CSS preview will be used.');
