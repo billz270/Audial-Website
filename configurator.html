@@ -1877,7 +1877,11 @@ function panelToCartItem(p){
     quantity: 1,
     // Also store the panel pixel size at save time so cart preview can reproduce the crop
     savedPanelWidth: p.width,
-    savedPanelHeight: p.height
+    savedPanelHeight: p.height,
+    // DEV-37: static 3D thumbnail, captured here because all three Add-to-Cart paths funnel through
+    // this function. null for custom sizes and when WebGL is unavailable — the cart card falls back
+    // to the CSS render in that case.
+    thumbnail: (window.audial3D && window.audial3D.captureThumbnail) ? window.audial3D.captureThumbnail() : null
   };
 }
 
