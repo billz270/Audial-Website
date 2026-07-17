@@ -2460,6 +2460,14 @@ const PANEL_KEYS = ['4x2V','4x2H','2x2','1x4V','1x4H','2x1V','2x1H','1x1'];
 const COMPONENTS = ['Frame','Rockwool','Fiberglass Sheet','Back Support','Fiberglass Screen','Acoustic Fabric'];
 // 2x2 and 1x1 are near-square; max-dimension fit frames them large, so pull the camera back.
 const PANEL_DISTANCE_FACTOR = { '2x2':1.45, '1x1':1.45 };
+
+// ===== DEV-37: cart thumbnail capture =====
+const THUMB_SIZE          = 400;
+const THUMB_QUALITY       = 0.85;
+const THUMB_AZIMUTH_DEG   = 35;      // from .panel-3d rotateY(-35deg)  (DES-28)
+const THUMB_ELEVATION_DEG = 8;       // from .panel-3d rotateX(8deg)
+const THUMB_REF_KEY       = '4x2H';  // largest catalog panel — it frames the fixed distance
+let thumbDistance = 0;               // measured once at model load; 0 until then
 // Configurator size + orientation -> .glb config key. Squares carry a single key.
 // "horizontal" means wider-than-tall (same convention as effectiveDimsFt), so 1x4 horizontal is
 // the 4-ft-wide 1x4H. Custom has no .glb config (handled by show3D(false) elsewhere).
@@ -2725,6 +2733,7 @@ function loadModel(){
     scene.add(model);
     applyFabricFold();
     applyWoodVarnish();   // currentVarnish may already be seeded by a showForSize that beat the load
+    measureThumbDistance();   // DEV-37: one fixed frame for every config's thumbnail
     modelReady = true;
     loadingEl.style.display = 'none';
     if (pendingConfig){ showConfig(pendingConfig); pendingConfig = null; }
@@ -2813,6 +2822,21 @@ function applyFabricVisibility(key){
   if (fab.userData.pairedFold) fab.userData.pairedFold.visible = layerState['Acoustic Fabric'];
 }
 
+// One fixed distance for every config, framed on the largest catalog panel, so a 1x1 genuinely
+// occupies less of its thumbnail than a 4x2. Deliberately ignores PANEL_DISTANCE_FACTOR: that
+// factor exists to make sizes look *comparable* on load, which is the opposite of what we want here.
+// Measured rather than hard-coded so nothing assumes the .glb's world units.
+function measureThumbDistance(){
+  const box = new THREE.Box3();
+  for (const c of COMPONENTS){
+    const m = panelMeshes[THUMB_REF_KEY] && panelMeshes[THUMB_REF_KEY][c];
+    if (m) box.expandByObject(m);       // ignores .visible, unlike centerCameraOn's box
+  }
+  if (box.isEmpty()) return;
+  const size = box.getSize(new THREE.Vector3());
+  thumbDistance = Math.max(size.x, size.y, size.z) * 2.5;   // same 2.5 as centerCameraOn
+}
+
 function centerCameraOn(key){
   const box = new THREE.Box3();
   for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m && m.visible) box.expandByObject(m); }
@@ -2824,6 +2848,67 @@ function centerCameraOn(key){
   controls.target.copy(center);
   camera.position.set(center.x + distance * 0.6, center.y + distance * 0.3, center.z + distance);
   controls.update();
+}
+
+// DEV-37: a static cart thumbnail of the finished panel, posed to match the CSS preview's angle.
+// Synchronous by necessity: the renderer has no preserveDrawingBuffer, so toDataURL must run in the
+// same block as render(), before the browser composites and clears the buffer. That also means no
+// paint happens mid-function — the user never sees the temporary 400x400 frame.
+function captureThumbnail(){
+  if (!webglOK || !modelReady || !renderer || !camera || !controls) return null;
+  const key = activeConfigKey();
+  if (!key || !thumbDistance) return null;      // custom size / unknown -> caller falls back to CSS
+
+  const savedPos    = camera.position.clone();
+  const savedQuat   = camera.quaternion.clone();
+  const savedAspect = camera.aspect;
+  const savedTarget = controls.target.clone();
+  const savedLayers = { ...layerState };
+  const savedHover  = frontHover;
+  const savedSize   = renderer.getSize(new THREE.Vector2());
+  const savedPR     = renderer.getPixelRatio();
+
+  // A cart thumbnail always depicts the COMPLETE, un-hovered panel, whatever the drawer says.
+  for (const n of DRAWER_ROWS) layerState[n] = true;
+  frontHover = false;
+  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = true; }
+  applyFabricVisibility(key);
+  renderFrontFaceCanvas();
+
+  const box = new THREE.Box3();
+  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m && m.visible) box.expandByObject(m); }
+  const center = box.getCenter(new THREE.Vector3());
+  const az = THREE.MathUtils.degToRad(THUMB_AZIMUTH_DEG);
+  const el = THREE.MathUtils.degToRad(THUMB_ELEVATION_DEG);
+  const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+  camera.position.copy(center).addScaledVector(dir, thumbDistance);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(center);
+  camera.aspect = 1;
+  camera.updateProjectionMatrix();
+
+  renderer.setPixelRatio(1);                       // exact THUMB_SIZE output, independent of DPR
+  renderer.setSize(THUMB_SIZE, THUMB_SIZE, false); // false => drawing buffer only, CSS size untouched
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL('image/jpeg', THUMB_QUALITY);
+
+  // Restore exhaustively — this panel stays on screen afterward.
+  Object.assign(layerState, savedLayers);
+  frontHover = savedHover;
+  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = layerState[c]; }
+  applyFabricVisibility(key);
+  renderFrontFaceCanvas();
+  camera.position.copy(savedPos);
+  camera.quaternion.copy(savedQuat);
+  camera.aspect = savedAspect;
+  camera.updateProjectionMatrix();
+  controls.target.copy(savedTarget);
+  controls.update();
+  renderer.setPixelRatio(savedPR);
+  renderer.setSize(savedSize.x, savedSize.y, false);
+  resize();
+  renderer.render(scene, camera);
+  return url;
 }
 
 function resize(){
@@ -3006,6 +3091,8 @@ window.__dev32.rotProbe     = () => imgRotate;
 window.__dev32.orbitEnabled = () => !!(controls && controls.enabled);
 window.__dev32.foldProbe    = () => currentFold;
 window.__dev32.camProbe     = () => camera.position.toArray();
+window.__dev32.layerProbe   = () => ({ ...layerState });
+window.__dev32.thumbDist    = () => thumbDistance;
 // Getter, not a plain assignment: `camera` is only assigned inside init(), so a snapshot taken at
 // module-eval time captures undefined.
 Object.defineProperty(window.__dev32, 'camera', { get: () => camera, configurable: true });
@@ -3227,7 +3314,7 @@ function showForSize(size, orientation){
   else pendingConfig = key;
 }
 
-window.audial3D = { available: webglOK, showForSize, show3D, refreshArt, setVarnish, setFold };
+window.audial3D = { available: webglOK, showForSize, show3D, refreshArt, setVarnish, setFold, captureThumbnail };
 
 if (!webglOK) {
   console.warn('[audial3D] WebGL unavailable — CSS preview will be used.');
