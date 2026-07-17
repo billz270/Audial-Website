@@ -1614,7 +1614,7 @@ live `roughness === 1`; Fabric + Fiberglass Sheet materials unchanged. No JS err
 ---
 
 ## Task #DEV-36: Fabric Wrap Toggle Investigation & Implementation
-- **Status:** TODO — but **Phase 1 investigation is already answered** (verified in code 2026-07-16)
+- **Status:** ✅ DONE (2026-07-17) — verified in-browser, 18/18 checks green
 - **Priority:** MEDIUM
 - **File:** configurator.html
 - **Depends on:** DEV-35
@@ -1653,6 +1653,44 @@ So the work is:
 ✅ `currentFold` default agrees with `currentPanel.fabricWrap` default
 ✅ Editing a saved panel restores its wrap in 3D
 ✅ Works across all panel sizes and both orientations
+
+### How it was actually built (2026-07-17)
+Investigation above held up in full — no Blender work, wiring only. Founder chose **Half** as the
+agreed default, so `currentFold` is now `'half'` (configurator.html:2492), matching `freshPanel()`,
+the pre-`active` Half button, and the `wrap-half-scene` class. Before this, first render always lied.
+
+**One deliberate deviation from the spec.** The spec said `setFold` should re-run
+`showConfig(activeConfigKey())`. That works, but `showConfig` also calls `centerCameraOn()` — so
+every wrap toggle would snap the camera home and throw away the user's orbit, contradicting the
+"instant, matching component-toggle feel" behavior spec (component toggles don't move the camera).
+Instead the fabric/fold visibility application was split out of `showConfig` into
+**`applyFabricVisibility(key)`**, which both `showConfig` and `setFold` call. `showConfig` is
+otherwise unchanged, so size/orientation changes still re-frame — which is correct there.
+
+**Why `setFold` needs more than `setVarnish` did.** `setVarnish` can rely on the continuous render
+loop, because reassigning `mesh.material` is picked up next frame. A fold change is a **mesh swap**:
+`applyFabricFold()` only hides the outgoing variant and re-points the `Acoustic Fabric` slot — the
+incoming mesh is still `visible=false` and carries its own **cloned, unpainted** material. So
+`setFold` must also call `applyFabricVisibility(key)` *and* `renderFrontFaceCanvas()`, or the toggle
+either shows nothing or drops the artwork. Both failure modes were tested for explicitly.
+
+Seeded at the **`showForSize` choke point** next to DEV-35's `setVarnish` seed — covers size pick,
+orientation swap, and `loadPanelToEditor`, so an edited saved panel restores its wrap structurally.
+
+### Verification (puppeteer, real Chrome, real .glb)
+18/18 green, live mesh state read through `window.__dev32`, not inferred:
+- default = Half on both the button and the actual 3D mesh; toggle both directions promotes the right
+  front + paired fold and hides the other (no z-fight);
+- **camera preserved across a wrap toggle**, with a control proving a size change still re-frames;
+- all 8 configs (`1x1, 2x1H/V, 2x2, 4x2H/V, 1x4H/V`) toggle correctly;
+- `showForSize` re-seeds the fold from `currentPanel.fabricWrap` (edit-restore);
+- **artwork survives a toggle in both directions** (repainted onto the promoted mesh).
+Only console 404 is the pre-existing `favicon.ico`.
+
+**Trap found while testing (cost a debug cycle):** `window.__dev32.camera = camera` captures
+`undefined` — `camera` is declared at module top but only *assigned* inside `init()`, so a plain
+assignment snapshots the pre-init value. The existing `() => ...` probes work because closures read
+the live binding. It's now an `Object.defineProperty` getter. New probes: `foldProbe`, `camProbe`.
 
 ---
 
