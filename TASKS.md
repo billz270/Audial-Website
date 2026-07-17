@@ -1741,8 +1741,8 @@ artwork tilted 14°.
 
 **Founder's calls:** posed 3D screenshot (not live-orbit, not CSS strips); angle matches
 `.panel-3d`'s `rotateY(-35deg) rotateX(8deg)` (DES-28), not `.cart-3d`'s flatter −14°/6°; JPEG on the
-paper background, not the spec's PNG; fixed camera distance to preserve relative panel size; the
-visualizer's "Your Designs" picker uses the thumbnails too.
+paper background, not the spec's PNG; **panel sizes match the CSS cards' sizes**; the visualizer's
+"Your Designs" picker uses the thumbnails too.
 
 **`captureThumbnail()` is synchronous by necessity.** The renderer is built without
 `preserveDrawingBuffer`, so `toDataURL` must run in the same block as `render()` — before the browser
@@ -1758,20 +1758,39 @@ background — so transparency renders nothing and PNG's ~100–300KB/item would
 zero. Measured: **~7KB/thumbnail, 60KB for a 4-panel cart.** The spec's localStorage anxiety was
 unfounded.
 
-**`thumbDistance` deliberately ignores `PANEL_DISTANCE_FACTOR`.** That 1.45 nudge exists to make all
-sizes look *comparable* on load — the exact opposite of a thumbnail's job. Distance is measured once
-at model load from `4x2H`'s box (`maxDim * 2.5`) and reused for every config, so a 1×1 genuinely
-occupies less of its frame.
+**Sizing: each config is framed individually to match the CSS card's own sizing curve.**
+`fitThumbCamera` targets `sqrt(area / 8) * 0.95` of the frame (`THUMB_AREA_SQFT`, `THUMB_FIT`) —
+i.e. `renderCartCardPreview`'s `CARD_MAX_LINEAR * sqrt(area / CARD_MAX_AREA)`, the math the CSS cards
+always used. Measured result: every size within 3% of its old CSS size (4×2 → 160px exactly).
 
-**Measured, don't assume — the `.glb` is not proportional.** Frame long sides are 1×1 → 0.354,
+**A single fixed distance was built first, and it FAILED — don't retry it.** It preserved physical
+proportionality, but the square frame must fit the tallest panel (1×4V), and `object-fit:contain`
+then shrank that whole frame into the card's 160px box, so **horizontal panels rendered at ~60% of
+the CSS size** (measured: 4×2 at 96px vs 160px). Cause: a 4ft *vertical* panel isn't foreshortened by
+the 35° yaw while a 4ft *horizontal* one is (×cos35 = 0.82), so 1×4 was already at 96% and blocked
+any uniform zoom. Matching CSS therefore means **abandoning physical proportionality** — the CSS
+`sqrt(area)` curve was never physically true (1×1:4×2 = 2.83, not the physical 3.54). Founder's call,
+made with the measurements in hand.
+
+**The fit must RECENTRE, not just scale — this is the subtle one.** Under perspective a wide panel at
+35° yaw projects **asymmetrically** (the near end projects further out), so its bbox centre is not the
+frame centre. Scaling alone let the 4×2 span 95% of the frame *while hanging off the right edge*
+(279 border pixels). `fitThumbCamera` corrects distance **and** pan each pass, panning eye and target
+together so the view direction is preserved.
+
+**Measured, don't assume — the `.glb` is not proportional to feet.** Frame long sides are 1×1 → 0.354,
 2×2 → 0.654, 4×2 → 1.254 model units, i.e. `0.30 × feet + 0.054`. That constant **+0.054 is the wood
-frame thickness**, so an exact 1:4 render was never possible. Rendered ratio is 1:3.54 — and the old
-CSS card's `sqrt(area/8)` math gave 1:2.83, so the new thumbnails are *closer to physical truth* than
-what they replace.
+frame thickness**. Any future "render N panels to scale" work must not assume 1:2:4.
 
 **The azimuth sign had to be measured, not derived.** CSS is Y-down/left-handed and the model carries
 a baked 180° Y rotation. `+35`/`+8` turned out correct — confirmed by rendering it beside the real CSS
 preview and checking the artwork wasn't swapped left-for-right (the tell a mirror would leave).
+
+**Verification trap — JPEG ringing fakes a clipping failure.** A pixel-scan clip test with a tight
+threshold (±8 of the paper background) reports the 4×2 as clipped: chroma bleed around the panel's
+high-contrast edge smears ~10px into the margin. Panel colours differ from the background by 40+ in
+some channel, so **use ±25**. Real clipping looks completely different — 279 solid border pixels, and
+visible to the eye.
 
 **Fallbacks:** `captureThumbnail` returns `null` for custom sizes (`activeConfigKey()` has no
 `SIZE_TO_CONFIG` entry) and when WebGL is unavailable. Both render sites branch on `panel.thumbnail`
