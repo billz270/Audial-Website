@@ -1810,9 +1810,9 @@ path. Removing them isn't DEV-37's job.
 ---
 
 ## Task #DEV-38: Mobile Performance Testing & Fallback (Final Task)
-- **Status:** TODO
+- **Status:** ✅ TESTED — no code changes needed. Production deploy still outstanding (founder-triggered).
 - **Priority:** MEDIUM
-- **File:** configurator.html
+- **File:** configurator.html (unchanged — see findings)
 - **Depends on:** DEV-32 through DEV-37
 
 ### Goal
@@ -1854,6 +1854,80 @@ Test 3D viewer performance on mobile devices. Add a "View in 3D" toggle for mobi
 ✅ Findings documented in CLAUDE.md
 ✅ Toggle (if needed) works correctly
 ✅ Touch controls (rotate, zoom) functional
+
+### What was found (2026-07-17) — the answer is "nothing to build"
+
+**Measured, emulated — NOT hardware.** Real Chrome, Pixel-7-class viewport (390×844 @ DPR 3,
+`isMobile`+`hasTouch`), driven with real CDP touch events and CPU throttling. **No iPhone or Android
+was touched**, so the phone *GPU* is unmeasured. With ~1010 tris and DPR already capped at 2 the
+residual risk is judged negligible — that's a judgement, not a measurement. Founder had independently
+confirmed the **layout** via the browser's mobile view.
+
+| Check | Result |
+|---|---|
+| Page load (`navigation` timing `loadEventEnd`) | **350 ms** |
+| 3D viewer ready (`audial3D.available`) | **~410 ms** |
+| three.js from unpkg (4 modules) | ~190 ms |
+| `Panels-web.glb` transfer | 312 KB |
+| Orbit @ **6× CPU throttle** (mid-range Android proxy) | vsync-capped, **0 long frames** |
+| Orbit @ **20× CPU throttle** (worse than any real phone) | median 33 fps, p95 20 fps — still usable |
+| JS heap | 7.4 MB |
+| Touch single-finger rotate | camera moved ✅ |
+| Pinch zoom | camera distance 4.39 → 2.71 ✅ |
+| Console errors | only the pre-existing `favicon.ico` 404 |
+
+**Decision: 3D stays default on mobile. No "View in 3D" toggle, no static fallback.** The spec's own
+rule — "if performance is acceptable, leave 3D as default and ensure touch controls work" — is
+satisfied with room to spare. The renderer only degrades at 20× throttling, a fictional device.
+Touch controls needed **zero work**: OrbitControls provides one-finger rotate and pinch-zoom natively,
+`enablePan` is already off, and `minDistance`/`maxDistance` are clamped.
+
+**Lazy-loading three.js + the `.glb` was rejected on measurement.** The spec floated it to cut initial
+weight, but three.js costs ~190 ms and the model is 312 KB — deferring them would save a few hundred
+ms of page load in exchange for a *slower first 3D paint*, which is the thing users actually wait for.
+Bad trade.
+
+**The continuous render loop (`animate`, ~line 2982) stays.** It redraws at 60fps even when idle,
+which is a battery cost, not a frame-rate problem — it never dropped a frame at 6×. And DEV-35's
+varnish swap and DEV-36's fold toggle both depend on it landing the change next frame. Converting to
+render-on-demand would risk two finished tasks to save battery nobody has complained about.
+
+**Measurement trap for future perf work:** wrapping `page.goto` in a `Date.now()` stopwatch reported
+**8 s** and looked identical throttled vs unthrottled — which reads exactly like a network-bound page
+load. It was Chrome's cold-start overhead inside the harness. The page's own
+`performance.getEntriesByType('navigation')` says 350 ms. **Read navigation timing; never time
+`page.goto` from the harness.** Related: unpkg omits `Timing-Allow-Origin`, so cross-origin
+`transferSize` reports **0 bytes** — not evidence of a cached or empty fetch.
+
+### Pre-DEV-38: `build-web-glb.mjs` hardening ✅ (commit `fe874f0`)
+
+The agreed prerequisite (founder's ordering: harden **first**, *then* rename the `Arrtwork 3` typo in
+Blender). Fabric folds were matched by a hardcoded material-name list that included the typo, so
+renaming it in Blender would have **silently shipped an 11.57 MB model instead of 319 KB** — measured
+by running the old logic against a renamed master: only **14 of 16** prims reassigned, the 2×2 folds
+keep their art material, `prune` sees a live user, and the 11.25 MB `Bombastik_Print` texture rides
+along. No error.
+
+Fabric is now found by **node name** (`^(.+) Acoustic Fabric (Half|Full) Fold$`), making the material
+name irrelevant. **Provably equivalent:** the master has exactly 16 fabric nodes (8 configs × 2 folds,
+1 prim each) carrying exactly the 5 materials the old list named, and the rebuilt model is
+**byte-identical to the committed one** (same SHA-256, 319 KB, "16 prims across 8 configs"). Against a
+master with the typo renamed: still 319 KB.
+
+Guards added, **each verified by forcing its failure**: no fabric nodes matched / a config missing a
+Half or Full fold → throw; either wood varnish pruned away → throw (DEV-35's toggle needs both — forced
+by reassigning every Dark prim to Light, error fired, exit 1); output over `MAX_WEB_BYTES` (1.5 MB) →
+throw. The build now writes to a **temp `.glb` and validates before replacing** the good model, so a
+failed build leaves the previous `Panels-web.glb` intact (confirmed — the forced wood failure left the
+baseline hash untouched).
+
+**Trap that bit during this work:** `NodeIO` picks its output format from the **file extension**. The
+temp path was first `Panels-web.glb.tmp`, which doesn't end in `.glb`, so gltf-transform emitted a
+**JSON glTF plus loose `baseColor_*.jpg` / `.bin` sidecars** (59 KB of JSON) which then got renamed
+over `Panels-web.glb`. Caught only because the output was hash-compared against the committed
+baseline. Temp paths for GLB **must** end in `.glb`.
+
+**Founder's next step:** the Blender rename of `Arrtwork 3` → `Artwork 3` is now safe.
 ✅ No crashes or major lag
 ✅ Final production deploy successful
 
