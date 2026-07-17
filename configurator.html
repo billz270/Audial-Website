@@ -412,6 +412,7 @@
   .cart-face{width:100%;height:100%;background:#FAFAF8;border:1.5px solid var(--ink);overflow:hidden;position:relative}
   .cart-face.has-image{background:transparent}
   .cart-face img{position:absolute;top:0;left:0;display:block}
+  .cart-thumb{width:100%;height:100%;object-fit:contain;display:block}
   .cart-info{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
   .cart-size-row{display:flex;justify-content:space-between;align-items:baseline}
   .cart-size{font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:-0.01em}
@@ -2010,11 +2011,13 @@ function updateCart(){
     item.innerHTML = `
       <button class="cart-remove" data-idx="${i}" title="Remove">×</button>
       <div class="cart-preview">
-        <div class="cart-3d ${woodClass} ${wrapClass}-scene" style="width:${preview.w}px;height:${preview.h}px">
-          <div class="cart-face has-image">
-            <img src="${panel.image}" alt="${panel.size}" style="width:${preview.imgW}px;height:${preview.imgH}px;transform-origin:0 0;transform:${preview.imgTransform}">
-          </div>
-        </div>
+        ${panel.thumbnail
+          ? `<img class="cart-thumb" src="${panel.thumbnail}" alt="${preview.effW}×${preview.effH} ft panel">`
+          : `<div class="cart-3d ${woodClass} ${wrapClass}-scene" style="width:${preview.w}px;height:${preview.h}px">
+               <div class="cart-face has-image">
+                 <img src="${panel.image}" alt="${panel.size}" style="width:${preview.imgW}px;height:${preview.imgH}px;transform-origin:0 0;transform:${preview.imgTransform}">
+               </div>
+             </div>`}
       </div>
       <div class="cart-info">
         <div class="cart-size-row">
