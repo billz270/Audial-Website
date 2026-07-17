@@ -1517,7 +1517,7 @@ When user uploads an image in the configurator, apply it as a texture to the Aco
 ---
 
 ## Task #DEV-35: Wood Varnish Toggle in Three.js Viewer
-- **Status:** TODO
+- **Status:** DONE (2026-07-17) — verified end-to-end in headless Chrome, 12/12 checks.
 - **Priority:** MEDIUM
 - **File:** configurator.html
 - **Depends on:** DEV-34
@@ -1538,11 +1538,58 @@ Wire the existing Light/Dark wood varnish toggle to swap the Pine Wood material'
 - Preserve anisotropic filtering for grain quality
 - Match existing CSS preview's wood tones
 
+### What was actually there (spec correction)
+The spec's "wood texture files should already exist — reuse them" was **half right, in the wrong
+place**. There are no wood *files* in the repo (the CSS preview uses hand-written gradients), but
+`Panels-web.glb` already ships both varnishes as real textured materials:
+`Pine Wood Light` (`pine-wood-light`, 41 KB jpeg) and `Pine Wood Dark` (`pine-wood-dark`, 154 KB).
+Both are `map`-based, so grain quality is a texture-sampling property — nothing to preserve by hand.
+
+**The `.glb`'s per-config varnish split is an asset artifact, not intent.** Light is baked onto
+`4x2V/4x2H/2x2/1x4V/1x4H`, dark onto `1x1/2x1V/2x1H`. That split exists because `build-web-glb.mjs`
+runs `prune()`, which deletes materials with zero users — assigning each varnish to ≥1 panel is what
+keeps **both** textures alive into the 319 KB web build. Consequence: **never set every panel to one
+varnish in Blender**, or the other silently vanishes from the web build and the toggle breaks.
+
+### Live bug this fixed
+The toggle only drove the CSS preview (`wood-dark-scene`), which is hidden whenever 3D is active.
+So each size showed whatever Blender baked in, regardless of the buttons — **picking 1×1 gave dark
+wood even with Light selected**. Verified fixed.
+
+### Implementation
+- `woodMats{light,dark}` captured during the `loadModel` traverse **before** configurator.html's
+  per-mesh `child.material.clone()` — after that clone the two shared originals have no mesh users
+  and are unreachable any other way.
+- `applyWoodVarnish()` assigns the selected material to `Frame` + `Back Support` (`WOOD_COMPONENTS`)
+  across all `PANEL_KEYS`. Sharing one material across wood meshes is safe: nothing mutates them
+  (only the fabric front's material is touched, by the art/hover paths).
+- `setVarnish()` exposed on `window.audial3D`; called from the `.fopt[data-option="wood"]` handler.
+  The render loop is continuous, so the swap lands next frame — no `showConfig` re-run.
+- **Seeded at the `showForSize` choke point**, not per call site — that one function covers all
+  three entries (size pick, orientation swap, `loadPanelToEditor`), so an edited saved panel
+  restores its varnish. Same class of gap as the DEV-34 `__artImageEl` bug, closed structurally.
+- `currentVarnish` defaults to `'light'`, which already agrees with `freshPanel()`'s
+  `woodVarnish:'light'` — unlike the `currentFold`/`fabricWrap` mismatch DEV-36 still has to fix.
+
+### Asset change (by founder, this session)
+`Pine Wood Dark` roughness 0.50 → **1.00** in the Blender master, matching Light. Both varnishes are
+now matte. Re-exported `Panels.glb` + rebuilt `Panels-web.glb` (still 319 KB, node names intact).
+Note: in Blender, "zero gloss" = Roughness **1.0**, not 0 (0 is a mirror).
+
 ### Acceptance Criteria
-✅ Light/Dark toggle switches wood material in 3D
-✅ Change is real-time
-✅ Wood grain quality preserved (anisotropic filtering)
-✅ Works across all panel sizes
+- [x] Light/Dark toggle switches wood material in 3D
+- [x] Change is real-time (continuous render loop; no re-render call needed)
+- [x] Wood grain quality preserved — both materials are `map`-based, sampling untouched
+- [x] Works across all panel sizes, overriding the `.glb`'s baked per-config varnish
+- [x] Frame and Back Support always share the varnish
+- [x] Editing a saved panel restores its varnish (seeded via `showForSize`)
+- [x] Non-wood layers untouched (Fabric / Fiberglass verified unchanged)
+
+### Verified (headless Chrome, 12/12)
+`1x1` renders Light at default despite the `.glb` baking Dark (the bug); Light↔Dark round-trips on
+Frame + Back Support; Dark overrides `4x2H`'s baked Light; varnish persists across a size change;
+live `roughness === 1`; Fabric + Fiberglass Sheet materials unchanged. No JS errors
+(the one console 404 is the pre-existing missing `favicon.ico`, unrelated).
 
 ---
 
