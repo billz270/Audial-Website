@@ -20,23 +20,45 @@
  *     when the master's hash differs (or --force). So the web build can never silently
  *     go stale, even if the watcher wasn't running when you exported from Blender.
  *
+ * CORRECTNESS GUARDS (this build fails loudly rather than shipping a bad model):
+ *   - Fabric folds are matched by node name, so renaming materials in Blender is safe.
+ *   - Every config must have both a Half and a Full fold.
+ *   - Both wood varnishes must survive prune (the runtime Light/Dark toggle needs both).
+ *   - Output must stay under MAX_WEB_BYTES; the existing build is left untouched if not.
+ *
  * Usage:  node build-web-glb.mjs [--force]
  */
 import { NodeIO } from '@gltf-transform/core';
 import { prune, dedup } from '@gltf-transform/functions';
 import { createHash } from 'node:crypto';
-import { readFileSync, existsSync, writeFileSync, statSync } from 'node:fs';
+import { readFileSync, existsSync, writeFileSync, statSync, renameSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const MASTER = join(HERE, 'Panels.glb');
 const WEB = join(HERE, 'Panels-web.glb');
+// NodeIO picks its output format from the extension — this MUST end in .glb or gltf-transform
+// writes a JSON glTF plus loose external texture/bin files instead of one self-contained binary.
+const TMP = join(HERE, 'Panels-web.tmp.glb');
 const HASH_FILE = join(HERE, 'Panels-web.glb.hash');
 
-// Materials whose only purpose is baked placeholder artwork on the fabric.
-const ARTWORK_MATERIALS = new Set(['Artwork', 'Artwork 2', 'Arrtwork 3', 'Artwork 4', 'Default']);
+// Fabric meshes are found by NODE NAME, never by material name. The master's fabric materials are
+// named inconsistently and carry typos ("Arrtwork 3"), and renaming one in Blender must not change
+// what this build strips. Matching the node name makes the material name irrelevant: whatever art
+// material a fold happens to carry is reassigned away, orphaned, and pruned.
+const FABRIC_NODE_RE = /^(.+) Acoustic Fabric (Half|Full) Fold$/;
 const BACKDROP_NAME = 'Backdrop';
+
+// Both varnishes must survive prune — the configurator's Light/Dark toggle (DEV-35) swaps between
+// these two materials at runtime. prune() deletes zero-user materials, so a Blender export that
+// assigns every panel the same varnish would silently drop the other one and break the toggle.
+const WOOD_MATERIALS = ['Pine Wood Light', 'Pine Wood Dark'];
+
+// The whole point of this build is that the web model is tiny. If a baked artwork texture ever
+// survives (the master's are 10–47 MB each), the output blows past this and we fail loudly rather
+// than shipping it. Real builds land ~319 KB.
+const MAX_WEB_BYTES = 1_500_000;
 
 const force = process.argv.includes('--force');
 
@@ -77,15 +99,38 @@ export async function build({ silent = false } = {}) {
     .setMetallicFactor(0)
     .setDoubleSided(true);
 
+  // Reassign every fabric fold to the blank material, keyed off the node name.
   let reassigned = 0;
-  for (const mesh of root.listMeshes()) {
+  const foldsByConfig = new Map();
+  for (const node of root.listNodes()) {
+    const match = FABRIC_NODE_RE.exec(node.getName());
+    if (!match) continue;
+    const [, configKey, fold] = match;
+    const mesh = node.getMesh();
+    if (!mesh) continue;
     for (const prim of mesh.listPrimitives()) {
-      const mat = prim.getMaterial();
-      if (mat && ARTWORK_MATERIALS.has(mat.getName())) {
-        prim.setMaterial(fabricMat);
-        reassigned++;
-      }
+      prim.setMaterial(fabricMat);
+      reassigned++;
     }
+    if (!foldsByConfig.has(configKey)) foldsByConfig.set(configKey, new Set());
+    foldsByConfig.get(configKey).add(fold);
+  }
+
+  // A rename or re-export that breaks the node convention would otherwise sail through and ship a
+  // multi-megabyte model with baked placeholder art still on it.
+  if (reassigned === 0) {
+    throw new Error(
+      `[build-web-glb] no fabric meshes matched ${FABRIC_NODE_RE}. The master's node naming ` +
+      `convention changed — fix the regex to match, or the baked artwork will ship.`
+    );
+  }
+  const incomplete = [...foldsByConfig].filter(([, folds]) => folds.size !== 2);
+  if (incomplete.length) {
+    throw new Error(
+      `[build-web-glb] these configs are missing a Half or Full fold: ` +
+      incomplete.map(([k, f]) => `${k} (has: ${[...f].join(', ')})`).join('; ') +
+      `. Both folds per config are required — the wrap toggle swaps between them.`
+    );
   }
 
   // Drop the Backdrop node + its mesh.
@@ -105,12 +150,35 @@ export async function build({ silent = false } = {}) {
   // texture with nowhere to map (front face renders blank, art smears onto the fold edges).
   await doc.transform(prune({ keepAttributes: true }), dedup());
 
-  await io.write(WEB, doc);
+  // Both varnishes have to still be here, or the runtime toggle has nothing to swap to.
+  const survivingMaterials = new Set(root.listMaterials().map((m) => m.getName()));
+  const missingWood = WOOD_MATERIALS.filter((name) => !survivingMaterials.has(name));
+  if (missingWood.length) {
+    throw new Error(
+      `[build-web-glb] wood material(s) pruned away: ${missingWood.join(', ')}. ` +
+      `prune() drops materials with zero users, so in Blender at least one panel must still be ` +
+      `assigned each varnish. Surviving materials: ${[...survivingMaterials].join(', ')}`
+    );
+  }
+
+  // Write to a temp file and validate before it replaces the good build — a failed run must never
+  // leave a broken or oversized Panels-web.glb behind for the site to load.
+  await io.write(TMP, doc);
+  const webBytes = statSync(TMP).size;
+  if (webBytes > MAX_WEB_BYTES) {
+    rmSync(TMP, { force: true });
+    throw new Error(
+      `[build-web-glb] output is ${(webBytes / 1e6).toFixed(1)} MB, over the ${(MAX_WEB_BYTES / 1e6).toFixed(1)} MB ` +
+      `limit — a baked artwork texture almost certainly survived. Check that every fabric node ` +
+      `matches ${FABRIC_NODE_RE}. Refusing to overwrite the existing build.`
+    );
+  }
+  renameSync(TMP, WEB);
   writeFileSync(HASH_FILE, masterHash + '\n');
 
   const masterMB = (statSync(MASTER).size / 1e6).toFixed(1);
-  const webKB = (statSync(WEB).size / 1e3).toFixed(0);
-  log(`[build-web-glb] fabric prims reassigned: ${reassigned} | backdrop removed: ${removedBackdrop}`);
+  const webKB = (webBytes / 1e3).toFixed(0);
+  log(`[build-web-glb] fabric prims reassigned: ${reassigned} across ${foldsByConfig.size} configs | backdrop removed: ${removedBackdrop}`);
   log(`[build-web-glb] wrote Panels-web.glb  (${masterMB} MB master -> ${webKB} KB web)`);
   return { built: true };
 }
