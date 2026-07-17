@@ -412,6 +412,7 @@
   .cart-face{width:100%;height:100%;background:#FAFAF8;border:1.5px solid var(--ink);overflow:hidden;position:relative}
   .cart-face.has-image{background:transparent}
   .cart-face img{position:absolute;top:0;left:0;display:block}
+  .cart-thumb{width:100%;height:100%;object-fit:contain;display:block}
   .cart-info{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
   .cart-size-row{display:flex;justify-content:space-between;align-items:baseline}
   .cart-size{font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:-0.01em}
@@ -1877,7 +1878,11 @@ function panelToCartItem(p){
     quantity: 1,
     // Also store the panel pixel size at save time so cart preview can reproduce the crop
     savedPanelWidth: p.width,
-    savedPanelHeight: p.height
+    savedPanelHeight: p.height,
+    // DEV-37: static 3D thumbnail, captured here because all three Add-to-Cart paths funnel through
+    // this function. null for custom sizes and when WebGL is unavailable — the cart card falls back
+    // to the CSS render in that case.
+    thumbnail: (window.audial3D && window.audial3D.captureThumbnail) ? window.audial3D.captureThumbnail() : null
   };
 }
 
@@ -2006,11 +2011,13 @@ function updateCart(){
     item.innerHTML = `
       <button class="cart-remove" data-idx="${i}" title="Remove">×</button>
       <div class="cart-preview">
-        <div class="cart-3d ${woodClass} ${wrapClass}-scene" style="width:${preview.w}px;height:${preview.h}px">
-          <div class="cart-face has-image">
-            <img src="${panel.image}" alt="${panel.size}" style="width:${preview.imgW}px;height:${preview.imgH}px;transform-origin:0 0;transform:${preview.imgTransform}">
-          </div>
-        </div>
+        ${panel.thumbnail
+          ? `<img class="cart-thumb" src="${panel.thumbnail}" alt="${preview.effW}×${preview.effH} ft panel">`
+          : `<div class="cart-3d ${woodClass} ${wrapClass}-scene" style="width:${preview.w}px;height:${preview.h}px">
+               <div class="cart-face has-image">
+                 <img src="${panel.image}" alt="${panel.size}" style="width:${preview.imgW}px;height:${preview.imgH}px;transform-origin:0 0;transform:${preview.imgTransform}">
+               </div>
+             </div>`}
       </div>
       <div class="cart-info">
         <div class="cart-size-row">
@@ -2460,6 +2467,23 @@ const PANEL_KEYS = ['4x2V','4x2H','2x2','1x4V','1x4H','2x1V','2x1H','1x1'];
 const COMPONENTS = ['Frame','Rockwool','Fiberglass Sheet','Back Support','Fiberglass Screen','Acoustic Fabric'];
 // 2x2 and 1x1 are near-square; max-dimension fit frames them large, so pull the camera back.
 const PANEL_DISTANCE_FACTOR = { '2x2':1.45, '1x1':1.45 };
+
+// ===== DEV-37: cart thumbnail capture =====
+const THUMB_SIZE          = 400;
+const THUMB_QUALITY       = 0.85;
+const THUMB_AZIMUTH_DEG   = 35;      // from .panel-3d rotateY(-35deg)  (DES-28)
+const THUMB_ELEVATION_DEG = 8;       // from .panel-3d rotateX(8deg)
+
+// Each config is framed so its rendered long side matches what the CSS cart card used to draw:
+// CARD_MAX_LINEAR * sqrt(area / CARD_MAX_AREA) — see renderCartCardPreview. That math is NOT
+// physically proportional (a 4ft vertical and a 4ft horizontal panel come out different sizes), but
+// matching the CSS cards is the point, so the panel sizes are the CSS sizes.
+// A single fixed distance was tried first and rejected: the frame has to fit the tallest panel
+// (1x4V), and object-fit:contain then shrank every horizontal panel to ~60% of the CSS size.
+const THUMB_AREA_SQFT = { '4x2V':8, '4x2H':8, '2x2':4, '1x4V':4, '1x4H':4, '2x1V':2, '2x1H':2, '1x1':1 };
+const THUMB_MAX_AREA  = 8;           // CARD_MAX_AREA — the 4x2 reference
+const THUMB_FIT       = 0.95;        // margin so the panel never touches the frame edge
+let lastThumbFit = null;             // what the fit converged to; read via __dev32.fitProbe
 // Configurator size + orientation -> .glb config key. Squares carry a single key.
 // "horizontal" means wider-than-tall (same convention as effectiveDimsFt), so 1x4 horizontal is
 // the 4-ft-wide 1x4H. Custom has no .glb config (handled by show3D(false) elsewhere).
@@ -2813,6 +2837,57 @@ function applyFabricVisibility(key){
   if (fab.userData.pairedFold) fab.userData.pairedFold.visible = layerState['Acoustic Fabric'];
 }
 
+// Pose the camera `dist` along `dir` from the box, panned by `pan`, and report the projection's
+// frame fraction (1 = edge to edge) plus its NDC centre. Mutates `camera` — only ever called from
+// captureThumbnail, which restores it.
+const _thumbV = new THREE.Vector3();
+function thumbPose(box, center, dir, dist, pan){
+  camera.position.copy(center).addScaledVector(dir, dist).add(pan);
+  camera.up.set(0, 1, 0);
+  camera.lookAt(_thumbV.copy(center).add(pan));   // pan eye and target together => pure pan
+  camera.aspect = 1;
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld(true);      // also refreshes matrixWorldInverse, which project() needs
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const x of [box.min.x, box.max.x])
+    for (const y of [box.min.y, box.max.y])
+      for (const z of [box.min.z, box.max.z]){
+        _thumbV.set(x, y, z).project(camera);
+        if (_thumbV.x < minX) minX = _thumbV.x; if (_thumbV.x > maxX) maxX = _thumbV.x;
+        if (_thumbV.y < minY) minY = _thumbV.y; if (_thumbV.y > maxY) maxY = _thumbV.y;
+      }
+  return { frac: Math.max(maxX - minX, maxY - minY) / 2,   // NDC spans -1..1, so halve
+           cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
+}
+
+// Frame this config to `target`, and LEAVE THE CAMERA THERE.
+// Two corrections per pass, both needed:
+//   distance — apparent size goes as ~1/dist, but only ~; perspective makes it non-linear, so
+//              correct and re-measure rather than solve in closed form.
+//   pan      — under perspective a wide panel at 35deg yaw projects ASYMMETRICALLY (the near end
+//              projects further out), so its bbox centre is not the frame centre. Scaling alone let
+//              4x2 span 95% of the frame while hanging off the right edge. Recentre or it clips.
+function fitThumbCamera(box, center, dir, target){
+  const size = box.getSize(new THREE.Vector3());
+  let dist = Math.max(size.x, size.y, size.z) * 2.5;   // seed with centerCameraOn's framing
+  const pan = new THREE.Vector3(), right = new THREE.Vector3(), up = new THREE.Vector3(), fwd = new THREE.Vector3();
+  let r = thumbPose(box, center, dir, dist, pan);
+  for (let i = 0; i < 8; i++){
+    if (!isFinite(r.frac) || r.frac <= 0.0001) break;
+    camera.matrixWorld.extractBasis(right, up, fwd);
+    const halfH = dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
+    const halfW = halfH * camera.aspect;
+    // Shifting the camera right moves the subject left in frame, so add +cx to recentre.
+    pan.addScaledVector(right, r.cx * halfW).addScaledVector(up, r.cy * halfH);
+    dist = Math.max(0.2, dist * (r.frac / target));
+    const prev = r;
+    r = thumbPose(box, center, dir, dist, pan);
+    if (Math.abs(r.frac - target) < 0.002 && Math.abs(r.cx) < 0.002 && Math.abs(r.cy) < 0.002) break;
+    if (!isFinite(r.frac)) { r = prev; break; }
+  }
+  return r;
+}
+
 function centerCameraOn(key){
   const box = new THREE.Box3();
   for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m && m.visible) box.expandByObject(m); }
@@ -2824,6 +2899,73 @@ function centerCameraOn(key){
   controls.target.copy(center);
   camera.position.set(center.x + distance * 0.6, center.y + distance * 0.3, center.z + distance);
   controls.update();
+}
+
+// DEV-37: a static cart thumbnail of the finished panel, posed to match the CSS preview's angle.
+// Synchronous by necessity: the renderer has no preserveDrawingBuffer, so toDataURL must run in the
+// same block as render(), before the browser composites and clears the buffer. That also means no
+// paint happens mid-function — the user never sees the temporary 400x400 frame.
+function captureThumbnail(){
+  if (!webglOK || !modelReady || !renderer || !camera || !controls) return null;
+  const key = activeConfigKey();
+  if (!key || !THUMB_AREA_SQFT[key]) return null;   // custom size / unknown -> caller falls back to CSS
+
+  const savedPos    = camera.position.clone();
+  const savedQuat   = camera.quaternion.clone();
+  const savedAspect = camera.aspect;
+  const savedTarget = controls.target.clone();
+  const savedLayers = { ...layerState };
+  const savedHover  = frontHover;
+  const savedSize   = renderer.getSize(new THREE.Vector2());
+  const savedPR     = renderer.getPixelRatio();
+
+  // A cart thumbnail always depicts the COMPLETE, un-hovered panel, whatever the drawer says.
+  for (const n of DRAWER_ROWS) layerState[n] = true;
+  frontHover = false;
+  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = true; }
+  applyFabricVisibility(key);
+  renderFrontFaceCanvas();
+
+  // The fabric's fold is NOT in panelMeshes[key][component] — it hangs off userData.pairedFold, and
+  // it wraps the panel edges. Leave it out and the box is smaller than what renders, so the fit lets
+  // the 4x2 clip.
+  const box = new THREE.Box3();
+  for (const c of COMPONENTS){
+    const m = panelMeshes[key][c];
+    if (!m || !m.visible) continue;
+    box.expandByObject(m);
+    if (m.userData.pairedFold && m.userData.pairedFold.visible) box.expandByObject(m.userData.pairedFold);
+  }
+  const center = box.getCenter(new THREE.Vector3());
+  const az = THREE.MathUtils.degToRad(THUMB_AZIMUTH_DEG);
+  const el = THREE.MathUtils.degToRad(THUMB_ELEVATION_DEG);
+  const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
+  // Target the CSS card's own sizing curve, so the cart shows the sizes it always showed.
+  const thumbTarget = Math.sqrt(THUMB_AREA_SQFT[key] / THUMB_MAX_AREA) * THUMB_FIT;
+  lastThumbFit = { key, target: thumbTarget, ...fitThumbCamera(box, center, dir, thumbTarget) };
+
+  renderer.setPixelRatio(1);                       // exact THUMB_SIZE output, independent of DPR
+  renderer.setSize(THUMB_SIZE, THUMB_SIZE, false); // false => drawing buffer only, CSS size untouched
+  renderer.render(scene, camera);
+  const url = renderer.domElement.toDataURL('image/jpeg', THUMB_QUALITY);
+
+  // Restore exhaustively — this panel stays on screen afterward.
+  Object.assign(layerState, savedLayers);
+  frontHover = savedHover;
+  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = layerState[c]; }
+  applyFabricVisibility(key);
+  renderFrontFaceCanvas();
+  camera.position.copy(savedPos);
+  camera.quaternion.copy(savedQuat);
+  camera.aspect = savedAspect;
+  camera.updateProjectionMatrix();
+  controls.target.copy(savedTarget);
+  controls.update();
+  renderer.setPixelRatio(savedPR);
+  renderer.setSize(savedSize.x, savedSize.y, false);
+  resize();
+  renderer.render(scene, camera);
+  return url;
 }
 
 function resize(){
@@ -3006,6 +3148,8 @@ window.__dev32.rotProbe     = () => imgRotate;
 window.__dev32.orbitEnabled = () => !!(controls && controls.enabled);
 window.__dev32.foldProbe    = () => currentFold;
 window.__dev32.camProbe     = () => camera.position.toArray();
+window.__dev32.layerProbe   = () => ({ ...layerState });
+window.__dev32.fitProbe     = () => lastThumbFit;
 // Getter, not a plain assignment: `camera` is only assigned inside init(), so a snapshot taken at
 // module-eval time captures undefined.
 Object.defineProperty(window.__dev32, 'camera', { get: () => camera, configurable: true });
@@ -3227,7 +3371,7 @@ function showForSize(size, orientation){
   else pendingConfig = key;
 }
 
-window.audial3D = { available: webglOK, showForSize, show3D, refreshArt, setVarnish, setFold };
+window.audial3D = { available: webglOK, showForSize, show3D, refreshArt, setVarnish, setFold, captureThumbnail };
 
 if (!webglOK) {
   console.warn('[audial3D] WebGL unavailable — CSS preview will be used.');

@@ -1695,7 +1695,7 @@ the live binding. It's now an `Object.defineProperty` getter. New probes: `foldP
 ---
 
 ## Task #DEV-37: Cart Thumbnails via Canvas Screenshot
-- **Status:** TODO
+- **Status:** ✅ DONE (2026-07-17) — verified in real Chrome against the real `.glb`
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-34 (image upload must work)
@@ -1729,6 +1729,83 @@ Capture a screenshot of the Three.js canvas at "Add to Cart" moment and use it a
 ✅ Thumbnail persists across page refresh (localStorage)
 ✅ localStorage size stays within safe limits
 ✅ Room visualizer's "Your Designs" section shows thumbnails correctly (may need adaptation)
+
+### What was built (deviations from the spec above are deliberate — read them)
+
+**The bug this actually fixed was bigger than "no thumbnail".** Cart cards already had a `.cart-3d`
+div, but it held only `.cart-face` + the artwork `<img>` — no `.panel-side` wood strips.
+`updateCart` computed `woodClass`/`wrapClass` and set them on that div, but every rule for
+`.wood-dark-scene`/`.wrap-*-scene` selects `.panel-side`, which cart cards never contained. **Dead
+code.** So the varnish and wrap the user picked were *invisible in the cart* — the card was bare
+artwork tilted 14°.
+
+**Founder's calls:** posed 3D screenshot (not live-orbit, not CSS strips); angle matches
+`.panel-3d`'s `rotateY(-35deg) rotateX(8deg)` (DES-28), not `.cart-3d`'s flatter −14°/6°; JPEG on the
+paper background, not the spec's PNG; **panel sizes match the CSS cards' sizes**; the visualizer's
+"Your Designs" picker uses the thumbnails too.
+
+**`captureThumbnail()` is synchronous by necessity.** The renderer is built without
+`preserveDrawingBuffer`, so `toDataURL` must run in the same block as `render()` — before the browser
+composites and clears the buffer. Upside: no paint happens mid-function, so the user never sees the
+temporary 400×400 frame.
+
+**It normalizes before capturing, and that is not optional.** DEV-33's drawer lets the user hide
+layers; a naive screenshot would store a *skeleton panel* as the cart thumbnail. `captureThumbnail`
+forces every `layerState` row on, clears `frontHover`, captures, then restores exhaustively.
+
+**JPEG-on-paper cost nothing extra:** `scene.background` was already `0xf2f2f9` — the cart card's own
+background — so transparency renders nothing and PNG's ~100–300KB/item would have bought literally
+zero. Measured: **~7KB/thumbnail, 60KB for a 4-panel cart.** The spec's localStorage anxiety was
+unfounded.
+
+**Sizing: each config is framed individually to match the CSS card's own sizing curve.**
+`fitThumbCamera` targets `sqrt(area / 8) * 0.95` of the frame (`THUMB_AREA_SQFT`, `THUMB_FIT`) —
+i.e. `renderCartCardPreview`'s `CARD_MAX_LINEAR * sqrt(area / CARD_MAX_AREA)`, the math the CSS cards
+always used. Measured result: every size within 3% of its old CSS size (4×2 → 160px exactly).
+
+**A single fixed distance was built first, and it FAILED — don't retry it.** It preserved physical
+proportionality, but the square frame must fit the tallest panel (1×4V), and `object-fit:contain`
+then shrank that whole frame into the card's 160px box, so **horizontal panels rendered at ~60% of
+the CSS size** (measured: 4×2 at 96px vs 160px). Cause: a 4ft *vertical* panel isn't foreshortened by
+the 35° yaw while a 4ft *horizontal* one is (×cos35 = 0.82), so 1×4 was already at 96% and blocked
+any uniform zoom. Matching CSS therefore means **abandoning physical proportionality** — the CSS
+`sqrt(area)` curve was never physically true (1×1:4×2 = 2.83, not the physical 3.54). Founder's call,
+made with the measurements in hand.
+
+**The fit must RECENTRE, not just scale — this is the subtle one.** Under perspective a wide panel at
+35° yaw projects **asymmetrically** (the near end projects further out), so its bbox centre is not the
+frame centre. Scaling alone let the 4×2 span 95% of the frame *while hanging off the right edge*
+(279 border pixels). `fitThumbCamera` corrects distance **and** pan each pass, panning eye and target
+together so the view direction is preserved.
+
+**Measured, don't assume — the `.glb` is not proportional to feet.** Frame long sides are 1×1 → 0.354,
+2×2 → 0.654, 4×2 → 1.254 model units, i.e. `0.30 × feet + 0.054`. That constant **+0.054 is the wood
+frame thickness**. Any future "render N panels to scale" work must not assume 1:2:4.
+
+**The azimuth sign had to be measured, not derived.** CSS is Y-down/left-handed and the model carries
+a baked 180° Y rotation. `+35`/`+8` turned out correct — confirmed by rendering it beside the real CSS
+preview and checking the artwork wasn't swapped left-for-right (the tell a mirror would leave).
+
+**Verification trap — JPEG ringing fakes a clipping failure.** A pixel-scan clip test with a tight
+threshold (±8 of the paper background) reports the 4×2 as clipped: chroma bleed around the panel's
+high-contrast edge smears ~10px into the margin. Panel colours differ from the background by 40+ in
+some channel, so **use ±25**. Real clipping looks completely different — 279 solid border pixels, and
+visible to the eye.
+
+**Fallbacks:** `captureThumbnail` returns `null` for custom sizes (`activeConfigKey()` has no
+`SIZE_TO_CONFIG` entry) and when WebGL is unavailable. Both render sites branch on `panel.thumbnail`
+and fall through to the pre-existing CSS/flat-art markup, which also covers **carts saved before this
+change**. No migration. Wall panels in the visualizer (flat, head-on) are untouched.
+
+**Known cosmetic limit:** at −35°/8° the wood frame reads as a thin sliver, so the varnish is legible
+but not prominent. This is faithful to the CSS angle that was requested — the CSS preview's edge is
+equally thin. Raising `THUMB_AZIMUTH_DEG` to ~45–50° would show more frame at the cost of no longer
+matching the CSS.
+
+**Not done (deliberate):** the dead `woodClass`/`wrapClass` at `updateCart` remain on the fallback
+path. Removing them isn't DEV-37's job.
+
+(`configurator.html`, `room-visualizer.html`)
 
 ---
 
