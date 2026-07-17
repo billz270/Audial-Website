@@ -1211,6 +1211,11 @@ $('pickerCreate').addEventListener('click', () => {
 
 function showDesigner(){
   designer.classList.add('active');
+  // Wood varnish and side wrap are properties of the panel, not of the artwork, and the 3D viewer
+  // renders them fine on bare fabric — so they belong on screen as soon as a panel exists. Revealing
+  // the Finish section here (the single entry both the catalog-size and custom-size flows funnel
+  // through) rather than on image upload. loadPanelToEditor shows it itself; it skips showDesigner.
+  customSection.style.display = 'block';
   if(_skipDesignerScroll){ _skipDesignerScroll = false; return; }
   setTimeout(()=>designer.scrollIntoView({behavior:'smooth',block:'start'}),100);
 }
@@ -1417,8 +1422,7 @@ function handleImageUpload(file){
       const dpi = Math.round(img.width / fw / 12);
       $('dpiEstimate').innerHTML = dpi >= 300 ? `<span style="color:#2D8659">${dpi}</span>` : dpi >= 150 ? `<span style="color:#ecad49">${dpi}</span>` : `<span style="color:#C03020">${dpi} (low)</span>`;
 
-      customSection.style.display = 'block';
-      enablePanMode();
+      enablePanMode();   // Finish section is already up — showDesigner reveals it with the panel
     };
     img.src = e.target.result;
   };
@@ -1772,7 +1776,8 @@ document.querySelectorAll('.fopt').forEach(opt=>{
     opt.classList.add('active');
     if(option === 'wood'){
       currentPanel.woodVarnish = value;
-      panel3d.classList.toggle('wood-dark-scene', value === 'dark');
+      panel3d.classList.toggle('wood-dark-scene', value === 'dark');   // CSS preview (custom sizes)
+      if (window.audial3D && window.audial3D.setVarnish) window.audial3D.setVarnish(value); // DEV-35
     } else if(option === 'wrap'){
       currentPanel.fabricWrap = value;
       panel3d.classList.toggle('wrap-half-scene', value === 'half');
@@ -2484,6 +2489,14 @@ let webglOK = webglAvailable();
 let modelReady = false;
 let pendingConfig = null;
 let currentFold = 'full';                 // default fabric wrap variant
+// DEV-35: both varnishes ship as real textured materials in Panels-web.glb. They survive the
+// build's prune() only because the Blender master assigns each to >=1 panel — hence the .glb's
+// arbitrary per-config split (light on 4x2*/2x2/1x4*, dark on 1x1/2x1*). That split is an asset
+// artifact, not intent: the toggle below overrides it so any panel can wear either varnish.
+const WOOD_MATERIAL_NAMES = { light: 'Pine Wood Light', dark: 'Pine Wood Dark' };
+const WOOD_COMPONENTS = ['Frame', 'Back Support'];   // same physical wood => always one varnish
+const woodMats = {};                      // woodMats[light|dark] = source material from the .glb
+let currentVarnish = 'light';             // agrees with freshPanel()'s woodVarnish default
 const panelMeshes = {};                   // panelMeshes[key][component] = mesh
 const fabricFolds = {};                   // fabricFolds[key][half|full] = mesh
 const foldMeshes = {};                     // foldMeshes[key][half|full] = solid neutral fold mesh
@@ -2665,6 +2678,11 @@ function loadModel(){
       if (idName === 'Backdrop' || child.parent?.name === 'Backdrop'){ child.visible = false; return; }
       const cls = classifyMesh(child);
       if (cls){
+        // Grab the two shared wood materials before the clone below hands this mesh a private copy;
+        // after the traverse the originals have no mesh users and are only reachable via woodMats.
+        const matName = child.material && child.material.name;
+        for (const v in WOOD_MATERIAL_NAMES)
+          if (matName === WOOD_MATERIAL_NAMES[v] && !woodMats[v]) woodMats[v] = child.material;
         if (child.material) child.material = child.material.clone(); // independent per-layer material
         if (cls.fold){
           fabricFolds[cls.panelKey][cls.fold] = child;
@@ -2705,6 +2723,7 @@ function loadModel(){
     model.rotation.y = Math.PI;  // bring the FRONT (fabric side) to face the +Z camera
     scene.add(model);
     applyFabricFold();
+    applyWoodVarnish();   // currentVarnish may already be seeded by a showForSize that beat the load
     modelReady = true;
     loadingEl.style.display = 'none';
     if (pendingConfig){ showConfig(pendingConfig); pendingConfig = null; }
@@ -2731,6 +2750,26 @@ function applyFabricFold(){
     if (otherFold)  otherFold.visible  = false;
     if (front){ panelMeshes[key]['Acoustic Fabric'] = front; front.userData.pairedFold = fold; }
   }
+}
+
+// DEV-35: paint every config's wood in the selected varnish, overriding whatever the .glb baked in.
+// Safe to share one material across all wood meshes: nothing mutates them (only the fabric front's
+// material is touched, by the art/hover paths). Frame and Back Support always move together.
+function applyWoodVarnish(){
+  const mat = woodMats[currentVarnish];
+  if (!mat) return;                                  // model not loaded yet, or material missing
+  for (const key of PANEL_KEYS)
+    for (const c of WOOD_COMPONENTS){
+      const mesh = panelMeshes[key][c];
+      if (mesh) mesh.material = mat;
+    }
+}
+
+// The render loop is continuous, so the swap lands on the next frame — no showConfig re-run needed.
+function setVarnish(v){
+  if (v !== 'light' && v !== 'dark') return;
+  currentVarnish = v;
+  applyWoodVarnish();
 }
 
 function hideAllComponents(){
@@ -3146,12 +3185,17 @@ function showForSize(size, orientation){
   exitEdit();                 // a new panel is not the one you were editing
   resetLayerState();          // a newly loaded panel always starts whole
   syncDrawerUI();
+  // DEV-35: seed the varnish from the panel's own state. This is the choke point for all three
+  // entries (size pick, orientation swap, loadPanelToEditor), so an edited saved panel restores
+  // its varnish here rather than needing a setVarnish call at each call site.
+  if (typeof currentPanel !== 'undefined' && currentPanel && currentPanel.woodVarnish)
+    setVarnish(currentPanel.woodVarnish);
   loadingEl.style.display = modelReady ? 'none' : 'flex';
   if (modelReady) showConfig(key);
   else pendingConfig = key;
 }
 
-window.audial3D = { available: webglOK, showForSize, show3D, refreshArt };
+window.audial3D = { available: webglOK, showForSize, show3D, refreshArt, setVarnish };
 
 if (!webglOK) {
   console.warn('[audial3D] WebGL unavailable — CSS preview will be used.');
