@@ -1211,6 +1211,11 @@ $('pickerCreate').addEventListener('click', () => {
 
 function showDesigner(){
   designer.classList.add('active');
+  // Wood varnish and side wrap are properties of the panel, not of the artwork, and the 3D viewer
+  // renders them fine on bare fabric — so they belong on screen as soon as a panel exists. Revealing
+  // the Finish section here (the single entry both the catalog-size and custom-size flows funnel
+  // through) rather than on image upload. loadPanelToEditor shows it itself; it skips showDesigner.
+  customSection.style.display = 'block';
   if(_skipDesignerScroll){ _skipDesignerScroll = false; return; }
   setTimeout(()=>designer.scrollIntoView({behavior:'smooth',block:'start'}),100);
 }
@@ -1417,8 +1422,7 @@ function handleImageUpload(file){
       const dpi = Math.round(img.width / fw / 12);
       $('dpiEstimate').innerHTML = dpi >= 300 ? `<span style="color:#2D8659">${dpi}</span>` : dpi >= 150 ? `<span style="color:#ecad49">${dpi}</span>` : `<span style="color:#C03020">${dpi} (low)</span>`;
 
-      customSection.style.display = 'block';
-      enablePanMode();
+      enablePanMode();   // Finish section is already up — showDesigner reveals it with the panel
     };
     img.src = e.target.result;
   };

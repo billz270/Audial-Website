@@ -1585,6 +1585,26 @@ Note: in Blender, "zero gloss" = Roughness **1.0**, not 0 (0 is a mirror).
 - [x] Editing a saved panel restores its varnish (seeded via `showForSize`)
 - [x] Non-wood layers untouched (Fabric / Fiberglass verified unchanged)
 
+### Follow-up: Finish section no longer gated behind an image upload
+Spotted while reviewing DEV-35: the **Finish** section (`#customSection` — a misnomer, it holds Wood
++ Side Wrap and has nothing to do with custom sizes) only appeared *after* an image upload, so the
+varnish buttons were invisible until you uploaded art. Pre-existing, not from DEV-35.
+
+It was never a principled gate — `display:block` was set in `handleImageUpload`'s `img.onload`
+(and in `loadPanelToEditor`), but the Clear-art handler never hid it again, so Finish already
+survived clearing the artwork. Varnish and wrap are properties of the *panel*, not the artwork,
+and the viewer renders both on bare fabric.
+
+Fix: reveal it in `showDesigner()` — the single entry both the catalog-size and custom-size flows
+funnel through — and drop the now-redundant upload-time line. `loadPanelToEditor` shows it itself
+(it skips `showDesigner`), so that path is unaffected. Finish now sits above the DES-8 Image Tips
+card and the two coexist until upload hides the tips.
+
+Verified (headless Chrome, 8/8): hidden before any size is picked; visible after a size pick with
+no image, with both Wood and Wrap buttons reachable; **Dark varnish applies to the 3D model with no
+image uploaded**; visible for custom sizes; survives a size switch. Upload path re-verified
+end-to-end: Finish stays up, art applies, filename populates, image tips still hide on upload.
+
 ### Verified (headless Chrome, 12/12)
 `1x1` renders Light at default despite the `.glb` baking Dark (the bug); Light↔Dark round-trips on
 Frame + Back Support; Dark overrides `4x2H`'s baked Light; varnish persists across a size change;
