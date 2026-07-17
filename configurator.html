@@ -1780,8 +1780,9 @@ document.querySelectorAll('.fopt').forEach(opt=>{
       if (window.audial3D && window.audial3D.setVarnish) window.audial3D.setVarnish(value); // DEV-35
     } else if(option === 'wrap'){
       currentPanel.fabricWrap = value;
-      panel3d.classList.toggle('wrap-half-scene', value === 'half');
+      panel3d.classList.toggle('wrap-half-scene', value === 'half');   // CSS preview (custom sizes)
       panel3d.classList.toggle('wrap-full-scene', value === 'full');
+      if (window.audial3D && window.audial3D.setFold) window.audial3D.setFold(value); // DEV-36
     }
   });
 });
@@ -2488,7 +2489,7 @@ const loadingEl  = document.getElementById('viewer3dLoading');
 let webglOK = webglAvailable();
 let modelReady = false;
 let pendingConfig = null;
-let currentFold = 'full';                 // default fabric wrap variant
+let currentFold = 'half';                 // agrees with freshPanel()'s fabricWrap default
 // DEV-35: both varnishes ship as real textured materials in Panels-web.glb. They survive the
 // build's prune() only because the Blender master assigns each to >=1 panel — hence the .glb's
 // arbitrary per-config split (light on 4x2*/2x2/1x4*, dark on 1x1/2x1*). That split is an asset
@@ -2772,6 +2773,21 @@ function setVarnish(v){
   applyWoodVarnish();
 }
 
+// DEV-36: both wraps ship as real geometry per config, so this is a mesh swap, not a material one.
+// Unlike setVarnish, the render loop alone isn't enough: applyFabricFold only HIDES the outgoing
+// variant and re-points the Acoustic Fabric slot — the incoming mesh is still hidden and unpainted.
+// Hence the explicit visibility + repaint, both scoped to the active config so the camera stays put.
+function setFold(f){
+  if (f !== 'half' && f !== 'full') return;
+  if (f === currentFold) return;
+  currentFold = f;
+  applyFabricFold();
+  const key = activeConfigKey();
+  if (!key || !modelReady) return;      // loadModel's own applyFabricFold picks up currentFold later
+  applyFabricVisibility(key);
+  renderFrontFaceCanvas();              // the promoted mesh has its own cloned material -> repaint
+}
+
 function hideAllComponents(){
   for (const key of PANEL_KEYS)
     for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = false; }
@@ -2782,10 +2798,19 @@ function showConfig(key){
   for (const key2 of PANEL_KEYS)               // hide every fold mesh first (defense-in-depth)
     for (const f of ['half','full']){ const m = foldMeshes[key2][f]; if (m) m.visible = false; }
   for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = layerState[c]; }
-  const fab = panelMeshes[key]['Acoustic Fabric'];       // = the active front mesh
-  if (fab && fab.userData.pairedFold) fab.userData.pairedFold.visible = layerState['Acoustic Fabric'];
+  applyFabricVisibility(key);
   centerCameraOn(key);
   renderFrontFaceCanvas();
+}
+
+// The active front mesh (= the Acoustic Fabric slot) and its fold move together, per layerState.
+// Split out of showConfig so setFold can re-apply visibility WITHOUT centerCameraOn's re-frame:
+// a wrap toggle must not throw away the user's orbit, but a size/orientation change should re-frame.
+function applyFabricVisibility(key){
+  const fab = panelMeshes[key] && panelMeshes[key]['Acoustic Fabric'];
+  if (!fab) return;
+  fab.visible = layerState['Acoustic Fabric'];
+  if (fab.userData.pairedFold) fab.userData.pairedFold.visible = layerState['Acoustic Fabric'];
 }
 
 function centerCameraOn(key){
@@ -2979,6 +3004,11 @@ window.__dev32.zoomProbe    = () => imgZoom;
 window.__dev32.flipProbe    = () => ({ h: imgFlipH, v: imgFlipV });
 window.__dev32.rotProbe     = () => imgRotate;
 window.__dev32.orbitEnabled = () => !!(controls && controls.enabled);
+window.__dev32.foldProbe    = () => currentFold;
+window.__dev32.camProbe     = () => camera.position.toArray();
+// Getter, not a plain assignment: `camera` is only assigned inside init(), so a snapshot taken at
+// module-eval time captures undefined.
+Object.defineProperty(window.__dev32, 'camera', { get: () => camera, configurable: true });
 
 function frontHit(ev){
   if (!camera) return null;
@@ -3190,12 +3220,14 @@ function showForSize(size, orientation){
   // its varnish here rather than needing a setVarnish call at each call site.
   if (typeof currentPanel !== 'undefined' && currentPanel && currentPanel.woodVarnish)
     setVarnish(currentPanel.woodVarnish);
+  if (typeof currentPanel !== 'undefined' && currentPanel && currentPanel.fabricWrap)
+    setFold(currentPanel.fabricWrap);   // DEV-36: same choke point, so an edited panel restores its wrap
   loadingEl.style.display = modelReady ? 'none' : 'flex';
   if (modelReady) showConfig(key);
   else pendingConfig = key;
 }
 
-window.audial3D = { available: webglOK, showForSize, show3D, refreshArt, setVarnish };
+window.audial3D = { available: webglOK, showForSize, show3D, refreshArt, setVarnish, setFold };
 
 if (!webglOK) {
   console.warn('[audial3D] WebGL unavailable — CSS preview will be used.');
