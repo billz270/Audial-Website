@@ -1209,7 +1209,7 @@ Transform the current "Play Assembly Animation" button behavior from a quick lay
 ---
 
 ## Task #DEV-32: Foundational Three.js Swap in Configurator
-- **Status:** TODO
+- **Status:** DONE (committed `57a24b7`..`e03f140`; status was stale, verified against code 2026-07-15)
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-31 completion, panels-web.glb file ready
@@ -1251,10 +1251,58 @@ Replace the CSS 3D panel preview with the Three.js panel viewer inside the confi
 ---
 
 ## Task #DEV-33: Panel Size Selector + Components Slider in Configurator
-- **Status:** TODO
+- **Status:** DONE (2026-07-15) — Parts 1 + 2 built and verified on desktop and mobile.
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-32
+
+### ⚠️ Resume here — actual state (verified against code, not assumed)
+- ✅ **Part 1 size wiring** — size buttons switch the 3D config and the camera auto-centers
+  (`showForSize`, `centerCameraOn`, `SIZE_TO_CONFIG` @ configurator.html:2323).
+- ✅ **1×1 and 2×1** — the spec's fallback options are moot; all 8 configs ship in `Panels-web.glb`,
+  so every size maps to its own real config. No placeholder needed.
+- ✅ **Orientation toggle drives the model** (2026-07-15). `SIZE_TO_CONFIG` now maps each non-square
+  size to a `{horizontal, vertical}` pair (squares keep a single key); `configKeyFor(size, orientation)`
+  resolves it and `activeConfigKey()` is what `renderFrontFaceCanvas` / `__dev32.currentFront` use to
+  find the front mesh. `showForSize(size, orientation)` is called from both the size-card handler and
+  the orient-btn handler (after `updatePanelPreview`, so the art canvas measures the new face aspect).
+  All 8 configs are reachable; the DEV-34 distortion path (tall CSS face vs. horizontal model) is gone.
+  **Verified by driving the real page** (puppeteer + d3d11 GPU): every size × orientation loads its own
+  config with exactly one front mesh visible, face aspect matches canvas aspect, and with artwork
+  uploaded the mirror canvas is pixel-faithful to the CSS `panelFace` after a flip.
+- ✅ **Part 2 Components slider** — DONE, desktop only (2026-07-15). Right-edge tab + 220px drawer
+  (`.components-slideout` = tab + drawer riding one transform; closed, the wrapper is shifted right
+  by the drawer width so it parks outside `#panelContainer`'s `overflow:hidden`). Overlays the
+  preview — the canvas never resizes, so the panel doesn't re-fit mid-inspection. 3D mode only
+  (`.view-3d`), so custom sizes and the WebGL fallback never show it.
+  - **7 rows, not 6** — the 6 mesh layers plus **Artwork**. Mesh rows drive `layerState` →
+    `showConfig`/`applyLayer` (Acoustic Fabric drags its paired fold along).
+  - **Artwork is a texture, not a mesh**, so its row feeds `renderFrontFaceCanvas`'s `hasArt` branch
+    instead of hiding anything. Off + art loaded → bare fabric and **no** affordance (the art exists;
+    inviting an upload would lie). No art at all → affordance. Fabric off → Artwork row greys out.
+  - **Dual-state Artwork row:** Upload button until art exists, then a normal toggle. Derived from
+    the same `artLoaded()` check the painter uses, so row and panel can't disagree; Clear falls back
+    to the button for free. **This button is currently the only working upload path in 3D** — the
+    fabric itself is not clickable until DEV-34 Task 6 lands the raycast.
+  - All toggles reset to ON on any config change (size *or* orientation), per the spec.
+  - Outside-click dismiss ignores drags >6px, else rotating the panel would slam the drawer shut.
+  - **Also fixed here (was a latent DEV-34 bug):** `clearArtBtn` never notified the viewer, so
+    cleared art lingered on the fabric. It now calls `refreshArt()`.
+- ✅ **Mobile slide-up drawer** — DONE (2026-07-15). Same tab + drawer, re-laid as a bottom sheet
+  below 900px: wrapper stacks into a column and parks below the container, leaving the 34px tab.
+  Rows go **2-up** and the title is dropped (the tab already says it), so the sheet is ~145px, not 280.
+  - **Mobile pushes, desktop overlays** — deliberately different. An overlay sheet buried the very
+    panel it explains (280px of a 420px preview), so on mobile the canvas takes an explicit px height
+    down to the drawer top and the camera re-frames into that band. Desktop keeps the pure overlay
+    (no resize, no re-frame) — verified the desktop canvas is byte-identical before/after opening.
+  - **Canvas-sizing trap (cost two wrong fixes):** `#viewer3dCanvas` is `inset:0` + `height:100%`, so
+    (a) setting `bottom` alone does nothing — height wins; and (b) `height:auto` on a `<canvas>`
+    resolves to its **drawing-buffer** size, which the renderer just set to the full height, so that
+    reproduces the bug too. It must be an explicit px height. `resize()` now measures the **canvas**,
+    not the container.
+  - Band is measured off the **drawer**, not the whole slideout, so the canvas runs behind the
+    floating tab and no strip of bare container backdrop shows either side of it.
+  - `#artworkRow` spans the full last row (7 rows don't divide by 2) and gives Upload room.
 
 ### Goal
 Two features in this task:
@@ -1340,10 +1388,48 @@ Styling:
 ---
 
 ## Task #DEV-34: Artwork Upload → Acoustic Fabric Texture
-- **Status:** TODO
+- **Status:** IN PROGRESS — started ahead of DEV-33 (see note below)
 - **Priority:** HIGH
 - **File:** configurator.html
 - **Depends on:** DEV-33
+
+### ⚠️ Resume here — actual state (2026-07-15)
+Work was started on this **before DEV-33 was finished**. Nothing needs reverting; DEV-33 just has to
+be caught up. Detailed step plan lives in
+`docs/superpowers/plans/2026-07-15-dev32-artwork-onto-fabric.md` (its "Task 1–10" are sub-steps of
+DEV-34 — NOT TASKS.md tasks; that name collision caused confusion, read it carefully).
+
+**Note:** the branch `dev-32-artwork-onto-fabric` and all its commits are labelled `DEV-32`, but the
+work is DEV-34. DEV-32 is the foundational swap and is already done.
+
+Built and committed (through `9b0b5a2`):
+- Runtime front/fold fabric split; canonical front UVs; canvas-mirror texture pipeline.
+- `drawUploadAffordance` — "+ UPLOAD ARTWORK" hint. `AFFORD_SCALE` (=1.5) is the single size knob;
+  offsets/fonts are fractions of `s` so it scales as a unit. Text alpha 0.75 resting.
+- `frontAspectComp()` — the fabric quad's aspect is NOT the panelFace aspect (the front is inset by
+  the wrap: 4×2 quad is 1.90 not 2.0; 1×4 canvas 0.247 vs quad 0.283). **Applied to the affordance
+  only** — the `hasArt` branch will inherit the stretch and needs a decision: match the quad
+  (physically right) or the CSS preview (canvas-mirror parity).
+- `ensureArtTexture()` now disposes/rebuilds when `artCanvas` dimensions change. Reusing one
+  CanvasTexture across a resize left a stale mip chain that anisotropy rendered as ghost copies of
+  the text at wrong scales. This was the "repeated text" bug — fixed and confirmed by the founder.
+- `__dev32.currentFront()` debug hook (the raycast step will want it).
+
+Verified by measurement, so don't re-litigate:
+- Front face is **NOT mirrored**. All 5 configs share identical world orientation
+  (`+X→[-1,0,0]`, `+Y→[0,1,0]`, `+Z→[0,0,-1]`), so per-config divergence is impossible.
+  `FRONT_MIRROR_U` = **false**. (An earlier "1×4V is mirrored" claim was read off a ghost-corrupted
+  render and was wrong.)
+- UVs span exactly 1.0 with `repeat:[1,1]` — the texture never tiles.
+
+Not yet done:
+- **Click-to-upload / edit / hover raycast** (plan Task 6). `frontHover` is declared and read but
+  **never assigned**, so the hover-brighten is dead code and the fabric is not clickable. Upload can
+  still be exercised via console: `document.getElementById('fileInput').click()`.
+- **Cleanup (plan Task 4, agreed but not applied):** switch `orientFrontTexture`'s wrap from
+  `RepeatWrapping` → `ClampToEdgeWrapping` (makes tiling structurally impossible; source UVs are
+  ragged, e.g. 4×2H ships `v=[0,1.017]`), and delete the speculative `__dev32.orient`
+  quarter/flipU/flipV knobs in favour of one documented `FRONT_MIRROR_U = false`. No visual change.
 
 ### Goal
 When user uploads an image in the configurator, apply it as a texture to the Acoustic Fabric mesh's material in the Three.js viewer.
