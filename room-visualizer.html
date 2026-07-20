@@ -269,7 +269,6 @@
   .designed-card.depleted{opacity:0.4;pointer-events:none}
   .designed-card-preview{position:relative;aspect-ratio:1.2;background:#F8F8FA;border-bottom:1.5px solid var(--ink);overflow:hidden;display:flex;align-items:center;justify-content:center;padding:8px}
   .designed-card.active .designed-card-preview{background:#0d4a63;border-bottom-color:var(--ink)}
-  .designed-card-thumb-img{width:100%;height:100%;object-fit:contain;display:block}
   .designed-card-thumb{position:relative;overflow:hidden;border:1px solid rgba(9,61,83,0.4);box-shadow:0 2px 8px rgba(0,23,31,0.2)}
   .designed-card.active .designed-card-thumb{border-color:rgba(255,255,255,0.3)}
   .designed-card-thumb img{display:block}
@@ -1098,9 +1097,7 @@ function renderDesignedPanels(){
     card.innerHTML = `
       <div class="designed-card-preview">
         <div class="designed-card-remaining">${remaining > 0 ? remaining : '—'}</div>
-        ${panel.thumbnail
-          ? `<img class="designed-card-thumb-img" src="${panel.thumbnail}" alt="">`
-          : `<div class="designed-card-thumb" style="width:${thumbPxW}px;height:${thumbPxH}px">${imgHtml}</div>`}
+        <div class="designed-card-thumb" style="width:${thumbPxW}px;height:${thumbPxH}px">${imgHtml}</div>
       </div>
       <div class="designed-card-info">
         <div class="designed-card-size">${dispW}×${dispH} ft</div>

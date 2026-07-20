@@ -134,106 +134,7 @@
     touch-action:none;overflow:hidden;
   }
   .panel-3d-container.grabbing{cursor:grabbing}
-  /* DEV-32: 3D viewer overlay. Hidden until .view-3d is set on the container. */
-  .panel-3d-container{position:relative}
-  #viewer3dCanvas{display:none;position:absolute;inset:0;width:100%;height:100%;z-index:2}
-  .panel-3d-container.view-3d #viewer3dCanvas{display:block}
-  /* DEV-32 artwork: hide the CSS panel visually but keep it laid out so
-     panelFace.clientWidth/Height stay valid for the canvas-mirror math. */
-  .panel-3d-container.view-3d #sceneWrap{visibility:hidden;pointer-events:none}
-  #viewer3dLoading{display:none;position:absolute;inset:0;z-index:3;align-items:center;justify-content:center;
-    background:var(--paper);color:var(--ink);font-family:'Archivo',sans-serif;font-weight:600;font-size:12px;
-    letter-spacing:0.1em;text-transform:uppercase}
   .panel-3d-container.image-mode{cursor:default}
-
-  /* DEV-33: Components slide-out. Tab + drawer ride one transform: closed, the wrapper is shifted
-     right by exactly the drawer width so the drawer sits outside the container's overflow:hidden
-     and only the tab shows. 3D mode only — custom sizes and the WebGL fallback never see it. */
-  .components-slideout{
-    position:absolute;top:0;bottom:0;right:0;z-index:4;
-    display:flex;align-items:stretch;
-    transform:translateX(220px);
-    transition:transform 0.25s ease;
-    pointer-events:none;
-  }
-  .components-slideout.open{transform:translateX(0)}
-  .panel-3d-container:not(.view-3d) .components-slideout{display:none}
-  .components-tab,.components-drawer{pointer-events:auto}
-  .components-tab{
-    align-self:center;display:flex;align-items:center;gap:8px;
-    padding:16px 7px;background:var(--paper);
-    border:1.5px solid var(--ink);border-right:none;
-    font-family:inherit;font-size:10px;font-weight:700;
-    text-transform:uppercase;letter-spacing:0.15em;color:var(--ink);
-    cursor:pointer;transition:background 0.2s,color 0.2s;
-    writing-mode:vertical-rl;              /* reads top-to-bottom; SVG stays upright */
-  }
-  .components-tab:hover{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper)}
-  .components-tab svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:2.5;transition:transform 0.25s ease}
-  .components-slideout.open .components-tab svg{transform:rotate(180deg)}
-  .components-drawer{
-    width:220px;background:var(--paper);border-left:1.5px solid var(--ink);
-    display:flex;flex-direction:column;cursor:default;overflow-y:auto;
-  }
-  .components-title{
-    padding:11px 12px;font-size:10px;font-weight:700;text-transform:uppercase;
-    letter-spacing:0.15em;color:var(--ink);border-bottom:1.5px solid var(--ink);flex:none;
-  }
-  .toggle-row{
-    display:flex;align-items:center;justify-content:space-between;gap:8px;
-    padding:9px 12px;border-bottom:1px solid rgba(9,61,83,0.15);flex:none;min-height:40px;
-  }
-  .toggle-row:last-child{border-bottom:none}
-  .toggle-label{font-size:11px;font-weight:600;color:var(--ink)}
-  .toggle-switch{
-    width:32px;height:18px;border-radius:9px;background:rgba(9,61,83,0.22);
-    position:relative;cursor:pointer;flex:none;transition:background 0.2s;
-  }
-  .toggle-switch::after{
-    content:'';position:absolute;top:2px;left:2px;width:14px;height:14px;border-radius:50%;
-    background:var(--paper);box-shadow:0 1px 2px rgba(0,23,31,0.35);transition:transform 0.2s;
-  }
-  .toggle-switch.active{background:var(--ink)}
-  .toggle-switch.active::after{transform:translateX(14px)}
-  .toggle-row.disabled{opacity:0.4;pointer-events:none}
-  /* Artwork row is dual-state: Upload button until artwork exists, then a normal toggle. */
-  .comp-upload-btn{
-    padding:5px 9px;background:var(--paper);border:1.5px solid var(--ink);
-    font-family:inherit;font-size:9px;font-weight:700;text-transform:uppercase;
-    letter-spacing:0.1em;color:var(--ink);cursor:pointer;transition:all 0.2s;
-  }
-  .comp-upload-btn:hover{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper);border-color:var(--primary)}
-  #artworkRow.no-art .toggle-switch{display:none}
-  #artworkRow:not(.no-art) .comp-upload-btn{display:none}
-  /* Mobile: same tab + drawer, re-laid as a bottom sheet. A 220px side drawer would swallow a
-     420px-tall preview, so the axis flips: the wrapper stacks into a column and parks below the
-     container with only the tab showing. The rows go 2-up and the title is dropped (the tab already
-     says "Components") to keep the sheet short — see .sheet-open, which hands the covered band back
-     to the canvas so the panel stays visible while you toggle it. Own block, after the base rules. */
-  @media(max-width:900px){
-    .components-slideout{
-      top:auto;left:0;right:0;bottom:0;
-      flex-direction:column;align-items:stretch;
-      transform:translateY(calc(100% - 34px));   /* 34px = tab height, the only part left showing */
-    }
-    .components-slideout.open{transform:translateY(0)}
-    .components-tab{
-      align-self:center;writing-mode:horizontal-tb;
-      height:34px;padding:0 16px;gap:7px;
-      border:1.5px solid var(--ink);border-bottom:none;
-    }
-    .components-tab svg{transform:rotate(90deg)}                        /* points up = pull me open */
-    .components-slideout.open .components-tab svg{transform:rotate(-90deg)}
-    .components-drawer{width:auto;border-left:none;border-top:1.5px solid var(--ink)}
-    .components-title{display:none}
-    .components-rows{display:grid;grid-template-columns:1fr 1fr}
-    .toggle-row{min-height:36px;padding:7px 10px;border-bottom:1px solid rgba(9,61,83,0.15)}
-    .toggle-row:nth-child(odd){border-right:1px solid rgba(9,61,83,0.15)}
-    /* 7 rows don't divide by 2 — Artwork spans the last row so nothing sits half-empty,
-       and it gives the Upload button room to breathe. */
-    #artworkRow{grid-column:1/-1;border-right:none;border-bottom:none}
-    .toggle-label{font-size:10px}
-  }
 
   .scene-wrap{transform-style:preserve-3d;transition:transform 0.15s ease-out;position:relative;transform:perspective(1800px)}
   .panel-3d{transform-style:preserve-3d;transition:transform 0.12s ease-out;position:relative;will-change:transform}
@@ -412,7 +313,6 @@
   .cart-face{width:100%;height:100%;background:#FAFAF8;border:1.5px solid var(--ink);overflow:hidden;position:relative}
   .cart-face.has-image{background:transparent}
   .cart-face img{position:absolute;top:0;left:0;display:block}
-  .cart-thumb{width:100%;height:100%;object-fit:contain;display:block}
   .cart-info{padding:12px 14px;display:flex;flex-direction:column;gap:8px}
   .cart-size-row{display:flex;justify-content:space-between;align-items:baseline}
   .cart-size{font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:-0.01em}
@@ -683,8 +583,6 @@
     </div>
 
     <div class="panel-3d-container" id="panelContainer">
-      <canvas id="viewer3dCanvas"></canvas>
-      <div id="viewer3dLoading">Loading 3D…</div>
       <div class="scene-wrap" id="sceneWrap">
         <div class="panel-3d" id="panel3d">
           <div class="panel-back" id="panelBack"></div>
@@ -708,30 +606,6 @@
             </div>
           </div>
           <div class="panel-shadow"></div>
-        </div>
-      </div>
-
-      <!-- DEV-33: Components peek-inside drawer. Rows are in physical build order. -->
-      <div class="components-slideout" id="componentsSlideout">
-        <button class="components-tab" id="componentsTab" aria-expanded="false">
-          <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
-          Components
-        </button>
-        <div class="components-drawer">
-          <div class="components-title">Components</div>
-          <div class="components-rows">
-          <div class="toggle-row"><span class="toggle-label">Frame</span><div class="toggle-switch active" data-component="Frame"></div></div>
-          <div class="toggle-row"><span class="toggle-label">Rockwool</span><div class="toggle-switch active" data-component="Rockwool"></div></div>
-          <div class="toggle-row"><span class="toggle-label">Fiberglass Sheet</span><div class="toggle-switch active" data-component="Fiberglass Sheet"></div></div>
-          <div class="toggle-row"><span class="toggle-label">Back Support</span><div class="toggle-switch active" data-component="Back Support"></div></div>
-          <div class="toggle-row"><span class="toggle-label">Fiberglass Screen</span><div class="toggle-switch active" data-component="Fiberglass Screen"></div></div>
-          <div class="toggle-row"><span class="toggle-label">Acoustic Fabric</span><div class="toggle-switch active" data-component="Acoustic Fabric"></div></div>
-          <div class="toggle-row no-art" id="artworkRow">
-            <span class="toggle-label">Artwork</span>
-            <button class="comp-upload-btn" id="compUploadBtn">Upload</button>
-            <div class="toggle-switch active" data-component="Artwork"></div>
-          </div>
-          </div>
         </div>
       </div>
     </div>
@@ -775,9 +649,6 @@
           </button>
           <button class="ctrl-btn" id="imgResetCropBtn" title="Recenter (keep zoom)">◎</button>
           <button class="ctrl-btn" id="imgFitBtn" title="Fit image (reset everything)">Fit</button>
-          <!-- The in-panel Replace lives inside panelFace, which is hidden in 3D mode; this toolbar
-               sits outside the viewer, so it's the only Replace reachable while editing in 3D. -->
-          <button class="ctrl-btn" id="imgReplaceBtn" title="Replace image">Replace</button>
         </div>
       </div>
     </div>
@@ -1117,7 +988,6 @@ sizeCards.forEach(card=>{
     panelActions.classList.add('visible');
     panelContainer.getBoundingClientRect(); // force layout so offsetWidth/offsetHeight are real
     updatePanelPreview();
-    if (window.audial3D) window.audial3D.showForSize(currentPanel.size, currentPanel.orientation); // DEV-32: catalog size -> 3D
     if (!currentPanel.image) showSizeTips(card.dataset.size);
   });
 });
@@ -1202,7 +1072,6 @@ $('pickerCreate').addEventListener('click', () => {
   }
 
   sceneZoom = 0.82;
-  if (window.audial3D) window.audial3D.show3D(false); // DEV-32: custom size uses the CSS preview
   showDesigner();
   panelActions.classList.add('visible');
   panelContainer.getBoundingClientRect();
@@ -1212,11 +1081,6 @@ $('pickerCreate').addEventListener('click', () => {
 
 function showDesigner(){
   designer.classList.add('active');
-  // Wood varnish and side wrap are properties of the panel, not of the artwork, and the 3D viewer
-  // renders them fine on bare fabric — so they belong on screen as soon as a panel exists. Revealing
-  // the Finish section here (the single entry both the catalog-size and custom-size flows funnel
-  // through) rather than on image upload. loadPanelToEditor shows it itself; it skips showDesigner.
-  customSection.style.display = 'block';
   if(_skipDesignerScroll){ _skipDesignerScroll = false; return; }
   setTimeout(()=>designer.scrollIntoView({behavior:'smooth',block:'start'}),100);
 }
@@ -1227,9 +1091,6 @@ document.querySelectorAll('.orient-btn').forEach(btn=>{
     btn.classList.add('active');
     currentPanel.orientation = btn.dataset.orient;
     updatePanelPreview();
-    // DEV-33: swap the 3D model to the matching orientation variant. Must follow updatePanelPreview
-    // so the art canvas is measured against the panelFace's new aspect.
-    if (window.audial3D) window.audial3D.showForSize(currentPanel.size, currentPanel.orientation);
     if(currentPanel.image) setTimeout(fitImageToPanel, 50);
     else showSizeTips(currentPanel.size, btn.dataset.orient);
   });
@@ -1328,14 +1189,10 @@ function applyRotation(){
   // — likely due to CSS rotateX/Y conventions combined with our perspective setup.)
   // eps prevents flicker right at zero.
   const eps = 0.5;
-  // DEV-32: in 3D mode #sceneWrap is visibility:hidden to stay measurable, but an inline
-  // visibility:visible on a child overrides a hidden parent — these strips would paint on top
-  // of the 3D canvas. Keep them hidden while the viewer owns the container.
-  const v3d = window.__viewer3dActive;
-  sideLeft.style.visibility   = (!v3d && panYaw   >  eps) ? 'visible' : 'hidden';
-  sideRight.style.visibility  = (!v3d && panYaw   < -eps) ? 'visible' : 'hidden';
-  sideBottom.style.visibility = (!v3d && panPitch >  eps) ? 'visible' : 'hidden';
-  sideTop.style.visibility    = (!v3d && panPitch < -eps) ? 'visible' : 'hidden';
+  sideLeft.style.visibility   = (panYaw   >  eps) ? 'visible' : 'hidden';
+  sideRight.style.visibility  = (panYaw   < -eps) ? 'visible' : 'hidden';
+  sideBottom.style.visibility = (panPitch >  eps) ? 'visible' : 'hidden';
+  sideTop.style.visibility    = (panPitch < -eps) ? 'visible' : 'hidden';
 }
 
 // ============ UPLOAD ============
@@ -1346,13 +1203,6 @@ uploadInPanel.addEventListener('drop',e=>{
   e.preventDefault();uploadInPanel.classList.remove('dragover');
   const f = e.dataTransfer.files[0];
   if(f && f.type.startsWith('image/')) handleImageUpload(f);
-});
-
-// Toolbar Replace — same synchronous-gesture rules as the in-panel one below.
-$('imgReplaceBtn').addEventListener('click', e => {
-  e.stopPropagation();
-  fileInput.value = '';
-  fileInput.click();
 });
 
 replaceBtn.addEventListener('pointerdown', e => { e.stopPropagation(); });
@@ -1400,9 +1250,6 @@ function handleImageUpload(file){
       currentPanel.fileSize = file.size;
       imgFlipH = false; imgFlipV = false; imgRotate = 0;
       panelImage.src = dataURL;
-      window.__artImageEl = window.__artImageEl || new Image();
-      window.__artImageEl.onload = () => { if (window.__viewer3dActive) window.audial3D.refreshArt(); };
-      window.__artImageEl.src = dataURL;
       panelImage.style.display = 'block';
       uploadInPanel.style.display = 'none';
       replaceBtn.style.display = 'block';
@@ -1423,7 +1270,8 @@ function handleImageUpload(file){
       const dpi = Math.round(img.width / fw / 12);
       $('dpiEstimate').innerHTML = dpi >= 300 ? `<span style="color:#2D8659">${dpi}</span>` : dpi >= 150 ? `<span style="color:#ecad49">${dpi}</span>` : `<span style="color:#C03020">${dpi} (low)</span>`;
 
-      enablePanMode();   // Finish section is already up — showDesigner reveals it with the panel
+      customSection.style.display = 'block';
+      enablePanMode();
     };
     img.src = e.target.result;
   };
@@ -1520,9 +1368,6 @@ function applyImageTransform(){
   currentPanel.flipH = imgFlipH;
   currentPanel.flipV = imgFlipV;
   currentPanel.rotate = imgRotate;
-
-  // DEV-32: mirror this render onto the 3D front face (covers upload/zoom/flip/rotate/recenter/fit).
-  if (window.__viewer3dActive && window.audial3D && window.audial3D.refreshArt) window.audial3D.refreshArt();
 }
 
 function computeEffectiveImageBox(){
@@ -1625,7 +1470,6 @@ function isImageTarget(t){return t === panelImage}
 function isUIControlTarget(t){return t === replaceBtn || (t && t.closest && t.closest('.upload-in-panel'))}
 
 panelContainer.addEventListener('pointerdown', e => {
-  if(window.__viewer3dActive) return; // DEV-32: OrbitControls owns the pointer in 3D mode
   if(isUIControlTarget(e.target)) return;
   if(isImageTarget(e.target) && currentPanel.image){
     if(!imageMode) enableImageMode();
@@ -1705,8 +1549,6 @@ $('clearArtBtn').addEventListener('click', e => {
   panelContainer.classList.remove('image-mode');
   modeIndicator.classList.remove('visible', 'image-mode');
   fileInput.value = '';
-  // Repaint the fabric bare and drop the Artwork row back to its Upload button.
-  if (window.audial3D && window.audial3D.refreshArt) window.audial3D.refreshArt();
 });
 
 // ============ IMAGE CONTROLS ============
@@ -1777,13 +1619,11 @@ document.querySelectorAll('.fopt').forEach(opt=>{
     opt.classList.add('active');
     if(option === 'wood'){
       currentPanel.woodVarnish = value;
-      panel3d.classList.toggle('wood-dark-scene', value === 'dark');   // CSS preview (custom sizes)
-      if (window.audial3D && window.audial3D.setVarnish) window.audial3D.setVarnish(value); // DEV-35
+      panel3d.classList.toggle('wood-dark-scene', value === 'dark');
     } else if(option === 'wrap'){
       currentPanel.fabricWrap = value;
-      panel3d.classList.toggle('wrap-half-scene', value === 'half');   // CSS preview (custom sizes)
+      panel3d.classList.toggle('wrap-half-scene', value === 'half');
       panel3d.classList.toggle('wrap-full-scene', value === 'full');
-      if (window.audial3D && window.audial3D.setFold) window.audial3D.setFold(value); // DEV-36
     }
   });
 });
@@ -1878,11 +1718,7 @@ function panelToCartItem(p){
     quantity: 1,
     // Also store the panel pixel size at save time so cart preview can reproduce the crop
     savedPanelWidth: p.width,
-    savedPanelHeight: p.height,
-    // DEV-37: static 3D thumbnail, captured here because all three Add-to-Cart paths funnel through
-    // this function. null for custom sizes and when WebGL is unavailable — the cart card falls back
-    // to the CSS render in that case.
-    thumbnail: (window.audial3D && window.audial3D.captureThumbnail) ? window.audial3D.captureThumbnail() : null
+    savedPanelHeight: p.height
   };
 }
 
@@ -2011,13 +1847,11 @@ function updateCart(){
     item.innerHTML = `
       <button class="cart-remove" data-idx="${i}" title="Remove">×</button>
       <div class="cart-preview">
-        ${panel.thumbnail
-          ? `<img class="cart-thumb" src="${panel.thumbnail}" alt="${preview.effW}×${preview.effH} ft panel">`
-          : `<div class="cart-3d ${woodClass} ${wrapClass}-scene" style="width:${preview.w}px;height:${preview.h}px">
-               <div class="cart-face has-image">
-                 <img src="${panel.image}" alt="${panel.size}" style="width:${preview.imgW}px;height:${preview.imgH}px;transform-origin:0 0;transform:${preview.imgTransform}">
-               </div>
-             </div>`}
+        <div class="cart-3d ${woodClass} ${wrapClass}-scene" style="width:${preview.w}px;height:${preview.h}px">
+          <div class="cart-face has-image">
+            <img src="${panel.image}" alt="${panel.size}" style="width:${preview.imgW}px;height:${preview.imgH}px;transform-origin:0 0;transform:${preview.imgTransform}">
+          </div>
+        </div>
       </div>
       <div class="cart-info">
         <div class="cart-size-row">
@@ -2113,14 +1947,6 @@ function loadPanelToEditor(panel){
   uploadInPanel.style.display = 'none';
   replaceBtn.style.display = 'block';
   clearArtGroup.style.display = 'flex';
-
-  // DEV-34: point the viewer at this panel's config, and hand the mirror its own decoded image —
-  // renderFrontFaceCanvas draws from __artImageEl, so setting panelImage.src alone leaves the
-  // fabric showing whatever was there before. The setTimeout below repaints once the transform lands.
-  if (window.audial3D) window.audial3D.showForSize(currentPanel.size, currentPanel.orientation);
-  window.__artImageEl = window.__artImageEl || new Image();
-  window.__artImageEl.onload = () => { if (window.__viewer3dActive) window.audial3D.refreshArt(); };
-  window.__artImageEl.src = panel.image;
 
   setTimeout(()=>{
     panelImage.style.width = imgNaturalW + 'px';
@@ -2446,938 +2272,6 @@ document.getElementById('checkoutSubmitBtn').addEventListener('click', async ()=
   document.addEventListener('click',function(e){if(!hn.contains(e.target)){hn.classList.remove('nav-open');hb.setAttribute('aria-expanded','false');}});
   document.querySelectorAll('.mobile-menu a,.mobile-menu button').forEach(function(el){el.addEventListener('click',function(){hn.classList.remove('nav-open');hb.setAttribute('aria-expanded','false');});});
 })();
-</script>
-
-<script type="importmap">
-{
-  "imports": {
-    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
-  }
-}
-</script>
-<script type="module">
-import * as THREE from 'three';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-
-const GLB_URL = './design-references/assets/3d-models/Panels-web.glb';
-// Confirmed from .glb inspection — matches panel-viewer.html.
-const PANEL_KEYS = ['4x2V','4x2H','2x2','1x4V','1x4H','2x1V','2x1H','1x1'];
-const COMPONENTS = ['Frame','Rockwool','Fiberglass Sheet','Back Support','Fiberglass Screen','Acoustic Fabric'];
-// 2x2 and 1x1 are near-square; max-dimension fit frames them large, so pull the camera back.
-const PANEL_DISTANCE_FACTOR = { '2x2':1.45, '1x1':1.45 };
-
-// ===== DEV-37: cart thumbnail capture =====
-const THUMB_SIZE          = 400;
-const THUMB_QUALITY       = 0.85;
-const THUMB_AZIMUTH_DEG   = 35;      // from .panel-3d rotateY(-35deg)  (DES-28)
-const THUMB_ELEVATION_DEG = 8;       // from .panel-3d rotateX(8deg)
-
-// Each config is framed so its rendered long side matches what the CSS cart card used to draw:
-// CARD_MAX_LINEAR * sqrt(area / CARD_MAX_AREA) — see renderCartCardPreview. That math is NOT
-// physically proportional (a 4ft vertical and a 4ft horizontal panel come out different sizes), but
-// matching the CSS cards is the point, so the panel sizes are the CSS sizes.
-// A single fixed distance was tried first and rejected: the frame has to fit the tallest panel
-// (1x4V), and object-fit:contain then shrank every horizontal panel to ~60% of the CSS size.
-const THUMB_AREA_SQFT = { '4x2V':8, '4x2H':8, '2x2':4, '1x4V':4, '1x4H':4, '2x1V':2, '2x1H':2, '1x1':1 };
-const THUMB_MAX_AREA  = 8;           // CARD_MAX_AREA — the 4x2 reference
-const THUMB_FIT       = 0.95;        // margin so the panel never touches the frame edge
-let lastThumbFit = null;             // what the fit converged to; read via __dev32.fitProbe
-// Configurator size + orientation -> .glb config key. Squares carry a single key.
-// "horizontal" means wider-than-tall (same convention as effectiveDimsFt), so 1x4 horizontal is
-// the 4-ft-wide 1x4H. Custom has no .glb config (handled by show3D(false) elsewhere).
-const SIZE_TO_CONFIG = {
-  '1x1': '1x1',
-  '2x2': '2x2',
-  '2x1': { horizontal:'2x1H', vertical:'2x1V' },
-  '4x2': { horizontal:'4x2H', vertical:'4x2V' },
-  '1x4': { horizontal:'1x4H', vertical:'1x4V' }
-};
-function configKeyFor(size, orientation){
-  const entry = SIZE_TO_CONFIG[size];
-  if (!entry) return null;
-  if (typeof entry === 'string') return entry;
-  return entry[orientation === 'vertical' ? 'vertical' : 'horizontal'];
-}
-// The config the CSS panelFace is currently showing — the one the art canvas must land on.
-function activeConfigKey(){
-  return currentPanel ? configKeyFor(currentPanel.size, currentPanel.orientation) : null;
-}
-
-const container  = document.getElementById('panelContainer');
-const canvas     = document.getElementById('viewer3dCanvas');
-const loadingEl  = document.getElementById('viewer3dLoading');
-
-// --- state ---
-let webglOK = webglAvailable();
-let modelReady = false;
-let pendingConfig = null;
-let currentFold = 'half';                 // agrees with freshPanel()'s fabricWrap default
-// DEV-35: both varnishes ship as real textured materials in Panels-web.glb. They survive the
-// build's prune() only because the Blender master assigns each to >=1 panel — hence the .glb's
-// arbitrary per-config split (light on 4x2*/2x2/1x4*, dark on 1x1/2x1*). That split is an asset
-// artifact, not intent: the toggle below overrides it so any panel can wear either varnish.
-const WOOD_MATERIAL_NAMES = { light: 'Pine Wood Light', dark: 'Pine Wood Dark' };
-const WOOD_COMPONENTS = ['Frame', 'Back Support'];   // same physical wood => always one varnish
-const woodMats = {};                      // woodMats[light|dark] = source material from the .glb
-let currentVarnish = 'light';             // agrees with freshPanel()'s woodVarnish default
-const panelMeshes = {};                   // panelMeshes[key][component] = mesh
-const fabricFolds = {};                   // fabricFolds[key][half|full] = mesh
-const foldMeshes = {};                     // foldMeshes[key][half|full] = solid neutral fold mesh
-const frontMeshes = {};                    // frontMeshes[key][half|full] = art-bearing front mesh
-PANEL_KEYS.forEach(k => { panelMeshes[k] = {}; fabricFolds[k] = {}; foldMeshes[k] = {}; frontMeshes[k] = {}; });
-let fabricBaseMat = null;                  // captured base Fabric material (for neutral fold clone)
-window.__dev32 = window.__dev32 || {};     // console debug hook (verification only)
-Object.assign(window.__dev32, { foldMeshes, frontMeshes, panelMeshes });
-let scene, camera, renderer, controls;
-
-// Single offscreen canvas mirrored onto the active front mesh. One canvas, redraw + needsUpdate.
-const artCanvas = document.createElement('canvas');
-const artCtx = artCanvas.getContext('2d');
-window.__dev32.artCanvas = artCanvas;      // debug: inspect the mirror canvas directly
-let frontHover = false;                     // pointer over the front face (brightens the affordance)
-let fabricColorCSS = '#8a8a8a';             // neutral fabric color, captured from the glb at load
-let artTexture = null;                     // THREE.CanvasTexture, created lazily
-// artCanvas is resized per panel size (1x1 663x663, 4x2 1024x510, 1x4 253x1024). A CanvasTexture
-// caches a GL texture + mipmap chain sized to the canvas at first upload; reusing it across a
-// resize can leave a stale chain, and anisotropic sampling at grazing angles then pulls that old
-// content in — ghost copies of the mark at the wrong scale. Rebuild whenever the size changes.
-function ensureArtTexture(){
-  if (artTexture && artTexture.__srcW === artCanvas.width && artTexture.__srcH === artCanvas.height)
-    return artTexture;
-  if (artTexture) artTexture.dispose();
-  artTexture = new THREE.CanvasTexture(artCanvas);
-  artTexture.colorSpace = THREE.SRGBColorSpace;
-  artTexture.flipY = false;                // GLTF UV convention
-  artTexture.anisotropy = renderer ? renderer.capabilities.getMaxAnisotropy() : 8; // sharpen at grazing angles
-  artTexture.generateMipmaps = true;
-  artTexture.__srcW = artCanvas.width;
-  artTexture.__srcH = artCanvas.height;
-  return artTexture;
-}
-
-function webglAvailable(){
-  try {
-    const c = document.createElement('canvas');
-    return !!(window.WebGLRenderingContext && (c.getContext('webgl') || c.getContext('experimental-webgl')));
-  } catch(e){ return false; }
-}
-
-function initViewer(){
-  scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf2f2f9);
-
-  camera = new THREE.PerspectiveCamera(35, 1, 0.1, 1000);
-  camera.position.set(3, 2, 4);
-
-  renderer = new THREE.WebGLRenderer({ canvas, antialias:true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-  renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.2;
-
-  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
-  const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
-  keyLight.position.set(5, 8, 5);
-  keyLight.castShadow = true;
-  keyLight.shadow.mapSize.set(2048, 2048);
-  scene.add(keyLight);
-  const fillLight = new THREE.DirectionalLight(0x93b5c6, 0.4);
-  fillLight.position.set(-5, 3, 2);
-  scene.add(fillLight);
-  const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
-  rimLight.position.set(0, 2, -5);
-  scene.add(rimLight);
-
-  controls = new OrbitControls(camera, canvas);
-  controls.enableDamping = true;
-  controls.enablePan = false;
-  controls.minDistance = 2;
-  controls.maxDistance = 15;
-
-  new ResizeObserver(resize).observe(container);
-
-  loadModel();
-  animate();
-}
-
-// Blender node names are clean; mesh names can carry .001/.002 suffixes.
-function getIdentifyingName(mesh){
-  if (mesh.parent && mesh.parent.name && mesh.parent.name !== 'Scene') return mesh.parent.name;
-  if (mesh.name) return mesh.name.replace(/\.\d+$/, '');
-  return '';
-}
-
-function classifyMesh(mesh){
-  const name = getIdentifyingName(mesh);
-  if (!name) return null;
-  const sortedKeys = [...PANEL_KEYS].sort((a,b) => b.length - a.length); // "4x2V" before "4x2"
-  for (const panelKey of sortedKeys){
-    for (const sep of [' ', '_']){
-      const prefix = panelKey + sep;
-      if (name.startsWith(prefix)){
-        const component = name.substring(prefix.length).trim().replace(/_/g, ' ');
-        if (COMPONENTS.includes(component)) return { panelKey, component };
-        // Fabric ships as two wrap variants; both map to the single Acoustic Fabric slot.
-        const fold = component.match(/^Acoustic Fabric (Half|Full) Fold$/);
-        if (fold) return { panelKey, component:'Acoustic Fabric', fold: fold[1].toLowerCase() };
-      }
-    }
-  }
-  return null;
-}
-
-// Split a fabric mesh into {front, fold} by per-triangle LOCAL normal.
-// Front = triangles whose local normal points toward +Z (the clean planar quad at max local Z).
-// TUNE: FRONT_NORMAL_MIN — raise toward 0.9 if fold flaps leak into the front set;
-//        lower toward 0.5 if part of the flat front is missing. 0.7 is the spec's start.
-const FRONT_NORMAL_MIN = 0.7;
-function splitFabricMesh(mesh){
-  const geo = mesh.geometry;
-  const pos = geo.attributes.position;
-  const nor = geo.attributes.normal;
-  const uv  = geo.attributes.uv;            // GLTFLoader names the UV attribute "uv"
-  const idx = geo.index ? geo.index.array : null;
-  const triCount = idx ? idx.length / 3 : pos.count / 3;
-  const vi = (t, k) => idx ? idx[t*3+k] : t*3+k;
-
-  const frontTris = [], foldTris = [];
-  const nA = new THREE.Vector3(), nB = new THREE.Vector3(), nC = new THREE.Vector3();
-  for (let t = 0; t < triCount; t++){
-    const a = vi(t,0), b = vi(t,1), c = vi(t,2);
-    nA.fromBufferAttribute(nor, a); nB.fromBufferAttribute(nor, b); nC.fromBufferAttribute(nor, c);
-    const nz = (nA.z + nB.z + nC.z) / 3;     // average local Z of the triangle normal
-    (nz > FRONT_NORMAL_MIN ? frontTris : foldTris).push([a,b,c]);
-  }
-
-  const build = (tris) => {
-    const g = new THREE.BufferGeometry();
-    const P = [], N = [], U = [];
-    for (const [a,b,c] of tris){
-      for (const v of [a,b,c]){
-        P.push(pos.getX(v), pos.getY(v), pos.getZ(v));
-        N.push(nor.getX(v), nor.getY(v), nor.getZ(v));
-        if (uv) U.push(uv.getX(v), uv.getY(v));
-      }
-    }
-    g.setAttribute('position', new THREE.Float32BufferAttribute(P, 3));
-    g.setAttribute('normal',   new THREE.Float32BufferAttribute(N, 3));
-    if (uv) g.setAttribute('uv', new THREE.Float32BufferAttribute(U, 2));
-    return g;
-  };
-
-  return { frontGeo: build(frontTris), foldGeo: build(foldTris),
-           frontCount: frontTris.length, foldCount: foldTris.length };
-}
-
-// Rewrite a front quad's UVs to a canonical [0,1] layout derived from local geometry,
-// so ALL configs (horizontal/vertical) end up identically oriented. local +Y is screen-up
-// (model is spun 180° about Y); local +X is screen-LEFT after that spin.
-// Canonical: screen-top => t=0, screen-left => s=0 (with texture flipY=false, canvas row 0 = image top).
-function canonicalizeFrontUV(geo){
-  const pos = geo.attributes.position, uv = geo.attributes.uv;
-  if (!uv) return;
-  let minX=Infinity,maxX=-Infinity,minY=Infinity,maxY=-Infinity;
-  for (let i=0;i<pos.count;i++){ const X=pos.getX(i),Y=pos.getY(i);
-    if(X<minX)minX=X; if(X>maxX)maxX=X; if(Y<minY)minY=Y; if(Y>maxY)maxY=Y; }
-  const midX=(minX+maxX)/2, midY=(minY+maxY)/2;
-  for (let i=0;i<pos.count;i++){
-    const X=pos.getX(i), Y=pos.getY(i);
-    const s = (X > midX) ? 0 : 1;   // local +X = screen-left => s=0
-    const t = (Y > midY) ? 0 : 1;   // local +Y = screen-top  => t=0
-    uv.setXY(i, s, t);
-  }
-  uv.needsUpdate = true;
-}
-
-function loadModel(){
-  new GLTFLoader().load(GLB_URL, (gltf) => {
-    const model = gltf.scene;
-    model.traverse((child) => {
-      if (!child.isMesh) return;
-      child.castShadow = true;
-      child.receiveShadow = true;
-      const idName = getIdentifyingName(child);
-      if (idName === 'Backdrop' || child.parent?.name === 'Backdrop'){ child.visible = false; return; }
-      const cls = classifyMesh(child);
-      if (cls){
-        // Grab the two shared wood materials before the clone below hands this mesh a private copy;
-        // after the traverse the originals have no mesh users and are only reachable via woodMats.
-        const matName = child.material && child.material.name;
-        for (const v in WOOD_MATERIAL_NAMES)
-          if (matName === WOOD_MATERIAL_NAMES[v] && !woodMats[v]) woodMats[v] = child.material;
-        if (child.material) child.material = child.material.clone(); // independent per-layer material
-        if (cls.fold){
-          fabricFolds[cls.panelKey][cls.fold] = child;
-          child.visible = false;
-          if (!fabricBaseMat) fabricBaseMat = child.material; // already cloned above
-        }
-        else { panelMeshes[cls.panelKey][cls.component] = child; child.visible = false; }
-      } else {
-        child.visible = false; // defense-in-depth: never leave an unknown mesh visible
-      }
-    });
-    if (fabricBaseMat && fabricBaseMat.color) fabricColorCSS = '#' + fabricBaseMat.color.getHexString();
-    // Split every fabric fold into front (art) + fold (neutral). Runs once at load.
-    for (const key of PANEL_KEYS){
-      for (const fold of ['half','full']){
-        const src = fabricFolds[key][fold];
-        if (!src) continue;
-        const { frontGeo, foldGeo } = splitFabricMesh(src);
-        canonicalizeFrontUV(frontGeo);          // normalize orientation across all configs
-
-        const foldMat = src.material.clone();
-        foldMat.map = null;                     // NO texture on folds => no bleed, ever
-        foldMat.side = THREE.DoubleSide;
-        foldMat.needsUpdate = true;
-
-        const front = new THREE.Mesh(frontGeo, src.material.clone());
-        const foldM = new THREE.Mesh(foldGeo, foldMat);
-        front.name = `${key} Front ${fold}`;
-        foldM.name = `${key} FoldOnly ${fold}`;
-        front.visible = false; foldM.visible = false;
-        src.parent.add(front); src.parent.add(foldM);
-        src.visible = false;                     // retire the combined mesh (kept, hidden)
-
-        frontMeshes[key][fold] = front;
-        foldMeshes[key][fold]  = foldM;
-      }
-    }
-    model.rotation.y = Math.PI;  // bring the FRONT (fabric side) to face the +Z camera
-    scene.add(model);
-    applyFabricFold();
-    applyWoodVarnish();   // currentVarnish may already be seeded by a showForSize that beat the load
-    modelReady = true;
-    loadingEl.style.display = 'none';
-    if (pendingConfig){ showConfig(pendingConfig); pendingConfig = null; }
-  },
-  undefined,
-  (err) => {
-    console.error('[audial3D] model load failed:', err);
-    loadingEl.style.display = 'none';
-    webglOK = false;
-    window.audial3D.available = false;
-    show3D(false); // fall back to the CSS preview
-  });
-}
-
-// Promote the active fold's front mesh into the Acoustic Fabric slot; pair its fold mesh; hide the other variant.
-function applyFabricFold(){
-  for (const key of PANEL_KEYS){
-    const front = frontMeshes[key][currentFold];
-    const fold  = foldMeshes[key][currentFold];
-    const other = currentFold === 'full' ? 'half' : 'full';
-    const otherFront = frontMeshes[key][other];
-    const otherFold  = foldMeshes[key][other];
-    if (otherFront) otherFront.visible = false;
-    if (otherFold)  otherFold.visible  = false;
-    if (front){ panelMeshes[key]['Acoustic Fabric'] = front; front.userData.pairedFold = fold; }
-  }
-}
-
-// DEV-35: paint every config's wood in the selected varnish, overriding whatever the .glb baked in.
-// Safe to share one material across all wood meshes: nothing mutates them (only the fabric front's
-// material is touched, by the art/hover paths). Frame and Back Support always move together.
-function applyWoodVarnish(){
-  const mat = woodMats[currentVarnish];
-  if (!mat) return;                                  // model not loaded yet, or material missing
-  for (const key of PANEL_KEYS)
-    for (const c of WOOD_COMPONENTS){
-      const mesh = panelMeshes[key][c];
-      if (mesh) mesh.material = mat;
-    }
-}
-
-// The render loop is continuous, so the swap lands on the next frame — no showConfig re-run needed.
-function setVarnish(v){
-  if (v !== 'light' && v !== 'dark') return;
-  currentVarnish = v;
-  applyWoodVarnish();
-}
-
-// DEV-36: both wraps ship as real geometry per config, so this is a mesh swap, not a material one.
-// Unlike setVarnish, the render loop alone isn't enough: applyFabricFold only HIDES the outgoing
-// variant and re-points the Acoustic Fabric slot — the incoming mesh is still hidden and unpainted.
-// Hence the explicit visibility + repaint, both scoped to the active config so the camera stays put.
-function setFold(f){
-  if (f !== 'half' && f !== 'full') return;
-  if (f === currentFold) return;
-  currentFold = f;
-  applyFabricFold();
-  const key = activeConfigKey();
-  if (!key || !modelReady) return;      // loadModel's own applyFabricFold picks up currentFold later
-  applyFabricVisibility(key);
-  renderFrontFaceCanvas();              // the promoted mesh has its own cloned material -> repaint
-}
-
-function hideAllComponents(){
-  for (const key of PANEL_KEYS)
-    for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = false; }
-}
-
-function showConfig(key){
-  hideAllComponents();
-  for (const key2 of PANEL_KEYS)               // hide every fold mesh first (defense-in-depth)
-    for (const f of ['half','full']){ const m = foldMeshes[key2][f]; if (m) m.visible = false; }
-  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = layerState[c]; }
-  applyFabricVisibility(key);
-  centerCameraOn(key);
-  renderFrontFaceCanvas();
-}
-
-// The active front mesh (= the Acoustic Fabric slot) and its fold move together, per layerState.
-// Split out of showConfig so setFold can re-apply visibility WITHOUT centerCameraOn's re-frame:
-// a wrap toggle must not throw away the user's orbit, but a size/orientation change should re-frame.
-function applyFabricVisibility(key){
-  const fab = panelMeshes[key] && panelMeshes[key]['Acoustic Fabric'];
-  if (!fab) return;
-  fab.visible = layerState['Acoustic Fabric'];
-  if (fab.userData.pairedFold) fab.userData.pairedFold.visible = layerState['Acoustic Fabric'];
-}
-
-// Pose the camera `dist` along `dir` from the box, panned by `pan`, and report the projection's
-// frame fraction (1 = edge to edge) plus its NDC centre. Mutates `camera` — only ever called from
-// captureThumbnail, which restores it.
-const _thumbV = new THREE.Vector3();
-function thumbPose(box, center, dir, dist, pan){
-  camera.position.copy(center).addScaledVector(dir, dist).add(pan);
-  camera.up.set(0, 1, 0);
-  camera.lookAt(_thumbV.copy(center).add(pan));   // pan eye and target together => pure pan
-  camera.aspect = 1;
-  camera.updateProjectionMatrix();
-  camera.updateMatrixWorld(true);      // also refreshes matrixWorldInverse, which project() needs
-  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-  for (const x of [box.min.x, box.max.x])
-    for (const y of [box.min.y, box.max.y])
-      for (const z of [box.min.z, box.max.z]){
-        _thumbV.set(x, y, z).project(camera);
-        if (_thumbV.x < minX) minX = _thumbV.x; if (_thumbV.x > maxX) maxX = _thumbV.x;
-        if (_thumbV.y < minY) minY = _thumbV.y; if (_thumbV.y > maxY) maxY = _thumbV.y;
-      }
-  return { frac: Math.max(maxX - minX, maxY - minY) / 2,   // NDC spans -1..1, so halve
-           cx: (minX + maxX) / 2, cy: (minY + maxY) / 2 };
-}
-
-// Frame this config to `target`, and LEAVE THE CAMERA THERE.
-// Two corrections per pass, both needed:
-//   distance — apparent size goes as ~1/dist, but only ~; perspective makes it non-linear, so
-//              correct and re-measure rather than solve in closed form.
-//   pan      — under perspective a wide panel at 35deg yaw projects ASYMMETRICALLY (the near end
-//              projects further out), so its bbox centre is not the frame centre. Scaling alone let
-//              4x2 span 95% of the frame while hanging off the right edge. Recentre or it clips.
-function fitThumbCamera(box, center, dir, target){
-  const size = box.getSize(new THREE.Vector3());
-  let dist = Math.max(size.x, size.y, size.z) * 2.5;   // seed with centerCameraOn's framing
-  const pan = new THREE.Vector3(), right = new THREE.Vector3(), up = new THREE.Vector3(), fwd = new THREE.Vector3();
-  let r = thumbPose(box, center, dir, dist, pan);
-  for (let i = 0; i < 8; i++){
-    if (!isFinite(r.frac) || r.frac <= 0.0001) break;
-    camera.matrixWorld.extractBasis(right, up, fwd);
-    const halfH = dist * Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2);
-    const halfW = halfH * camera.aspect;
-    // Shifting the camera right moves the subject left in frame, so add +cx to recentre.
-    pan.addScaledVector(right, r.cx * halfW).addScaledVector(up, r.cy * halfH);
-    dist = Math.max(0.2, dist * (r.frac / target));
-    const prev = r;
-    r = thumbPose(box, center, dir, dist, pan);
-    if (Math.abs(r.frac - target) < 0.002 && Math.abs(r.cx) < 0.002 && Math.abs(r.cy) < 0.002) break;
-    if (!isFinite(r.frac)) { r = prev; break; }
-  }
-  return r;
-}
-
-function centerCameraOn(key){
-  const box = new THREE.Box3();
-  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m && m.visible) box.expandByObject(m); }
-  if (box.isEmpty()) return;
-  const center = box.getCenter(new THREE.Vector3());
-  const size   = box.getSize(new THREE.Vector3());
-  const maxDim = Math.max(size.x, size.y, size.z);
-  const distance = maxDim * 2.5 * (PANEL_DISTANCE_FACTOR[key] || 1);
-  controls.target.copy(center);
-  camera.position.set(center.x + distance * 0.6, center.y + distance * 0.3, center.z + distance);
-  controls.update();
-}
-
-// DEV-37: a static cart thumbnail of the finished panel, posed to match the CSS preview's angle.
-// Synchronous by necessity: the renderer has no preserveDrawingBuffer, so toDataURL must run in the
-// same block as render(), before the browser composites and clears the buffer. That also means no
-// paint happens mid-function — the user never sees the temporary 400x400 frame.
-function captureThumbnail(){
-  if (!webglOK || !modelReady || !renderer || !camera || !controls) return null;
-  const key = activeConfigKey();
-  if (!key || !THUMB_AREA_SQFT[key]) return null;   // custom size / unknown -> caller falls back to CSS
-
-  const savedPos    = camera.position.clone();
-  const savedQuat   = camera.quaternion.clone();
-  const savedAspect = camera.aspect;
-  const savedTarget = controls.target.clone();
-  const savedLayers = { ...layerState };
-  const savedHover  = frontHover;
-  const savedSize   = renderer.getSize(new THREE.Vector2());
-  const savedPR     = renderer.getPixelRatio();
-
-  // A cart thumbnail always depicts the COMPLETE, un-hovered panel, whatever the drawer says.
-  for (const n of DRAWER_ROWS) layerState[n] = true;
-  frontHover = false;
-  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = true; }
-  applyFabricVisibility(key);
-  renderFrontFaceCanvas();
-
-  // The fabric's fold is NOT in panelMeshes[key][component] — it hangs off userData.pairedFold, and
-  // it wraps the panel edges. Leave it out and the box is smaller than what renders, so the fit lets
-  // the 4x2 clip.
-  const box = new THREE.Box3();
-  for (const c of COMPONENTS){
-    const m = panelMeshes[key][c];
-    if (!m || !m.visible) continue;
-    box.expandByObject(m);
-    if (m.userData.pairedFold && m.userData.pairedFold.visible) box.expandByObject(m.userData.pairedFold);
-  }
-  const center = box.getCenter(new THREE.Vector3());
-  const az = THREE.MathUtils.degToRad(THUMB_AZIMUTH_DEG);
-  const el = THREE.MathUtils.degToRad(THUMB_ELEVATION_DEG);
-  const dir = new THREE.Vector3(Math.sin(az) * Math.cos(el), Math.sin(el), Math.cos(az) * Math.cos(el));
-  // Target the CSS card's own sizing curve, so the cart shows the sizes it always showed.
-  const thumbTarget = Math.sqrt(THUMB_AREA_SQFT[key] / THUMB_MAX_AREA) * THUMB_FIT;
-  lastThumbFit = { key, target: thumbTarget, ...fitThumbCamera(box, center, dir, thumbTarget) };
-
-  renderer.setPixelRatio(1);                       // exact THUMB_SIZE output, independent of DPR
-  renderer.setSize(THUMB_SIZE, THUMB_SIZE, false); // false => drawing buffer only, CSS size untouched
-  renderer.render(scene, camera);
-  const url = renderer.domElement.toDataURL('image/jpeg', THUMB_QUALITY);
-
-  // Restore exhaustively — this panel stays on screen afterward.
-  Object.assign(layerState, savedLayers);
-  frontHover = savedHover;
-  for (const c of COMPONENTS){ const m = panelMeshes[key][c]; if (m) m.visible = layerState[c]; }
-  applyFabricVisibility(key);
-  renderFrontFaceCanvas();
-  camera.position.copy(savedPos);
-  camera.quaternion.copy(savedQuat);
-  camera.aspect = savedAspect;
-  camera.updateProjectionMatrix();
-  controls.target.copy(savedTarget);
-  controls.update();
-  renderer.setPixelRatio(savedPR);
-  renderer.setSize(savedSize.x, savedSize.y, false);
-  resize();
-  renderer.render(scene, camera);
-  return url;
-}
-
-function resize(){
-  if (!renderer) return;
-  // Measure the canvas, not the container: on mobile the open sheet shortens the canvas's box and
-  // the render must match that band, not the full container.
-  const w = canvas.clientWidth, h = canvas.clientHeight;
-  if (!w || !h) return;
-  renderer.setSize(w, h, false);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
-}
-
-function animate(){
-  requestAnimationFrame(animate);
-  if (controls) controls.update();
-  if (renderer && scene && camera) renderer.render(scene, camera);
-}
-
-// Mirror the CSS panel's artwork render into artCanvas, then onto the active front mesh.
-// Reads the classic script's global-lexical state by bare name (currentPanel, imgPos, imgZoom,
-// imgRotate, imgFlipH/V, imgNaturalW/H) so reassignments are tracked automatically.
-function renderFrontFaceCanvas(){
-  const key = activeConfigKey();
-  const front = key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric'];
-  if (!front) return;
-
-  const face = document.getElementById('panelFace');
-  const W = Math.max(2, Math.round(face.clientWidth));    // panelFace px == transform coord space
-  const H = Math.max(2, Math.round(face.clientHeight));
-
-  // This canvas is stretched across the fabric quad's whole 0..1 UV range, so it must carry the
-  // QUAD's aspect — not the panelFace's — or everything drawn lands stretched (up to 14.6% on 1x4).
-  // The two shapes genuinely differ: the flat fabric front is the panel's full OUTER face, measuring
-  // 0.300*ft + 0.055 world on BOTH axes. That constant is a big slice of a 1ft side and a small one
-  // of a 4ft side, so every quad's aspect sits nearer 1.0 than its nominal (4x2: 2.007→1.900;
-  // 1x4V: 0.247→0.283; squares are within 1% and were never visibly wrong).
-  //
-  // So map the WxH design rect onto the quad with ONE uniform COVER scale: the art stays undistorted
-  // and always reaches the edges, and the overflow spills off the long axis as bleed — which is what
-  // physically happens, since the fabric has to cover the frame it wraps over. Art only ever lands on
-  // this front quad; the folds are a separate mesh with map=null and stay solid.
-  const qa   = frontQuadAspect(front) || (W / H);   // fall back to no-op if unmeasurable
-  const wide = qa >= (W / H);                       // is the quad wider than the design rect?
-  const LW = wide ? H * qa : W;                     // logical canvas: panelFace units, quad aspect
-  const LH = wide ? H : W / qa;
-  const s  = wide ? qa / (W / H) : (W / H) / qa;    // >=1, uniform on both axes => no distortion
-  const ox = (LW - s * W) / 2, oy = (LH - s * H) / 2;   // centre the design rect; negative => cropped
-
-  // Supersample toward ~1024px on the long side so narrow panels aren't soft. All drawing math
-  // stays in panelFace units; this base transform carries both the cover fit and the SS scale-up.
-  const SS = Math.min(3, Math.max(1, 1024 / Math.max(LW, LH)));
-  const cw = Math.max(2, Math.round(LW * SS)), ch = Math.max(2, Math.round(LH * SS));
-  if (artCanvas.width !== cw)  artCanvas.width  = cw;
-  if (artCanvas.height !== ch) artCanvas.height = ch;
-  const base = () => artCtx.setTransform(SS * s, 0, 0, SS * s, SS * ox, SS * oy);
-
-  // Artwork toggled off paints bare fabric — and NOT the upload affordance, since the art exists
-  // and inviting an upload would be a lie. The affordance is only for a genuinely empty panel.
-  const loaded = artLoaded();
-  const hasArt = loaded && layerState['Artwork'] !== false;
-
-  // Fill in raw canvas px, not design-rect units: the cover fit guarantees the rect covers the
-  // canvas, but rounding could still leave a hairline at the edge.
-  artCtx.setTransform(1,0,0,1,0,0);
-  artCtx.clearRect(0,0,cw,ch);
-  artCtx.fillStyle = hasArt ? '#ffffff' : fabricColorCSS;  // white backs transparent art; else fabric-neutral
-  artCtx.fillRect(0,0,cw,ch);
-
-  if (hasArt){
-    // Recompute cssTx/cssTy exactly like applyImageTransform (bounding-box correction).
-    const r = imgRotate, fh = imgFlipH, fv = imgFlipV;
-    const rad = r * Math.PI/180, cos = Math.cos(rad), sin = Math.sin(rad);
-    const sx = fh ? -1 : 1, sy = fv ? -1 : 1;
-    const corners = [[0,0],[imgNaturalW,0],[0,imgNaturalH],[imgNaturalW,imgNaturalH]];
-    let minX=Infinity, minY=Infinity;
-    for (const [x,y] of corners){
-      const px=x*sx, py=y*sy;
-      const rx=px*cos-py*sin, ry=px*sin+py*cos;
-      const zx=rx*imgZoom, zy=ry*imgZoom;
-      if (zx<minX) minX=zx; if (zy<minY) minY=zy;
-    }
-    const cssTx = imgPos.x - minX, cssTy = imgPos.y - minY;
-
-    base();
-    artCtx.translate(cssTx, cssTy);
-    artCtx.scale(imgZoom, imgZoom);
-    artCtx.rotate(rad);
-    artCtx.scale(sx, sy);
-    artCtx.drawImage(window.__artImageEl, 0, 0, imgNaturalW, imgNaturalH);
-  } else if (!loaded) {
-    base();
-    drawUploadAffordance(W, H);            // Task 5 (draws in panelFace units under the base transform)
-  }
-
-  const tex = ensureArtTexture();
-  orientFrontTexture(tex);                 // Task 4
-  front.material.map = tex;
-  if (front.material.color) front.material.color.setRGB(1,1,1);  // don't tint the artwork/affordance
-  front.material.needsUpdate = true;
-  tex.needsUpdate = true;
-}
-window.__dev32.renderFrontFaceCanvas = renderFrontFaceCanvas;
-// debug: the front mesh currently receiving the art texture (verification only)
-window.__dev32.currentFront = () => {
-  const key = activeConfigKey();
-  return (key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric']) || null;
-};
-
-function refreshArt(){
-  // Clear/reset can pull the art out from under edit mode; don't strand orbit disabled.
-  if (editing && !artDisplayed()) exitEdit();
-  if (webglOK && modelReady) renderFrontFaceCanvas();
-  syncArtworkRow();          // art may have just appeared or been cleared
-}
-
-// Aspect of the flat fabric front, measured off the geometry. Local == world on all 8 configs
-// (verified: every front shares +X→[-1,0,0], +Y→[0,1,0]), so the local bbox is safe to read.
-// Returns 0 if unmeasurable, so callers can fall back rather than divide by garbage.
-function frontQuadAspect(front){
-  const geo = front && front.geometry;
-  if (!geo) return 0;
-  if (!geo.boundingBox) geo.computeBoundingBox();
-  const bb = geo.boundingBox;
-  const a = (bb.max.x - bb.min.x) / (bb.max.y - bb.min.y);
-  return (isFinite(a) && a > 0) ? a : 0;
-}
-
-// Box-less "＋ UPLOAD ARTWORK" hint painted on the bare fabric; brightens on hover.
-// Draws in panelFace units (the caller's base transform already carries the cover fit + SS).
-// TUNE: AFFORD_SCALE — overall size of the mark. Every offset and font below is a fraction of
-// `s`, so this scales the whole thing as a unit and keeps the tuned proportions intact.
-// At 1.5 the label is ~64% of the panel's short side; raise for bigger, lower for smaller.
-const AFFORD_SCALE = 1.5;
-function drawUploadAffordance(W, H){
-  const s = Math.min(W, H) * AFFORD_SCALE;
-  artCtx.save();
-  artCtx.translate(W/2, H/2);
-  artCtx.fillStyle = '#093d53';                    // --ink
-  artCtx.textAlign = 'center';
-  artCtx.textBaseline = 'middle';
-  artCtx.globalAlpha = frontHover ? 0.68 : 0.5;    // brighten on hover; no box, no border
-  artCtx.font = `300 ${Math.round(s*0.13)}px Archivo, sans-serif`;
-  artCtx.fillText('+', 0, -s*0.033);
-  artCtx.globalAlpha = frontHover ? 0.9 : 0.75;    // text carries more weight than the mark
-  artCtx.font = `600 ${Math.round(s*0.05)}px Archivo, sans-serif`;
-  artCtx.fillText('UPLOAD ARTWORK', 0, s*0.041);
-  artCtx.restore();
-}
-
-// Front UVs are canonicalized at split time, so orientation is uniform across every config — this
-// is one constant, not a per-config knob. Measured, not guessed: all configs share identical world
-// orientation (+X→[-1,0,0], +Y→[0,1,0], +Z→[0,0,-1]), so the front face is NOT mirrored.
-// ClampToEdge makes tiling structurally impossible: the source UVs are ragged (4x2H ships
-// v=[0,1.017]) and RepeatWrapping would wrap that overhang back around as a sliver.
-const FRONT_MIRROR_U = false;
-function orientFrontTexture(tex){
-  tex.center.set(0.5, 0.5);
-  tex.rotation = 0;
-  if (FRONT_MIRROR_U){ tex.wrapS = THREE.RepeatWrapping; tex.repeat.x = -1; tex.offset.x = 1; }
-  else                { tex.wrapS = THREE.ClampToEdgeWrapping; tex.repeat.x = 1; tex.offset.x = 0; }
-  tex.wrapT = THREE.ClampToEdgeWrapping;
-  tex.repeat.y = 1; tex.offset.y = 0;
-  tex.matrixAutoUpdate = true;
-}
-
-// ===== DEV-34 Tasks 6+7: front-face raycast — click to upload / click to edit / hover / drag =====
-// Reads the classic script's globals by bare name (currentPanel, imgPos, …). They're top-level
-// `let`s, so they live in the global LEXICAL scope, not on window — `window.imgPos` is undefined.
-const raycaster = new THREE.Raycaster();
-const ndc = new THREE.Vector2();
-let editing = false;
-window.__dev32.isEditing = () => editing;
-// debug probes (verification only) — these read the classic script's global-lexical state, which
-// isn't reachable from a test as window.*.
-window.__dev32.imgPosProbe  = () => ({ x: imgPos.x, y: imgPos.y });
-window.__dev32.zoomProbe    = () => imgZoom;
-window.__dev32.flipProbe    = () => ({ h: imgFlipH, v: imgFlipV });
-window.__dev32.rotProbe     = () => imgRotate;
-window.__dev32.orbitEnabled = () => !!(controls && controls.enabled);
-window.__dev32.foldProbe    = () => currentFold;
-window.__dev32.camProbe     = () => camera.position.toArray();
-window.__dev32.layerProbe   = () => ({ ...layerState });
-window.__dev32.fitProbe     = () => lastThumbFit;
-// Getter, not a plain assignment: `camera` is only assigned inside init(), so a snapshot taken at
-// module-eval time captures undefined.
-Object.defineProperty(window.__dev32, 'camera', { get: () => camera, configurable: true });
-
-function frontHit(ev){
-  if (!camera) return null;
-  const key = activeConfigKey();
-  const front = key && panelMeshes[key] && panelMeshes[key]['Acoustic Fabric'];
-  if (!front || !front.visible) return null;
-  const rect = canvas.getBoundingClientRect();
-  ndc.x =  ((ev.clientX - rect.left) / rect.width)  * 2 - 1;
-  ndc.y = -((ev.clientY - rect.top)  / rect.height) * 2 + 1;
-  raycaster.setFromCamera(ndc, camera);
-  const hits = raycaster.intersectObject(front, false);
-  return hits.length ? hits[0] : null;
-}
-function hasArtNow(){ return !!(currentPanel && currentPanel.image); }
-// What the face is actually showing decides what a click means. Art hidden via the Artwork toggle
-// is inert: there's nothing to edit, and offering an upload would contradict the art that exists.
-function artDisplayed(){ return hasArtNow() && layerState['Artwork'] !== false; }
-function affordanceShown(){ return !hasArtNow(); }
-
-function enterEdit(){
-  if (editing) return;
-  editing = true;
-  if (controls) controls.enabled = false;      // orbit off while editing
-  enableImageMode();                           // shows #imgCtrlGroup, "◆ Editing artwork"
-}
-function exitEdit(){
-  if (!editing) return;
-  editing = false;
-  if (controls) controls.enabled = true;
-  enablePanMode();
-  if (frontHover){ frontHover = false; refreshArt(); }
-}
-window.__dev32.exitEdit = exitEdit;
-
-const CLICK_SLOP = 6;      // px; a pointerup under this counts as a click, not a drag
-const DRAG_GAIN  = 1.0;    // screen-px → panelFace-px; the front face shows near 1:1
-let downXY = null, dragging = null;
-
-canvas.addEventListener('pointerdown', e => {
-  downXY = { x:e.clientX, y:e.clientY };
-  if (editing && frontHit(e)){
-    dragging = { x:e.clientX, y:e.clientY };
-    try { canvas.setPointerCapture(e.pointerId); } catch(_){}
-  }
-});
-canvas.addEventListener('pointermove', e => {
-  if (dragging){
-    const face = document.getElementById('panelFace');
-    const rect = canvas.getBoundingClientRect();
-    const scale = (face.clientWidth / rect.width) * DRAG_GAIN;   // panelFace px per screen px
-    imgPos.x += (e.clientX - dragging.x) * scale;
-    imgPos.y += (e.clientY - dragging.y) * scale;
-    dragging = { x:e.clientX, y:e.clientY };
-    clampImagePosition();
-    applyImageTransform();      // repaints the front face through the existing hook
-    return;
-  }
-  const live = affordanceShown() || artDisplayed();
-  const over = live && !!frontHit(e);
-  canvas.style.cursor = over ? 'pointer' : '';
-  // Only the bare-fabric affordance brightens; loaded art has nothing to brighten.
-  const wantHover = over && affordanceShown();
-  if (wantHover !== frontHover){ frontHover = wantHover; renderFrontFaceCanvas(); }
-});
-canvas.addEventListener('pointerup', e => {
-  if (dragging){ dragging = null; try { canvas.releasePointerCapture(e.pointerId); } catch(_){} }
-  if (!downXY) return;
-  const moved = Math.hypot(e.clientX - downXY.x, e.clientY - downXY.y);
-  downXY = null;
-  if (moved > CLICK_SLOP) return;              // that was an orbit/reposition drag
-  if (frontHit(e)){
-    if (artDisplayed()) enterEdit();
-    else if (affordanceShown()){
-      const fi = document.getElementById('fileInput');
-      fi.value = '';                           // re-selecting the same file must still fire change
-      fi.click();                              // synchronous: the gesture chain must not be broken
-    }
-  } else if (editing){
-    exitEdit();                                // tapping off the face exits edit
-  }
-});
-canvas.addEventListener('pointerleave', () => {
-  if (frontHover){ frontHover = false; renderFrontFaceCanvas(); }
-});
-
-// ===== DEV-33: Components drawer =====
-// Six of the seven rows hide a mesh. Artwork is the odd one out — it's a texture painted on the
-// fabric's front face, so its row feeds renderFrontFaceCanvas's hasArt branch instead.
-const DRAWER_ROWS = [...COMPONENTS, 'Artwork'];
-const layerState = {};
-function resetLayerState(){ for (const n of DRAWER_ROWS) layerState[n] = true; }
-resetLayerState();
-
-const slideout    = document.getElementById('componentsSlideout');
-const drawerEl    = slideout.querySelector('.components-drawer');
-const compTab     = document.getElementById('componentsTab');
-const artworkRow  = document.getElementById('artworkRow');
-const compUpload  = document.getElementById('compUploadBtn');
-
-function artLoaded(){
-  return !!(currentPanel && currentPanel.image && window.__artImageEl && window.__artImageEl.complete);
-}
-
-// The row's shape derives from the same art check the fabric painter uses, so the drawer and the
-// panel can't disagree. Fabric off => the art has no surface to sit on, so the row goes dead.
-function syncArtworkRow(){
-  if (!artworkRow) return;
-  artworkRow.classList.toggle('no-art', !artLoaded());
-  artworkRow.classList.toggle('disabled', !layerState['Acoustic Fabric']);
-}
-
-function syncDrawerUI(){
-  slideout.querySelectorAll('.toggle-switch').forEach(sw =>
-    sw.classList.toggle('active', !!layerState[sw.dataset.component]));
-  syncArtworkRow();
-}
-
-function applyLayer(name){
-  if (name === 'Artwork'){
-    if (editing && !artDisplayed()) exitEdit();   // nothing left on the face to edit
-    renderFrontFaceCanvas();
-    return;
-  }
-  const key = activeConfigKey();
-  if (!key) return;
-  const m = panelMeshes[key][name];
-  if (m) m.visible = layerState[name];
-  if (name === 'Acoustic Fabric'){
-    if (m && m.userData.pairedFold) m.userData.pairedFold.visible = layerState[name];
-    if (editing && !layerState[name]) exitEdit();  // the surface being edited just went away
-    syncArtworkRow();
-  }
-}
-
-// Desktop overlays: there's dead backdrop to spend, and a fixed panel is what makes toggling
-// readable. A phone has no such room — an overlay sheet would bury the very panel it explains — so
-// there the canvas gives up the covered band and the camera re-frames into what's left.
-const mobileMQ = window.matchMedia('(max-width:900px)');
-function syncSheetViewport(){
-  const shrink = mobileMQ.matches && slideout.classList.contains('open');
-  // Must be an explicit px height. The canvas is inset:0 + height:100%, so a `bottom` offset alone
-  // is ignored (height wins), and `height:auto` on a <canvas> resolves to its drawing-buffer size
-  // — which the renderer just set to the full height — so that reproduces the bug too.
-  // Measure the drawer, not the whole slideout: the canvas runs on behind the floating tab, so no
-  // strip of bare container backdrop shows either side of it.
-  const band = container.clientHeight - drawerEl.offsetHeight;
-  canvas.style.height = (shrink && band > 80) ? band + 'px' : '';
-  if (!webglOK) return;
-  requestAnimationFrame(() => {
-    resize();
-    const key = activeConfigKey();
-    if (key && modelReady && mobileMQ.matches) centerCameraOn(key);
-  });
-}
-mobileMQ.addEventListener('change', syncSheetViewport);
-
-function setSheetOpen(open){
-  slideout.classList.toggle('open', open);
-  compTab.setAttribute('aria-expanded', String(open));
-  syncSheetViewport();
-}
-
-compTab.addEventListener('click', () => setSheetOpen(!slideout.classList.contains('open')));
-// Collapse on an outside click — but only a real click, not a drag. Rotating the panel is an
-// outside press, and slamming the drawer shut mid-rotate would fight the whole point of it
-// (toggle a layer, turn the panel, toggle the next).
-let outsidePress = null;
-document.addEventListener('pointerdown', e => {
-  outsidePress = (slideout.classList.contains('open') && !slideout.contains(e.target))
-    ? { x: e.clientX, y: e.clientY } : null;
-});
-document.addEventListener('pointerup', e => {
-  if (!outsidePress) return;
-  const moved = Math.hypot(e.clientX - outsidePress.x, e.clientY - outsidePress.y);
-  outsidePress = null;
-  if (moved > 6) return;                    // that was a rotate, not a dismiss
-  setSheetOpen(false);
-});
-slideout.querySelectorAll('.toggle-switch').forEach(sw => {
-  sw.addEventListener('click', () => {
-    const name = sw.dataset.component;
-    layerState[name] = !layerState[name];
-    sw.classList.toggle('active', layerState[name]);
-    applyLayer(name);
-  });
-});
-compUpload.addEventListener('click', () => document.getElementById('fileInput').click());
-
-// ===== Public API used by the classic configurator script =====
-function show3D(on){
-  const use = !!on && webglOK;
-  container.classList.toggle('view-3d', use);
-  window.__viewer3dActive = use;   // read by the CSS-panel drag handler to yield to OrbitControls
-  // Re-run the CSS panel's side-strip pass for the new mode: their inline visibility would
-  // otherwise survive the switch and paint over (or stay missing from) the CSS preview.
-  if (typeof window.applyRotation === 'function') window.applyRotation();
-  if (use) requestAnimationFrame(resize);
-}
-
-function showForSize(size, orientation){
-  const key = configKeyFor(size, orientation);
-  if (!key || !webglOK){ show3D(false); return; }  // custom/unknown or no WebGL -> CSS preview
-  show3D(true);
-  exitEdit();                 // a new panel is not the one you were editing
-  resetLayerState();          // a newly loaded panel always starts whole
-  syncDrawerUI();
-  // DEV-35: seed the varnish from the panel's own state. This is the choke point for all three
-  // entries (size pick, orientation swap, loadPanelToEditor), so an edited saved panel restores
-  // its varnish here rather than needing a setVarnish call at each call site.
-  if (typeof currentPanel !== 'undefined' && currentPanel && currentPanel.woodVarnish)
-    setVarnish(currentPanel.woodVarnish);
-  if (typeof currentPanel !== 'undefined' && currentPanel && currentPanel.fabricWrap)
-    setFold(currentPanel.fabricWrap);   // DEV-36: same choke point, so an edited panel restores its wrap
-  loadingEl.style.display = modelReady ? 'none' : 'flex';
-  if (modelReady) showConfig(key);
-  else pendingConfig = key;
-}
-
-window.audial3D = { available: webglOK, showForSize, show3D, refreshArt, setVarnish, setFold, captureThumbnail };
-
-if (!webglOK) {
-  console.warn('[audial3D] WebGL unavailable — CSS preview will be used.');
-} else {
-  initViewer();
-}
 </script>
 
 </body>

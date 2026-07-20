@@ -37,8 +37,10 @@ audial-website/
             ├── panel-viewer.html   ← standalone Three.js panel viewer + cinematic assembly animation (DEV-31)
             ├── build-web-glb.mjs   ← strips Panels.glb master → Panels-web.glb (gltf-transform; DEV-32)
             ├── Panels.glb          ← ~59MB Blender master (gitignored, local only)
-            └── Panels-web.glb      ← ~319KB web model the configurator loads (committed; DEV-32)
+            └── Panels-web.glb      ← ~319KB web model (committed; DEV-32)
 ```
+
+**No page currently loads any 3D.** `Panels-web.glb`, `build-web-glb.mjs` and `panel-viewer.html` are all retained but unreferenced by the site — see "Parked: the 3D configurator" below.
 
 The nav logo is composed of two `<img>` tags inside `.logo`: `Audial Logo.png` (mark, 50px height) + `Audial Logo_Black.png` (wordmark, 64px height), gap 8px. Nav auto-sizes to 64px. Adding a font or photo? Drop it in `assets/` and ask Claude to wire it up.
 
@@ -143,6 +145,25 @@ _(none)_
 
 ### Medium Priority
 _(none)_
+
+### Parked: the 3D configurator (DEV-32 … DEV-38) — REVERTED 2026-07-20
+
+**The configurator no longer has a Three.js viewer. It is back on the CSS 3D preview, byte-identical to what is deployed on Vercel.** `configurator.html` and `room-visualizer.html` were restored to their `46df3da` state (verified: the restored `configurator.html` is 122,810 bytes, exactly what `www.audial.in` serves; the live site 404s on `Panels-web.glb` and contains no 3D markers — the 3D work was **never deployed**).
+
+**Why:** the artwork cropped on the sides. The fabric front face is the panel's full *outer* face — `0.300 × feet + 0.055` world units on **both** axes — so its aspect is pulled toward square and never matches the nominal panel ratio (4×2 → **1.900**, not 2.000; 2×1 → 1.845; 1×4 → 3.529). Under the cover-fit that meant 5–12% of the art fell off the long axis. Separating the flat fabric front from the fold in Blender (done, and clean — see below) did **not** fix it, because the split changed no dimensions. The founder's call was that fixing it properly meant reworking the Blender master to non-physical "website" ratios, and that the 3D belongs elsewhere on the site rather than in the configurator.
+
+**The plan going forward: upgrade the CSS preview using what the 3D work produced.** Concretely available:
+- **Real wood textures** — `pine-wood-light` (41 KB) and `pine-wood-dark` (154 KB) JPEGs are inside `Panels-web.glb` and can be extracted to replace the CSS gradient fakes. Likely the biggest visual win.
+- **True measured proportions** — the `0.300 × feet + 0.055` fabric-face geometry above; the CSS preview currently uses nominal feet.
+- The `−35° / 8°` pose already matches what CSS uses; the 6-layer component breakdown is documented in the DEV-33 entry.
+
+**Everything is recoverable.** The 8 commits (`15c124f` → `02c701b`) remain in `master`'s history and are tagged **`3d-configurator-archive`** (local tag; not pushed). `panel-viewer.html` is standalone, was never wired into the site, and is untouched — it's the natural starting point for rehoming the 3D. The detailed DEV-32…DEV-38 write-ups below are **kept deliberately**: they are the most valuable artifact of that work and describe the `.glb`, the build pipeline, and every trap hit along the way. Read them as *history and asset documentation*, **not** as a description of the current configurator.
+
+**Two non-3D fixes were lost in the revert** (they were entangled in the 3D commits; re-apply if wanted):
+1. **Finish section un-gating** — `customSection.style.display='block'` had been moved from `handleImageUpload` into `showDesigner()`. Reverted, so Wood + Side Wrap are once again hidden until an image is uploaded. That gate was never principled (clearing the art didn't re-hide them).
+2. **`#imgReplaceBtn`** — a Replace button in the preview toolbar. Only needed because `panelFace` was hidden in 3D mode; the in-panel Replace works again in CSS mode.
+
+**Blender master state (2026-07-20, current):** the fabric front is now its own flat 2-triangle quad per config (`<key> Acoustic Fabric`), fully separate from `<key> Half Fold` / `<key> Full Fold`. Verified: all 8 configs present, **zero fold triangles coplanar with the front plane** (no z-fighting, no art bleed onto the rim), every node name matches its mesh datablock name, no typos, all 8 Rockwool meshes carry the Rockwool material, both wood varnishes still in use so neither gets pruned. **`build-web-glb.mjs` has NOT been updated for this new node layout** — its `FABRIC_NODE_RE` still expects `<key> Acoustic Fabric (Half|Full) Fold`, so a rebuild against the current master will fail its guards (correctly, and loudly). Fix the regex before rebuilding.
 
 ### Recently resolved
 - **Mobile performance testing (DEV-38)** ✓ — **The outcome is that no code was needed.** Measured in real Chrome at a Pixel-7-class viewport (390×844 @ DPR 3, `isMobile`+`hasTouch`) with real CDP touch events and CPU throttling — **emulated, not hardware**; the phone GPU is unmeasured, judged negligible at ~1010 tris with DPR already capped at 2. Results: **page load 350 ms**, 3D viewer ready **~410 ms**, three.js from unpkg ~190 ms, `.glb` 312 KB, JS heap 7.4 MB. Orbiting at **6× CPU throttle** (mid-range-Android proxy) was **vsync-capped with zero long frames**; it only degrades at **20×** (median 33 fps — a fictional device). **Decision: 3D stays default on mobile — no "View in 3D" toggle, no static fallback**, since the spec's own rule was "if performance is acceptable, leave 3D as default". **Touch controls needed zero work** — OrbitControls gives one-finger rotate + pinch-zoom natively (verified: camera moved; pinch took distance 4.39 → 2.71), `enablePan` already off, distances clamped. **Lazy-loading three.js/`.glb` was rejected on measurement:** it would save a few hundred ms of page load in exchange for a slower *first 3D paint* — bad trade. **The continuous render loop stays** — it's a battery cost, not a frame-rate problem (never dropped a frame at 6×), and DEV-35's varnish swap + DEV-36's fold toggle both depend on it landing next frame. **Measurement trap:** timing `page.goto` with a harness stopwatch reported **8 s**, flat across throttling — which reads exactly like a network-bound load, but was Chrome's cold-start overhead; the page's own `performance` navigation timing says 350 ms. **Read navigation timing, never time `page.goto`.** Also: unpkg omits `Timing-Allow-Origin`, so cross-origin `transferSize` reads **0 bytes** — not evidence of an empty fetch. Only console error is the pre-existing `favicon.ico` 404. (no files changed)
