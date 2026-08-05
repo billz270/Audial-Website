@@ -1,0 +1,27 @@
+# Everything listed here is EXCLUDED from Vercel deploys.
+# Vercel CLI uploads the whole working directory, not just git-tracked files, so anything
+# local-only must be named here or it becomes publicly fetchable on www.audial.in.
+
+# --- Local-only credential files. Never deploy. ---
+website/
+
+# Internal source material and working notes
+website-content/
+screenshots/
+design-references/wesite-banners/
+CLAUDE.md
+TASKS.md
+DESIGN.md
+
+# Build-only / oversized assets (Panels-web.glb is kept — it is the web model)
+design-references/assets/3d-models/Panels.glb
+design-references/assets/3d-models/node_modules/
+design-references/assets/3d-models/build-web-glb.mjs
+design-references/assets/3d-models/*.hash
+design-references/assets/3d-models/package*.json
+design-references/old-logo/
+
+# Tooling
+.claude/
+.superpowers/
+docs/

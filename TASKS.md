@@ -1932,3 +1932,118 @@ baseline. Temp paths for GLB **must** end in `.glb`.
 ✅ Final production deploy successful
 
 ---
+
+## Task #DEV-39: Replace Hero Showcase Grid with Cycling Video Banner
+- **Status:** DONE (local, tested — awaiting founder's Vercel deploy)
+- **Priority:** HIGH
+- **File:** index.html
+
+### Goal
+Replace the current SVG mockup showcase grid in the hero section with a video banner that plays two 4:5 aspect ratio .mp4 videos in rotation. One video plays at a time, then cycles to the next automatically. Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
+
+### Behavior Spec
+
+**Video files:**
+- Two .mp4 files, 4:5 aspect ratio
+- Stored in a new folder: /assets/videos/ (create if it doesn't exist)
+- Naming: video-1.mp4 and video-2.mp4 (or descriptive names — decide during implementation)
+- Compressed to under 5MB each before adding to the folder
+
+**Placement:**
+- Replaces the existing hero showcase grid (SVG mockups) in the hero section
+- Sits in the same right column as the current grid
+- Left column (headline, subheadline, CTAs) stays unchanged
+
+**Playback behavior:**
+- Autoplay on page load
+- Muted (required for autoplay to work in browsers)
+- No controls visible to users
+- Full clip of video 1 plays, then video 2 starts automatically
+- Once video 2 ends, video 1 starts again (infinite rotation)
+- Transition between videos: fade or instant cut — decide during implementation which feels cleaner
+
+**Aspect ratio handling:**
+- Container preserves the 4:5 vertical ratio
+- Desktop: video sits within the hero right column, contained (no cropping)
+- Mobile: video fills the width, stacks below the headline/CTA section (like current mobile behavior)
+
+**Fallback:**
+- If videos fail to load, show a static poster image (first frame of video 1 as .jpg or .webp)
+- Poster attribute set on the video element
+- Poster image also stored in /assets/videos/
+
+**Performance:**
+- Preload metadata only, not full videos (preload="metadata")
+- Video 2 should not start downloading until video 1 nears completion
+- Lazy load if possible to keep initial page load fast
+
+### Constraints
+- Do NOT autoplay with sound (browsers block it)
+- Do NOT add video controls (play/pause bar)
+- Do NOT break existing hero layout on desktop or mobile
+- Existing headline, subheadline, and CTA buttons stay unchanged
+- Do NOT deploy to Vercel until fully tested and functional on localhost
+
+### Acceptance Criteria
+✅ Hero showcase grid removed
+✅ Video banner in place, 4:5 aspect ratio preserved
+✅ Video 1 autoplays on page load (muted)
+✅ Video 2 plays automatically after video 1 finishes
+✅ Loop back to video 1 after video 2 finishes
+✅ Poster image shows if videos fail to load
+✅ Desktop and mobile layouts both work
+✅ No controls visible to users
+✅ Preload strategy doesn't bloat initial page load
+✅ Fully tested locally before production deployment
+
+### Out of Scope
+- Video editing or compression (handled outside this task)
+- More than 2 videos (task scoped to exactly 2)
+- User-facing play/pause controls
+- Deployment to Vercel (separate action after acceptance)
+
+### Implementation notes (2026-08-06)
+
+**Scope, per founder:** both hero slides were removed, not just the showcase grid — the DES-9 line-art
+configs (slide 1), the 12-panel `.showcase` (slide 2), the 2 slide dots and `goHeroSlide()` are all
+gone. The video pair now does the cycling. `index.html` dropped 51,677 → ~28,300 bytes.
+
+**Assets** — `design-references/assets/videos/`: `banner-1.mp4` (1.17 MB, 10.0 s, from
+`ACOUSTIC PANELS.mp4`), `banner-2.mp4` (1.92 MB, 14.57 s, from `As Flexible.mp4`), both already
+1080×1350 = exactly 4:5 h264/30fps so **no compression was needed**; `banner-poster.jpg` (11 KB,
+frame 1 of banner-1, extracted with ffmpeg). Originals stay in `design-references/wesite-banners/`.
+
+**Desktop sizing — the hero must not grow.** `.hero-video` is `position:absolute` inside
+`.hero-right`, so it contributes **zero intrinsic height** and the hero row stays sized by
+`.hero-left`, exactly as the slider did. A first attempt using `flex:1` + `aspect-ratio` created a
+cyclic size dependency and let the video drive the row to 725 px — **verified pixel-identical to the
+live baseline only after going absolute** (heroH / ctaTop / procTop deltas all 0.0 at 1920, 1440,
+1280, 1100, 1024, 940).
+
+**`width:min(100%,80cqh)` is load-bearing.** With `top/bottom:0` the box was height-locked, so at
+1024 px `max-width` clamped the width and the ratio broke to **0.73 → ~9% of the clip cropped** by
+`object-fit:cover`. Container-query units let *whichever axis runs out first* cap the box, so it is
+exact 4:5 at every width (verified 320 → 1920). `.hero-right` therefore carries
+`container-type:size`, and the mobile block **must** reset it to `normal` — `container-type:size`
+with `height:auto` would collapse the stacked column to zero.
+
+**Mobile/tablet:** stacked, full column width, but `max-width:56vh` caps the video at 70vh tall —
+without it an iPad-portrait hero grew +450 px. Phones sit below the cap (50–58% vh) and fill edge to
+edge. Hero still grows below 900 px (+142 px on SE → +222 px on iPad Air): unavoidable, a 4:5
+portrait clip replaces a 1.4 landscape one.
+
+**Preload:** video 1 `preload="auto"` (it has to autoplay), video 2 `preload="none"` until a
+`timeupdate` handler arms it 3 s before video 1 ends — measured firing at **7.3 s**, and total bytes
+on load are *lower* than the spec's `preload="metadata"`-on-both, since video 2 fetches nothing.
+Setting `preload='auto'` alone starts the fetch in Chromium; the `load()` nudge is deferred 1 s and
+guarded on `networkState !== 2` because calling it eagerly caused a **duplicate 1.9 MB request**.
+
+**Beyond spec, all mandatory:** `playsinline` (without it iOS Safari forces fullscreen), `muted` set
+as both attribute and property (Safari checks the property before allowing autoplay), and a `.catch()`
+on every `play()`. The `poster` attribute alone is *not* a real fallback — it only covers the initial
+load — so a sibling `<img>` layer + an `error` handler restores it at any point.
+
+**Testing trap:** `python -m http.server` ignores HTTP Range requests, so `video.currentTime = dur-1`
+**silently seeks back to 0** and the video restarts. The first rotation test looked like a broken
+`ended` handler; it was the server. Rotation was re-verified by real-time playback instead — three
+consecutive handoffs at t=10s, 24s, 34s, 48s, 58s, plus a mobile run. Zero console errors.
