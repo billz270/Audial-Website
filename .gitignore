@@ -5,3 +5,11 @@ docs/superpowers/
 # 3D pipeline: the Blender master is huge and local-only; the web build is committed.
 design-references/assets/3d-models/Panels.glb
 design-references/assets/3d-models/node_modules/
+
+# Local-only credential files — never commit. Also excluded from deploys via .vercelignore.
+website/
+
+# Local-only working material
+website-content/
+screenshots/
+design-references/wesite-banners/
