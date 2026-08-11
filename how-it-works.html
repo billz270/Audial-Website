@@ -210,9 +210,19 @@
   .process.no-3d .build-layout{grid-template-columns:1fr}
   .process.no-3d .build-viewer{display:none}
   .process.no-3d .process-hint-3d{display:none}
+  .process-dots{display:none;justify-content:center;gap:8px;margin-top:14px}
+  .process-dot{width:6px;height:6px;border-radius:50%;background:var(--ink);opacity:0.22;transition:opacity 0.2s,background 0.2s;flex-shrink:0}
+  .process-dot.active{opacity:1;background:var(--accent)}
   @media(max-width:900px){
     .build-layout{grid-template-columns:1fr;gap:22px}
     .build-viewer{position:static}
+    /* Mobile: the step grid becomes a horizontal slider carrying only the six
+       steps that drive the viewer. Scoped to :not(.no-3d) because disable3D()
+       strips .is-layer off every card — unscoped this would hide all eight. */
+    .build-steps{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
+    .build-step{flex:0 0 min(210px,62vw);scroll-snap-align:center}
+    .process:not(.no-3d) .build-step:not(.is-layer){display:none}
+    .process-dots{display:flex}
     .viewer-stage{height:clamp(300px,44vh,380px)}
     /* pan-y keeps one-finger page scroll working over the canvas; rotate is two-finger on touch */
     #buildCanvas{touch-action:pan-y}
@@ -220,7 +230,7 @@
     .step-icon,.step-icon svg{width:62px;height:62px}
   }
   @media(max-width:560px){
-    .build-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .build-step{flex-basis:min(190px,66vw)}
     .step-icon,.step-icon svg{width:66px;height:66px}
     .process-hint{margin:-18px 0 22px}
   }
@@ -424,6 +434,7 @@
         <div class="step-name">Package &amp; Ship</div>
       </div>
     </div>
+    <div class="process-dots" id="processDots"></div>
     <div class="build-viewer" id="buildViewer">
       <div class="viewer-stage">
         <canvas id="buildCanvas"></canvas>
@@ -570,6 +581,44 @@ document.getElementById('consultForm').addEventListener('submit', e => {
   obs.observe(section);
 })();
 
+// Mobile step-slider dots. Built from the cards that are actually visible, so
+// it reports 6 normally and 8 in the no-3d fallback (where 01/08 come back).
+(function(){
+  const scroller = document.getElementById('buildSteps');
+  const dots = document.getElementById('processDots');
+  if(!scroller || !dots) return;
+  let steps = [];
+  function build(){
+    steps = [...scroller.children].filter(el => getComputedStyle(el).display !== 'none');
+    dots.innerHTML = '';
+    steps.forEach((_,i)=>{
+      const d = document.createElement('span');
+      d.className = 'process-dot' + (i===0 ? ' active' : '');
+      dots.appendChild(d);
+    });
+  }
+  function update(){
+    if(!steps.length) return;
+    // Nearest card centre, matching scroll-snap-align:center. Dividing scrollLeft
+    // by card width instead picks the LEFTMOST card, which never reaches the last
+    // dot — at max scroll the final card sits at the right edge, not the left.
+    const sr = scroller.getBoundingClientRect();
+    const mid = sr.left + sr.width / 2;
+    let best = 0, bestDist = Infinity;
+    steps.forEach((el,i)=>{
+      const r = el.getBoundingClientRect();
+      const dist = Math.abs(r.left + r.width / 2 - mid);
+      if(dist < bestDist){ bestDist = dist; best = i; }
+    });
+    [...dots.children].forEach((d,j)=>d.classList.toggle('active', j===best));
+  }
+  build();
+  scroller.addEventListener('scroll', update, {passive:true});
+  window.addEventListener('resize', ()=>{ build(); update(); });
+  // The module calls this after a load failure flips the section to no-3d.
+  window.__rebuildStepDots = ()=>{ build(); update(); };
+})();
+
 // Reveal on scroll
 const observer = new IntersectionObserver(entries => {
   entries.forEach(entry => { if(entry.isIntersecting) entry.target.classList.add('revealed'); });
@@ -649,6 +698,8 @@ function disable3D() {
     const tag = el.querySelector('.step-3d');
     if (tag) tag.remove();
   });
+  // Steps 01/08 become visible again on mobile — the dot count must follow.
+  if (typeof window.__rebuildStepDots === 'function') window.__rebuildStepDots();
 }
 
 if (!webglAvailable()) {
