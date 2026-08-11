@@ -580,8 +580,32 @@ document.getElementById('consultForm').addEventListener('submit', e => {
   obs.observe(section);
 })();
 
+// Strips the build section back to steps-only. Defined in the CLASSIC script,
+// not the module, so it still runs when the three.js module never executes —
+// e.g. unpkg unreachable or blocked, where an inline module's failed import
+// takes the whole script with it and no module-side handler can fire.
+window.__audialDisable3D = function(){
+  var sec = document.querySelector('.process');
+  if(!sec || sec.classList.contains('no-3d')) return;
+  sec.classList.add('no-3d');
+  document.querySelectorAll('.build-step.is-layer').forEach(function(el){
+    el.classList.remove('is-layer','selected');
+    el.removeAttribute('role');
+    el.removeAttribute('tabindex');
+    el.removeAttribute('aria-pressed');
+    var tag = el.querySelector('.step-3d');
+    if(tag) tag.remove();
+  });
+};
+// Watchdog for that case: without it the viewer sits on "Loading panel…"
+// indefinitely while six cards still advertise themselves as clickable.
+// Only guards module BOOT — once booted, a slow .glb is left to finish.
+setTimeout(function(){
+  if(!window.__audialViewerBooted) window.__audialDisable3D();
+}, 6000);
+
 // Mobile step-slider dots. Built from the cards that are actually visible, so
-// it reports 6 normally and 8 in the no-3d fallback (where 01/08 come back).
+// it reports 8 normally and 8 in the no-3d fallback too.
 (function(){
   const scroller = document.getElementById('buildSteps');
   const dots = document.getElementById('processDots');
@@ -667,6 +691,9 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
+// Reaching here means three.js resolved — stand the boot watchdog down.
+window.__audialViewerBooted = true;
+
 const MODEL_URL = 'design-references/assets/3d-models/Panels-web.glb';
 const PANEL_KEYS = ['4x2V', '4x2H', '2x2', '1x4V', '1x4H', '2x1V', '2x1H', '1x1'];
 const COMPONENTS = ['Frame', 'Rockwool', 'Fiberglass Sheet', 'Back Support', 'Fiberglass Screen', 'Acoustic Fabric'];
@@ -682,7 +709,6 @@ const WOOD_COMPONENTS = ['Frame', 'Back Support'];
 const WOOD_MATERIAL = 'Pine Wood Light';
 const DEFAULT_KEY = '4x2V';
 
-const section = document.querySelector('.process');
 const canvas = document.getElementById('buildCanvas');
 const stage = canvas.parentElement;
 const viewerEl = document.getElementById('buildViewer');
@@ -700,18 +726,9 @@ function webglAvailable() {
 }
 
 // No WebGL (or the model failed to load): drop the viewer column, widen the
-// grid, and strip the interaction affordances so nothing looks broken.
-function disable3D() {
-  section.classList.add('no-3d');
-  stepEls.forEach((el) => {
-    el.classList.remove('is-layer', 'selected');
-    el.removeAttribute('role');
-    el.removeAttribute('tabindex');
-    el.removeAttribute('aria-pressed');
-    const tag = el.querySelector('.step-3d');
-    if (tag) tag.remove();
-  });
-}
+// grid, and strip the interaction affordances so nothing looks broken. Shared
+// with the classic script's boot watchdog so both paths degrade identically.
+const disable3D = window.__audialDisable3D;
 
 if (!webglAvailable()) {
   disable3D();
