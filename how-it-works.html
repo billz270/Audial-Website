@@ -216,12 +216,11 @@
   @media(max-width:900px){
     .build-layout{grid-template-columns:1fr;gap:22px}
     .build-viewer{position:static}
-    /* Mobile: the step grid becomes a horizontal slider carrying only the six
-       steps that drive the viewer. Scoped to :not(.no-3d) because disable3D()
-       strips .is-layer off every card — unscoped this would hide all eight. */
-    .build-steps{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory}
+    /* Mobile: the step grid becomes a horizontal slider. All 8 steps ride it —
+       it just opens scrolled to 02, the first step that drives the viewer.
+       scroll-behavior:auto so that opening jump is instant, not animated. */
+    .build-steps{display:flex;overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;scroll-behavior:auto}
     .build-step{flex:0 0 min(210px,62vw);scroll-snap-align:center}
-    .process:not(.no-3d) .build-step:not(.is-layer){display:none}
     .process-dots{display:flex}
     .viewer-stage{height:clamp(300px,44vh,380px)}
     /* pan-y keeps one-finger page scroll working over the canvas; rotate is two-finger on touch */
@@ -612,11 +611,25 @@ document.getElementById('consultForm').addEventListener('submit', e => {
     });
     [...dots.children].forEach((d,j)=>d.classList.toggle('active', j===best));
   }
+  // Open on step 02 — the first step that drives the viewer — with 01 left
+  // peeking so it still reads as scrollable in both directions. Only applies
+  // while the slider is actually overflowing (i.e. mobile), and only once per
+  // entry into that mode, so a resize never yanks the user's position.
+  let startApplied = false;
+  function applyStart(){
+    if(scroller.scrollWidth <= scroller.clientWidth + 4){ startApplied = false; return; }
+    if(startApplied || !steps[1]) return;
+    const sr = scroller.getBoundingClientRect();
+    const tr = steps[1].getBoundingClientRect();
+    scroller.scrollLeft += (tr.left + tr.width / 2) - (sr.left + sr.width / 2);
+    startApplied = true;
+  }
+
   build();
+  applyStart();
+  update();
   scroller.addEventListener('scroll', update, {passive:true});
-  window.addEventListener('resize', ()=>{ build(); update(); });
-  // The module calls this after a load failure flips the section to no-3d.
-  window.__rebuildStepDots = ()=>{ build(); update(); };
+  window.addEventListener('resize', ()=>{ build(); applyStart(); update(); });
 })();
 
 // Reveal on scroll
@@ -698,8 +711,6 @@ function disable3D() {
     const tag = el.querySelector('.step-3d');
     if (tag) tag.remove();
   });
-  // Steps 01/08 become visible again on mobile — the dot count must follow.
-  if (typeof window.__rebuildStepDots === 'function') window.__rebuildStepDots();
 }
 
 if (!webglAvailable()) {
