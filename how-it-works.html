@@ -164,25 +164,65 @@
     .misconception-tile:nth-child(1),.misconception-tile:nth-child(2){border-bottom:1.5px solid rgba(242,242,249,0.2)}
   }
 
-  /* PROCESS TIMELINE */
-  .process-scroll{overflow:visible}
-  .process-track{display:flex}
-  .process-step{flex:1;display:flex;flex-direction:column;align-items:center;gap:8px;padding:0 8px;opacity:0;transform:translateY(10px);transition:opacity 0.4s ease,transform 0.4s ease}
-  .process-step.drawn{opacity:1;transform:translateY(0)}
-  .step-label{font-family:'Archivo Black',sans-serif;font-size:11px;letter-spacing:0.12em;color:var(--accent);text-transform:uppercase;height:32px;display:flex;align-items:flex-end;padding-bottom:2px}
-  .step-icon{width:80px;height:80px;flex-shrink:0}
-  .step-icon svg{width:80px;height:80px;display:block;stroke:var(--ink)}
+  /* PROCESS — STEP GRID + 3D BUILD VIEWER */
+  .process-hint{font-size:12.5px;line-height:1.6;color:var(--mute);margin:-24px 0 28px;max-width:560px}
+  .process-hint .accent{color:var(--accent);font-weight:700}
+  /* stretch + auto-rows:1fr makes the step grid match the viewer's height exactly,
+     so the two columns always bottom out together and the cards breathe. */
+  .build-layout{display:grid;grid-template-columns:minmax(0,1.12fr) minmax(0,1fr);gap:28px;align-items:stretch}
+  .build-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));grid-auto-rows:1fr;border-top:1.5px solid var(--ink);border-left:1.5px solid var(--ink)}
+  .build-step{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:24px 14px;border-right:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);background:none;font-family:inherit;color:inherit;text-align:center;overflow:hidden;opacity:0;transform:translateY(10px);transition:opacity 0.4s ease,transform 0.4s ease,background 0.25s ease,color 0.25s ease}
+  .build-step.drawn{opacity:1;transform:translateY(0)}
+  .build-step.is-layer{cursor:pointer}
+  .step-label{font-family:'Archivo Black',sans-serif;font-size:11px;letter-spacing:0.12em;color:var(--accent);text-transform:uppercase;transition:color 0.25s ease}
+  .step-icon{width:72px;height:72px;flex-shrink:0}
+  .step-icon svg{width:72px;height:72px;display:block;stroke:var(--ink);transition:stroke 0.25s ease}
   .step-icon svg *{stroke-dasharray:500;stroke-dashoffset:500;transition:none}
-  .process-step.drawn .step-icon svg *{stroke-dashoffset:0;transition:stroke-dashoffset 0.9s ease-out}
-  .step-name{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink);opacity:0.6;text-align:center;line-height:1.4;max-width:90px;padding-top:10px}
-  .process-dots{display:none;justify-content:center;gap:8px;margin-top:16px}
-  .process-dot{width:6px;height:6px;border-radius:50%;background:var(--ink);opacity:0.22;transition:opacity 0.2s,background 0.2s;flex-shrink:0}
-  .process-dot.active{opacity:1;background:var(--accent)}
+  .build-step.drawn .step-icon svg *{stroke-dashoffset:0;transition:stroke-dashoffset 0.9s ease-out}
+  .step-name{font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--ink);opacity:0.6;text-align:center;line-height:1.4;max-width:110px;padding-top:8px;transition:opacity 0.25s ease,color 0.25s ease}
+  /* Marks steps 02-07 as wired to the viewer. Steps 01/08 have no layer. */
+  .step-3d{position:absolute;top:8px;right:9px;font-size:8px;font-weight:700;letter-spacing:0.1em;color:var(--accent);opacity:0.65;transition:opacity 0.25s ease,color 0.25s ease}
+  .build-step:hover{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper)}
+  .build-step.is-layer:focus-visible{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper);outline:none}
+  .build-step:hover .step-icon svg,.build-step.is-layer:focus-visible .step-icon svg{stroke:var(--paper)}
+  .build-step:hover .step-name,.build-step.is-layer:focus-visible .step-name{color:var(--paper);opacity:1}
+  .build-step:hover .step-label,.build-step:hover .step-3d,.build-step.is-layer:focus-visible .step-label{color:var(--paper);opacity:1}
+  /* Selected uses ink per the site's selection convention; accent rides the top edge as the marker */
+  .build-step.selected,.build-step.selected:hover{background:var(--ink);color:var(--paper)}
+  .build-step.selected::after{content:'';position:absolute;left:0;right:0;top:0;height:3px;background:var(--accent)}
+  .build-step.selected .step-icon svg{stroke:var(--paper)}
+  .build-step.selected .step-name{color:var(--paper);opacity:1}
+  .build-step.selected .step-label,.build-step.selected .step-3d{color:var(--accent);opacity:1}
+
+  .build-viewer{position:sticky;top:84px;border:1.5px solid var(--ink);background:var(--paper);display:flex;flex-direction:column}
+  .viewer-stage{position:relative;width:100%;height:clamp(360px,46vh,480px)}
+  #buildCanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .viewer-loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--mute);background:var(--paper);z-index:2}
+  .viewer-loading.hidden{display:none}
+  /* Own strip below the canvas — overlaid on the stage it collided with tall panels */
+  .viewer-hint{padding:9px 8px 10px;text-align:center;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--mute);opacity:0.7;pointer-events:none;border-top:1.5px solid var(--line)}
+  .viewer-sizes{display:flex;border-top:1.5px solid var(--ink)}
+  .vsize{flex:1;min-width:0;padding:12px 4px;background:none;border:none;border-right:1.5px solid var(--ink);font-family:inherit;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink);cursor:pointer;transition:background 0.2s,color 0.2s;min-height:44px}
+  .vsize:last-child{border-right:none}
+  .vsize:hover{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper)}
+  .vsize.active{background:var(--ink);color:var(--paper)}
+  /* No WebGL (or model load failure): viewer drops out, step grid takes full width */
+  .process.no-3d .build-layout{grid-template-columns:1fr}
+  .process.no-3d .build-viewer{display:none}
+  .process.no-3d .process-hint-3d{display:none}
   @media(max-width:900px){
-    .process-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;scroll-snap-type:x mandatory;padding-bottom:4px}
-    .process-track{min-width:max-content}
-    .process-step{flex:0 0 min(220px,68vw);scroll-snap-align:center;padding:0 2px}
-    .process-dots{display:flex}
+    .build-layout{grid-template-columns:1fr;gap:22px}
+    .build-viewer{position:static}
+    .viewer-stage{height:clamp(300px,44vh,380px)}
+    /* pan-y keeps one-finger page scroll working over the canvas; rotate is two-finger on touch */
+    #buildCanvas{touch-action:pan-y}
+    .build-step{padding:20px 10px 16px}
+    .step-icon,.step-icon svg{width:62px;height:62px}
+  }
+  @media(max-width:560px){
+    .build-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+    .step-icon,.step-icon svg{width:66px;height:66px}
+    .process-hint{margin:-18px 0 22px}
   }
 
   /* Site max-width container — content constrained on wide screens */
@@ -226,9 +266,10 @@
 <section class="process">
   <div class="section-label">◆ How it's made</div>
   <h2 class="section-title">Eight steps. <span class="accent">Handbuilt.</span></h2>
-  <div class="process-scroll" id="processScroll">
-    <div class="process-track">
-      <div class="process-step">
+  <p class="process-hint"><span class="process-hint-3d">Steps 02–07 build the panel in the viewer. <span class="accent">Select one</span> to look at that layer on its own. </span>Every panel is assembled by hand, in this order.</p>
+  <div class="build-layout" id="buildLayout">
+    <div class="build-steps" id="buildSteps">
+      <div class="build-step">
         <div class="step-label">01</div>
         <div class="step-icon">
           <svg viewBox="0 0 120 120" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Source Wood">
@@ -248,7 +289,8 @@
         </div>
         <div class="step-name">Source Wood</div>
       </div>
-      <div class="process-step">
+      <div class="build-step is-layer" role="button" tabindex="0" aria-pressed="false" data-layer="Frame">
+        <span class="step-3d">3D</span>
         <div class="step-label">02</div>
         <div class="step-icon">
           <svg viewBox="0 0 120 120" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Create Frame">
@@ -262,7 +304,8 @@
         </div>
         <div class="step-name">Create Frame</div>
       </div>
-      <div class="process-step">
+      <div class="build-step is-layer" role="button" tabindex="0" aria-pressed="false" data-layer="Rockwool">
+        <span class="step-3d">3D</span>
         <div class="step-label">03</div>
         <div class="step-icon">
           <svg viewBox="0 0 120 120" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Install Rockwool">
@@ -281,7 +324,8 @@
         </div>
         <div class="step-name">Install Rockwool</div>
       </div>
-      <div class="process-step">
+      <div class="build-step is-layer" role="button" tabindex="0" aria-pressed="false" data-layer="Fiberglass Sheet">
+        <span class="step-3d">3D</span>
         <div class="step-label">04</div>
         <div class="step-icon">
           <svg viewBox="0 0 120 120" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Add Fiberglass Backing">
@@ -299,7 +343,8 @@
         </div>
         <div class="step-name">Fiberglass Backing</div>
       </div>
-      <div class="process-step">
+      <div class="build-step is-layer" role="button" tabindex="0" aria-pressed="false" data-layer="Back Support">
+        <span class="step-3d">3D</span>
         <div class="step-label">05</div>
         <div class="step-icon">
           <svg viewBox="0 0 120 120" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Add Back Support">
@@ -315,7 +360,8 @@
         </div>
         <div class="step-name">Back Support</div>
       </div>
-      <div class="process-step">
+      <div class="build-step is-layer" role="button" tabindex="0" aria-pressed="false" data-layer="Fiberglass Screen">
+        <span class="step-3d">3D</span>
         <div class="step-label">06</div>
         <div class="step-icon">
           <svg viewBox="0 0 120 120" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Apply Fiberglass Screen">
@@ -338,7 +384,8 @@
         </div>
         <div class="step-name">Fiberglass Screen</div>
       </div>
-      <div class="process-step">
+      <div class="build-step is-layer" role="button" tabindex="0" aria-pressed="false" data-layer="Acoustic Fabric">
+        <span class="step-3d">3D</span>
         <div class="step-label">07</div>
         <div class="step-icon">
           <svg viewBox="0 0 120 120" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Apply Acoustic Cloth">
@@ -356,7 +403,7 @@
         </div>
         <div class="step-name">Acoustic Cloth</div>
       </div>
-      <div class="process-step">
+      <div class="build-step">
         <div class="step-label">08</div>
         <div class="step-icon">
           <svg viewBox="0 0 120 120" fill="none" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-label="Package and Ship">
@@ -377,16 +424,20 @@
         <div class="step-name">Package &amp; Ship</div>
       </div>
     </div>
-  </div>
-  <div class="process-dots" id="processDots">
-    <span class="process-dot active"></span>
-    <span class="process-dot"></span>
-    <span class="process-dot"></span>
-    <span class="process-dot"></span>
-    <span class="process-dot"></span>
-    <span class="process-dot"></span>
-    <span class="process-dot"></span>
-    <span class="process-dot"></span>
+    <div class="build-viewer" id="buildViewer">
+      <div class="viewer-stage">
+        <canvas id="buildCanvas"></canvas>
+        <div class="viewer-loading" id="viewerLoading">Loading panel…</div>
+      </div>
+      <div class="viewer-hint" id="viewerHint">Drag to rotate · Scroll to zoom</div>
+      <div class="viewer-sizes" id="viewerSizes">
+        <button type="button" class="vsize" data-config="1x1">1×1</button>
+        <button type="button" class="vsize" data-config="2x1H">2×1</button>
+        <button type="button" class="vsize" data-config="2x2">2×2</button>
+        <button type="button" class="vsize active" data-config="4x2V">4×2</button>
+        <button type="button" class="vsize" data-config="1x4V">1×4</button>
+      </div>
+    </div>
   </div>
 </section>
 
@@ -506,26 +557,17 @@ document.getElementById('consultForm').addEventListener('submit', e => {
   window.location.href = `mailto:support@audial.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
 });
 
-// Process timeline animation + mobile dots
+// Process step-grid line-draw reveal
 (function(){
   const section = document.querySelector('.process');
   if(!section) return;
-  const steps = section.querySelectorAll('.process-step');
+  const steps = section.querySelectorAll('.build-step');
   const obs = new IntersectionObserver(entries=>{
     if(!entries[0].isIntersecting) return;
-    steps.forEach((s,i)=>setTimeout(()=>s.classList.add('drawn'),i*150));
+    steps.forEach((s,i)=>setTimeout(()=>s.classList.add('drawn'),i*120));
     obs.disconnect();
   },{threshold:0.1});
   obs.observe(section);
-  const scroll = document.getElementById('processScroll');
-  const dots = document.querySelectorAll('#processDots .process-dot');
-  if(scroll && dots.length){
-    scroll.addEventListener('scroll',()=>{
-      const w = steps[0]?.offsetWidth||220;
-      const active = Math.min(Math.round(scroll.scrollLeft/w),steps.length-1);
-      dots.forEach((d,i)=>d.classList.toggle('active',i===active));
-    },{passive:true});
-  }
 })();
 
 // Reveal on scroll
@@ -541,6 +583,407 @@ document.querySelectorAll('section').forEach(s => { if(!s.classList.contains('he
   document.addEventListener('click',function(e){if(!hn.contains(e.target)){hn.classList.remove('nav-open');hb.setAttribute('aria-expanded','false');}});
   document.querySelectorAll('.mobile-menu a,.mobile-menu button').forEach(function(el){el.addEventListener('click',function(){hn.classList.remove('nav-open');hb.setAttribute('aria-expanded','false');});});
 })();
+</script>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+// ============================================================================
+// DEV-40 — build viewer. Steps 02-07 map to the six physical layers in
+// Panels-web.glb; selecting one keeps it opaque and dims the other five.
+// Scene/classifier logic is lifted from design-references/assets/3d-models/
+// panel-viewer.html, minus the assembly animation and component toggles.
+// ============================================================================
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const MODEL_URL = 'design-references/assets/3d-models/Panels-web.glb';
+const PANEL_KEYS = ['4x2V', '4x2H', '2x2', '1x4V', '1x4H', '2x1V', '2x1H', '1x1'];
+const COMPONENTS = ['Frame', 'Rockwool', 'Fiberglass Sheet', 'Back Support', 'Fiberglass Screen', 'Acoustic Fabric'];
+// The .glb ships both wrap variants per config as real geometry. 'half' matches
+// the cart data model's default (fabricWrap:'half').
+const ACTIVE_FOLD = 'half';
+const DIM_OPACITY = 0.35;
+const FIT_MARGIN = 1.12;
+// The .glb assigns light varnish to some configs and dark to others (an asset
+// artifact of keeping both textures alive through the build's prune step, not
+// a design choice). Unify so the wood doesn't change colour as sizes switch.
+const WOOD_COMPONENTS = ['Frame', 'Back Support'];
+const WOOD_MATERIAL = 'Pine Wood Light';
+const DEFAULT_KEY = '4x2V';
+
+const section = document.querySelector('.process');
+const canvas = document.getElementById('buildCanvas');
+const stage = canvas.parentElement;
+const viewerEl = document.getElementById('buildViewer');
+const loadingEl = document.getElementById('viewerLoading');
+const hintEl = document.getElementById('viewerHint');
+const stepEls = Array.from(document.querySelectorAll('.build-step.is-layer'));
+const sizeBtns = Array.from(document.querySelectorAll('.vsize'));
+const narrowMQ = window.matchMedia('(max-width:900px)');
+
+function webglAvailable() {
+  try {
+    const c = document.createElement('canvas');
+    return !!(window.WebGLRenderingContext && (c.getContext('webgl2') || c.getContext('webgl')));
+  } catch (e) { return false; }
+}
+
+// No WebGL (or the model failed to load): drop the viewer column, widen the
+// grid, and strip the interaction affordances so nothing looks broken.
+function disable3D() {
+  section.classList.add('no-3d');
+  stepEls.forEach((el) => {
+    el.classList.remove('is-layer', 'selected');
+    el.removeAttribute('role');
+    el.removeAttribute('tabindex');
+    el.removeAttribute('aria-pressed');
+    const tag = el.querySelector('.step-3d');
+    if (tag) tag.remove();
+  });
+}
+
+if (!webglAvailable()) {
+  disable3D();
+} else {
+  init();
+}
+
+function init() {
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0xf2f2f9); // --paper, so the canvas melts into the card
+
+  // 30deg rather than the standalone viewer's 35 — less perspective stretch on
+  // the wide configs, which read as a wedge at the 38deg yaw.
+  const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 1000);
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.2;
+
+  scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+  const keyLight = new THREE.DirectionalLight(0xffffff, 1.2);
+  keyLight.position.set(5, 8, 5);
+  scene.add(keyLight);
+  const fillLight = new THREE.DirectionalLight(0x93b5c6, 0.4);
+  fillLight.position.set(-5, 3, 2);
+  scene.add(fillLight);
+  const rimLight = new THREE.DirectionalLight(0xffffff, 0.3);
+  rimLight.position.set(0, 2, -5);
+  scene.add(rimLight);
+
+  const controls = new OrbitControls(camera, canvas);
+  controls.enableDamping = true;
+  controls.enablePan = false;
+
+  const panelMeshes = {};
+  const fabricFolds = {};
+  PANEL_KEYS.forEach((k) => { panelMeshes[k] = {}; fabricFolds[k] = {}; });
+
+  // ~38deg yaw / ~9deg pitch — close to the CSS preview's -35/8 pose, and far
+  // enough off axis that the wood frame edge reads (the fabric front is blank
+  // grey in the web build, so a face-on shot looks like a flat slab).
+  const HOME_DIR = new THREE.Vector3(0.78, 0.19, 1).normalize();
+  let currentKey = DEFAULT_KEY;
+  let activeLayer = null;
+  let modelReady = false;
+
+  // ---- classification (node name first; Blender drifts mesh names, not nodes)
+  function identifyingName(mesh) {
+    if (mesh.parent && mesh.parent.name && mesh.parent.name !== 'Scene') return mesh.parent.name;
+    return mesh.name ? mesh.name.replace(/\.\d+$/, '') : '';
+  }
+
+  function classifyMesh(mesh) {
+    const name = identifyingName(mesh);
+    if (!name) return null;
+    const sorted = [...PANEL_KEYS].sort((a, b) => b.length - a.length); // "4x2V" before "4x2"
+    for (const panelKey of sorted) {
+      for (const sep of [' ', '_']) {
+        const prefix = panelKey + sep;
+        if (!name.startsWith(prefix)) continue;
+        const component = name.substring(prefix.length).trim().replace(/_/g, ' ');
+        if (COMPONENTS.includes(component)) return { panelKey, component };
+        const fold = component.match(/^Acoustic Fabric (Half|Full) Fold$/);
+        if (fold) return { panelKey, component: 'Acoustic Fabric', fold: fold[1].toLowerCase() };
+      }
+    }
+    return null;
+  }
+
+  // ---- camera
+  function fitCameraTo(key, dir) {
+    const box = new THREE.Box3();
+    let any = false;
+    for (const c of COMPONENTS) {
+      const m = panelMeshes[key][c];
+      if (m) { box.expandByObject(m); any = true; }
+    }
+    if (!any || box.isEmpty()) return;
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
+    const view = (dir || HOME_DIR).clone().normalize();
+
+    const vFov = THREE.MathUtils.degToRad(camera.fov);
+    const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+    let dist = Math.max(
+      Math.hypot(size.x, size.z) / (2 * Math.tan(hFov / 2)),
+      Math.hypot(size.y, size.z) / (2 * Math.tan(vFov / 2))
+    );
+
+    // Closed-form distance under-shoots: viewed off-axis the NEAR edge of the
+    // panel sits closer than `dist` and so projects larger than the formula
+    // predicts (it clipped top and bottom at ~38deg yaw). Iterate on the actual
+    // projected corners instead — converges in 2-3 passes and is exact for any
+    // config, aspect ratio, or view direction.
+    const corners = [];
+    for (const x of [box.min.x, box.max.x]) {
+      for (const y of [box.min.y, box.max.y]) {
+        for (const z of [box.min.z, box.max.z]) corners.push(new THREE.Vector3(x, y, z));
+      }
+    }
+    for (let i = 0; i < 8; i++) {
+      camera.position.copy(center).addScaledVector(view, dist);
+      camera.lookAt(center);
+      camera.updateMatrixWorld(true);
+      let maxAbs = 0;
+      for (const c of corners) {
+        const p = c.clone().project(camera);
+        maxAbs = Math.max(maxAbs, Math.abs(p.x), Math.abs(p.y));
+      }
+      if (maxAbs <= 0) break;
+      const scale = maxAbs * FIT_MARGIN;
+      dist *= scale;
+      if (Math.abs(scale - 1) < 0.004) break;
+    }
+
+    controls.target.copy(center);
+    camera.position.copy(center).addScaledVector(view, dist);
+    controls.minDistance = dist * 0.4;
+    controls.maxDistance = dist * 2.4;
+    controls.update();
+  }
+
+  function resize() {
+    const w = stage.clientWidth;
+    const h = stage.clientHeight;
+    if (!w || !h) return;
+    renderer.setSize(w, h, false); // false: CSS sizes the canvas, JS only the buffer
+    camera.aspect = w / h;
+    camera.updateProjectionMatrix();
+    // Refit distance along the CURRENT view direction so a resize (or mobile
+    // browser chrome sliding away) doesn't throw away the user's orbit.
+    if (modelReady) {
+      const dir = camera.position.clone().sub(controls.target);
+      fitCameraTo(currentKey, dir.lengthSq() > 0 ? dir.normalize() : HOME_DIR);
+    }
+  }
+
+  // ---- layer highlighting
+  function applyDim(key, layer) {
+    for (const c of COMPONENTS) {
+      const mesh = panelMeshes[key][c];
+      if (!mesh || !mesh.material) continue;
+      const mat = mesh.material;
+      if (!mat.userData.baseState) {
+        mat.userData.baseState = { transparent: mat.transparent, opacity: mat.opacity, depthWrite: mat.depthWrite };
+      }
+      const base = mat.userData.baseState;
+      if (!layer || c === layer) {
+        mat.transparent = base.transparent;
+        mat.opacity = base.opacity;
+        mat.depthWrite = base.depthWrite;
+      } else {
+        mat.transparent = true;
+        mat.opacity = DIM_OPACITY;
+        // depthTest stays on (so the selected layer still occludes correctly),
+        // but dimmed layers must not depth-write or they occlude each other
+        // in draw order and the stack reads as garbage.
+        mat.depthWrite = false;
+      }
+      mat.needsUpdate = true;
+    }
+  }
+
+  function selectLayer(layer) {
+    activeLayer = layer;
+    applyDim(currentKey, layer);
+    stepEls.forEach((el) => {
+      const on = el.dataset.layer === layer;
+      el.classList.toggle('selected', on);
+      el.setAttribute('aria-pressed', String(on));
+    });
+  }
+
+  function resetSelection() {
+    if (activeLayer === null) return;
+    selectLayer(null);
+    fitCameraTo(currentKey);
+  }
+
+  function showPanel(key) {
+    if (currentKey !== key) applyDim(currentKey, null); // un-dim the outgoing config
+    currentKey = key;
+    for (const k of PANEL_KEYS) {
+      for (const c of COMPONENTS) {
+        const m = panelMeshes[k][c];
+        if (m) m.visible = (k === key);
+      }
+    }
+    applyDim(key, activeLayer); // selection survives a size change
+    fitCameraTo(key);
+    sizeBtns.forEach((b) => b.classList.toggle('active', b.dataset.config === key));
+  }
+
+  // ---- input
+  function applyTouchMode() {
+    if (narrowMQ.matches) {
+      // One finger must stay free to scroll the page — the viewer is a section
+      // in a long document, not the whole screen.
+      controls.touches.ONE = THREE.TOUCH.NONE;
+      controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
+      // OrbitControls writes touch-action:none INLINE on the canvas, which beats
+      // the stylesheet — without this override one finger would be swallowed and
+      // the page could not be scrolled past the viewer.
+      canvas.style.touchAction = 'pan-y';
+      hintEl.textContent = 'Two fingers to rotate · Pinch to zoom';
+    } else {
+      controls.touches.ONE = THREE.TOUCH.ROTATE;
+      controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
+      canvas.style.touchAction = 'none';
+      hintEl.textContent = 'Drag to rotate · Scroll to zoom';
+    }
+  }
+
+  function revealViewerIfNeeded() {
+    if (!narrowMQ.matches) return;
+    const r = viewerEl.getBoundingClientRect();
+    if (r.top > window.innerHeight * 0.6 || r.bottom < 100) {
+      viewerEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  stepEls.forEach((el) => {
+    el.addEventListener('click', () => {
+      if (!modelReady) return;
+      const layer = el.dataset.layer;
+      if (activeLayer === layer) { resetSelection(); return; }
+      selectLayer(layer);
+      revealViewerIfNeeded();
+    });
+    el.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); el.click(); }
+    });
+  });
+
+  sizeBtns.forEach((b) => {
+    b.addEventListener('click', () => {
+      if (!modelReady) return;
+      showPanel(b.dataset.config);
+    });
+  });
+
+  // Clicks inside the viewer are orbit gestures, not "outside" clicks — without
+  // this exclusion every drag-release would clear the selection.
+  document.addEventListener('click', (e) => {
+    if (!activeLayer) return;
+    if (e.target.closest('.build-step') || e.target.closest('.build-viewer')) return;
+    resetSelection();
+  });
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || !activeLayer) return;
+    const modal = document.getElementById('consultModal');
+    if (modal && modal.classList.contains('open')) return; // modal owns Escape first
+    resetSelection();
+  });
+
+  if (narrowMQ.addEventListener) narrowMQ.addEventListener('change', applyTouchMode);
+  new ResizeObserver(resize).observe(stage);
+  window.addEventListener('resize', resize);
+  applyTouchMode();
+  resize();
+
+  // ---- load
+  new GLTFLoader().load(
+    MODEL_URL,
+    (gltf) => {
+      const model = gltf.scene;
+      // Grab the shared wood material BEFORE the per-mesh clone below — that is
+      // the last moment the original is reachable.
+      let woodMat = null;
+      model.traverse((child) => {
+        if (child.isMesh && child.material && child.material.name === WOOD_MATERIAL) woodMat = child.material;
+      });
+
+      model.traverse((child) => {
+        if (!child.isMesh) return;
+        const cls = classifyMesh(child);
+        if (!cls) { child.visible = false; return; } // incl. any stray/unknown node
+        // Per-mesh material clone: Frame and Back Support share one wood
+        // material in the .glb, so without this, dimming one dims the other.
+        if (child.material) child.material = child.material.clone();
+        if (cls.fold) {
+          fabricFolds[cls.panelKey][cls.fold] = child;
+          child.visible = false;
+        } else {
+          panelMeshes[cls.panelKey][cls.component] = child;
+        }
+      });
+
+      // Promote the active wrap into the Acoustic Fabric slot; the other stays hidden.
+      for (const key of PANEL_KEYS) {
+        const folds = fabricFolds[key];
+        const active = folds[ACTIVE_FOLD] || folds.half || folds.full || null;
+        const inactive = active === folds.half ? folds.full : folds.half;
+        if (inactive) inactive.visible = false;
+        if (active) panelMeshes[key]['Acoustic Fabric'] = active;
+      }
+
+      // One varnish across every config. Cloned per mesh so layer dimming stays
+      // independent (Frame and Back Support must fade separately).
+      if (woodMat) {
+        for (const key of PANEL_KEYS) {
+          for (const c of WOOD_COMPONENTS) {
+            const m = panelMeshes[key][c];
+            if (m) m.material = woodMat.clone();
+          }
+        }
+      }
+
+      model.rotation.y = Math.PI; // bring the fabric FRONT around to face +Z
+      scene.add(model);
+      scene.updateMatrixWorld(true); // bounding boxes below need fresh world matrices
+      modelReady = true;
+
+      showPanel(DEFAULT_KEY);
+      loadingEl.classList.add('hidden');
+    },
+    (progress) => {
+      if (progress.total > 0) {
+        loadingEl.textContent = `Loading panel… ${((progress.loaded / progress.total) * 100).toFixed(0)}%`;
+      }
+    },
+    (err) => {
+      console.error('DEV-40: panel model failed to load', err);
+      disable3D();
+    }
+  );
+
+  (function loop() {
+    requestAnimationFrame(loop);
+    controls.update();
+    renderer.render(scene, camera);
+  })();
+}
 </script>
 
 </body>
