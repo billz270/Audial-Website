@@ -2047,3 +2047,107 @@ load — so a sibling `<img>` layer + an `error` handler restores it at any poin
 **silently seeks back to 0** and the video restarts. The first rotation test looked like a broken
 `ended` handler; it was the server. Rotation was re-verified by real-time playback instead — three
 consecutive handoffs at t=10s, 24s, 34s, 48s, 58s, plus a mobile run. Zero console errors.
+
+---
+
+## Task #DEV-40: Integrate 3D Panel Viewer into How It Works Page
+- **Status:** DONE (local, tested — awaiting founder's Vercel deploy)
+- **Priority:** HIGH
+- **File:** how-it-works.html
+- **Depends on:** panels-web.glb file ready
+
+### Goal
+Add an interactive 3D panel viewer to the how-it-works page, integrated with the existing 8-step process. Users click a step to highlight the corresponding layer in the 3D viewer. The section sits just above the "What They Do, No More Reflections" section. Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
+
+### Behavior Spec
+
+**File to use:**
+- panels-web.glb (lightweight web version, not full Panels.glb)
+- Reuse Three.js setup and classifier logic from panel-viewer.html
+
+**Default panel loaded:**
+- 4×2 vertical (4x2V from panels-web.glb)
+- Positioned at default 3/4 front angle
+- OrbitControls enabled (drag to rotate, scroll to zoom)
+
+**Placement:**
+- New section inserted just above the "What They Do, No More Reflections" section on how-it-works.html
+- Section has a subtle heading (e.g., "How It's Built" or similar — decide during implementation)
+- Section does NOT replace the existing 8-step content — it integrates it
+
+**Desktop layout (approx 55/45 split):**
+- Left column (~55%): 4×2 grid of the 8 steps (4 columns, 2 rows)
+  - Each step is a card with number, icon, title, short description
+  - Steps 2 through 7 have a subtle visual indicator (e.g., small "3D" badge or interaction hint) marking them as interactive with the viewer
+  - Steps 1 and 8 have hover animations only — no viewer interaction
+- Right column (~45%): 3D viewer, sticky as user scrolls
+- OrbitControls active on the viewer
+
+**Mobile layout:**
+- Steps on top: 8 steps in a scrollable horizontal row OR stacked cards (decide during implementation which feels cleaner)
+- 3D viewer below the steps
+- Both sections vertically stacked
+- 3D viewer takes appropriate height for mobile screens (not too tall)
+
+**Step interaction behavior:**
+
+Steps 1 (Source Wood) and 8 (Final step):
+- No viewer interaction
+- Hover animation on desktop (matching existing card hover behavior on the site)
+- Tap on mobile: no viewer change, subtle visual feedback only
+
+Steps 2 through 7 (mapped to 6 physical layers):
+- Step 2 → Frame
+- Step 3 → Rockwool
+- Step 4 → Fiberglass Sheet
+- Step 5 → Back Support
+- Step 6 → Fiberglass Screen
+- Step 7 → Acoustic Fabric
+(Confirm actual step-to-layer mapping during implementation based on current step titles on the page)
+
+When user clicks a layer step:
+- Selected layer stays at full opacity
+- All other layers reduce to 30-50% opacity (dimmed but still visible)
+- Selected step card highlights (e.g., accent color border or background)
+- Only one step can be selected at a time — clicking a different step switches focus
+
+When user clicks anywhere outside the step cards (or clicks the selected step again):
+- All layers return to full opacity
+- No step card is highlighted
+- 3D viewer resets to default view
+
+**Loading state:**
+- Show a subtle loading indicator while panels-web.glb loads
+- Fall back gracefully if WebGL is unsupported (show a static image or existing step content only)
+
+### Constraints
+- Do NOT remove or modify the existing 8-step content
+- Do NOT add the Play Assembly Animation button — that stays in panel-viewer.html only
+- Do NOT include component visibility toggles (like DEV-33's slider) — this is a click-to-highlight interaction, not a toggle interaction
+- Do NOT auto-rotate the panel when a layer is selected — user stays in control of camera
+- Preserve all other how-it-works page content and behavior
+- Do NOT deploy to Vercel until fully tested and functional on localhost
+
+### Acceptance Criteria
+✅ New section inserted just above "What They Do, No More Reflections"
+✅ 3D viewer loads panels-web.glb and displays 4×2 vertical panel by default
+✅ OrbitControls work (drag, zoom)
+✅ Desktop shows 4×2 grid of steps on left, viewer on right (~55/45 split)
+✅ Mobile shows steps on top, viewer below
+✅ Steps 1 and 8 have hover animations only, no viewer interaction
+✅ Steps 2 through 7 correctly map to 6 physical layers
+✅ Clicking a layer step dims other layers to 30-50% opacity
+✅ Selected step card visually highlighted
+✅ Clicking outside or on selected step resets all layers to full opacity
+✅ Only one layer can be highlighted at a time
+✅ Loading state shown while .glb loads
+✅ WebGL fallback works gracefully
+✅ Existing page content and behavior preserved
+✅ Fully tested locally before production deployment
+
+### Out of Scope
+- Play Assembly Animation button
+- Component visibility toggles (like the configurator slider)
+- Changes to the configurator or room-visualizer pages
+- Modifications to any step content or copy
+- Deployment to Vercel (separate action after acceptance)
