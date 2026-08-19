@@ -223,7 +223,8 @@
     .build-step{flex:0 0 min(210px,62vw);scroll-snap-align:center}
     .process-dots{display:flex}
     .viewer-stage{height:clamp(300px,44vh,380px)}
-    /* pan-y keeps one-finger page scroll working over the canvas; rotate is two-finger on touch */
+    /* pan-y keeps one-finger page scroll working over the canvas: the browser
+       takes vertical drags, OrbitControls gets horizontal ones and rotates */
     #buildCanvas{touch-action:pan-y}
     .build-step{padding:20px 10px 16px}
     .step-icon,.step-icon svg{width:62px;height:62px}
@@ -690,6 +691,11 @@ document.querySelectorAll('section').forEach(s => { if(!s.classList.contains('he
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+// DEV-41 — post-processing chain for the selected-layer outline.
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { OutlinePass } from 'three/addons/postprocessing/OutlinePass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // Reaching here means three.js resolved — stand the boot watchdog down.
 window.__audialViewerBooted = true;
@@ -708,6 +714,34 @@ const FIT_MARGIN = 1.12;
 const WOOD_COMPONENTS = ['Frame', 'Back Support'];
 const WOOD_MATERIAL = 'Pine Wood Light';
 const DEFAULT_KEY = '4x2V';
+
+// ---- DEV-41 tuning
+// Pre-compensated --accent. The rim is composited BEFORE OutputPass, so ACES
+// tone mapping + the sRGB encode still run over it and push a literal #e26167
+// out to rgb(237,126,127). Feeding 0xcc4f56 in lands the rendered rim on
+// rgb(227,96,101) -- one step off the token's rgb(226,97,103). Measured, not
+// derived: re-measure with the tuning sweep if the tone mapping ever changes.
+const OUTLINE_COLOR = 0xcc4f56;   // renders as --accent #e26167
+const OUTLINE_STRENGTH = 1.0;   // now opacity, not additive gain (see overlayMaterial below)
+const OUTLINE_THICKNESS = 2.0;    // reads as roughly a 3px rim at this FOV
+// No glow. edgeTexture2 is a wide blur of the edge, and once the overlay
+// normalises premultiplied colour back to full saturation that blur stops being
+// a faint halo and composites as a big soft pink cloud that swallows the rim.
+// Crisp edge only.
+const OUTLINE_GLOW = 0.0;
+const OUTLINE_FADE_IN = 200;
+const OUTLINE_FADE_OUT = 300;
+const ROTATE_MS = 600;
+// Which face of the panel each layer wants the camera on. null = core layer:
+// it lives inside the stack, so there is no better side to look from — stay put.
+const LAYER_SIDE = {
+  'Frame': null,
+  'Rockwool': null,
+  'Fiberglass Sheet': 'back',
+  'Back Support': 'back',
+  'Fiberglass Screen': 'front',
+  'Acoustic Fabric': 'front'
+};
 
 const canvas = document.getElementById('buildCanvas');
 const stage = canvas.parentElement;
@@ -738,13 +772,20 @@ if (!webglAvailable()) {
 
 function init() {
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xf2f2f9); // --paper, so the canvas melts into the card
+  // DEV-41: the canvas is now TRANSPARENT and .build-viewer's CSS --paper shows
+  // through it. A scene.background Color used to be exact because a glClear is
+  // not tone mapped — but the composer's OutputPass tone maps everything it is
+  // handed, which would push #f2f2f9 off-colour and make the canvas read as a
+  // visible rectangle inside the card. Letting CSS own the backdrop keeps it
+  // pinned to the same token the card uses.
+  scene.background = null;
 
   // 30deg rather than the standalone viewer's 35 — less perspective stretch on
   // the wide configs, which read as a wedge at the 38deg yaw.
   const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 1000);
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setClearColor(0x000000, 0);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.2;
 
@@ -762,6 +803,84 @@ function init() {
   const controls = new OrbitControls(camera, canvas);
   controls.enableDamping = true;
   controls.enablePan = false;
+
+  // ---- DEV-41 post-processing chain
+  // The renderer's own MSAA does NOT apply once frames go through a composer,
+  // and losing it would undo DES-27's whole point (jagged panel edges). An
+  // explicitly multisampled target puts it back; `samples` is ignored on WebGL1,
+  // which only costs aliasing on machines that have no post-processing budget
+  // anyway. HalfFloat keeps the chain linear until OutputPass.
+  const composerTarget = new THREE.WebGLRenderTarget(1, 1, {
+    type: THREE.HalfFloatType,
+    samples: 4
+  });
+  const composer = new EffectComposer(renderer, composerTarget);
+  composer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  composer.addPass(new RenderPass(scene, camera));
+
+  const outlinePass = new OutlinePass(new THREE.Vector2(1, 1), scene, camera);
+  outlinePass.visibleEdgeColor.set(OUTLINE_COLOR);
+  // Same colour for hidden edges: an interior layer (Rockwool, Fiberglass Sheet)
+  // is buried in the stack, and OutlinePass's depth prepass uses an override
+  // MeshDepthMaterial that ignores our depthWrite:false dimming — so most of a
+  // core layer's rim classifies as "hidden". Two colours would read as a bug.
+  outlinePass.hiddenEdgeColor.set(OUTLINE_COLOR);
+  outlinePass.edgeThickness = OUTLINE_THICKNESS;
+  outlinePass.edgeGlow = OUTLINE_GLOW;
+  outlinePass.pulsePeriod = 0;      // static, per spec — no pulse
+  outlinePass.edgeStrength = 0;     // faded in on selection
+  outlinePass.enabled = false;
+  // Composite the rim as a NORMAL alpha blend instead of OutlinePass's default
+  // ADDITIVE one. Additive can only ever brighten, and this canvas sits on
+  // --paper (#f2f2f9): adding peach to near-white washed the rim out to a pale
+  // pink (measured rgb(255,156,159), red channel clipped at 255) and NO amount
+  // of strength/glow tuning fixed it -- lowering them only made it paler still.
+  // The edge texture already stores premultiplied colour (rgb = edgeColor * d,
+  // a = d), so dividing rgb back out recovers the pure token colour, and a
+  // One / OneMinusSrcAlpha blend lays it over the scene at full saturation on
+  // light and dark backgrounds alike. edgeStrength now reads as plain opacity
+  // (0..1), which is exactly what the fade already wanted it to mean.
+  outlinePass.overlayMaterial.fragmentShader = `
+    varying vec2 vUv;
+    uniform sampler2D maskTexture;
+    uniform sampler2D edgeTexture1;
+    uniform sampler2D edgeTexture2;
+    uniform float edgeStrength;
+    uniform float edgeGlow;
+    void main() {
+      vec4 edgeValue = texture2D(edgeTexture1, vUv) + texture2D(edgeTexture2, vUv) * edgeGlow;
+      vec4 maskColor = texture2D(maskTexture, vUv);
+      // The clamp is load-bearing: the composer target is HalfFloat, so nothing
+      // saturates on its own, and an alpha above 1 would make (1 - srcAlpha)
+      // negative and punch a black hole through the frame.
+      // x6 gain: the edge-detect shader emits d = length(vec2(dr, dg) * 0.5), which
+      // peaks well under 1, so without it the rim never reaches full opacity and
+      // half-blends back toward the paper. Coverage saturates FIRST and opacity is
+      // applied after, though: folding edgeStrength
+      // inside the clamp instead would make the rim opaque at edgeStrength 0.167,
+      // so the 200ms fade would visually finish in ~33ms and read as a hard pop.
+      float a = clamp(maskColor.r * edgeValue.a * 6.0, 0.0, 1.0) * edgeStrength;
+      vec3 rgb = edgeValue.a > 0.0001 ? edgeValue.rgb / edgeValue.a : vec3(0.0);
+      gl_FragColor = vec4(rgb * a, a);
+    }`;
+  outlinePass.overlayMaterial.blending = THREE.CustomBlending;
+  outlinePass.overlayMaterial.blendSrc = THREE.OneFactor;               // rgb is premultiplied
+  outlinePass.overlayMaterial.blendDst = THREE.OneMinusSrcAlphaFactor;
+  outlinePass.overlayMaterial.blendSrcAlpha = THREE.OneFactor;
+  outlinePass.overlayMaterial.blendDstAlpha = THREE.OneMinusSrcAlphaFactor;
+  outlinePass.overlayMaterial.needsUpdate = true;
+  composer.addPass(outlinePass);
+
+  // Restores tone mapping + sRGB, which the renderer skips when drawing into a
+  // render target. Without it the panel renders washed out and flat.
+  const outputPass = new OutputPass();
+  // NoBlending on the final blit. MSAA resolves partly-covered edge pixels
+  // against a transparent clear, i.e. already premultiplied — blending them
+  // again with SRC_ALPHA would multiply the alpha in twice and leave a dark
+  // fringe where the panel meets the paper. Write the texel through instead
+  // and let the canvas compositor (premultipliedAlpha) do it once.
+  outputPass.material.blending = THREE.NoBlending;
+  composer.addPass(outputPass);
 
   const panelMeshes = {};
   const fabricFolds = {};
@@ -799,17 +918,29 @@ function init() {
   }
 
   // ---- camera
-  function fitCameraTo(key, dir) {
+  // Scratch camera for fitting. DEV-41 split the solve out of fitCameraTo so a
+  // tween can ask "where would home be?" without teleporting the live camera
+  // there first — the iteration below moves whatever camera it is handed.
+  const fitCam = new THREE.PerspectiveCamera();
+
+  // Returns { center, view, dist } framing `key` along `dir`, or null.
+  function computeFit(key, dir) {
     const box = new THREE.Box3();
     let any = false;
     for (const c of COMPONENTS) {
       const m = panelMeshes[key][c];
       if (m) { box.expandByObject(m); any = true; }
     }
-    if (!any || box.isEmpty()) return;
+    if (!any || box.isEmpty()) return null;
     const center = box.getCenter(new THREE.Vector3());
     const size = box.getSize(new THREE.Vector3());
     const view = (dir || HOME_DIR).clone().normalize();
+
+    fitCam.fov = camera.fov;
+    fitCam.aspect = camera.aspect;
+    fitCam.near = camera.near;
+    fitCam.far = camera.far;
+    fitCam.updateProjectionMatrix();
 
     const vFov = THREE.MathUtils.degToRad(camera.fov);
     const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
@@ -830,12 +961,12 @@ function init() {
       }
     }
     for (let i = 0; i < 8; i++) {
-      camera.position.copy(center).addScaledVector(view, dist);
-      camera.lookAt(center);
-      camera.updateMatrixWorld(true);
+      fitCam.position.copy(center).addScaledVector(view, dist);
+      fitCam.lookAt(center);
+      fitCam.updateMatrixWorld(true);
       let maxAbs = 0;
       for (const c of corners) {
-        const p = c.clone().project(camera);
+        const p = c.clone().project(fitCam);
         maxAbs = Math.max(maxAbs, Math.abs(p.x), Math.abs(p.y));
       }
       if (maxAbs <= 0) break;
@@ -843,12 +974,77 @@ function init() {
       dist *= scale;
       if (Math.abs(scale - 1) < 0.004) break;
     }
+    return { center, view, dist };
+  }
 
-    controls.target.copy(center);
-    camera.position.copy(center).addScaledVector(view, dist);
-    controls.minDistance = dist * 0.4;
-    controls.maxDistance = dist * 2.4;
+  function fitCameraTo(key, dir) {
+    const fit = computeFit(key, dir);
+    if (!fit) return;
+    endCamTween(); // a hard re-frame supersedes any rotation in flight
+    controls.target.copy(fit.center);
+    camera.position.copy(fit.center).addScaledVector(fit.view, fit.dist);
+    controls.minDistance = fit.dist * 0.4;
+    controls.maxDistance = fit.dist * 2.4;
     controls.update();
+  }
+
+  // ---- DEV-41 auto-rotate
+  const FRONT_DIR = HOME_DIR.clone();
+  // The home pose mirrored through the panel: rotating HOME_DIR 180deg about Y
+  // puts the camera behind the panel at the same yaw and pitch, so front and
+  // back read as the same shot from either side rather than two unrelated views.
+  const BACK_DIR = new THREE.Vector3(-HOME_DIR.x, HOME_DIR.y, -HOME_DIR.z).normalize();
+
+  let camTween = null;
+  const easeInOutCubic = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+
+  function endCamTween() {
+    camTween = null;
+    controls.enableDamping = true;
+  }
+
+  // Tweens the camera to `pos` in spherical space around the current orbit
+  // target, so the path arcs around the panel instead of cutting through it.
+  // Azimuth takes the shortest way round.
+  function tweenCameraTo(pos, duration) {
+    const from = new THREE.Spherical().setFromVector3(camera.position.clone().sub(controls.target));
+    const to = new THREE.Spherical().setFromVector3(pos.clone().sub(controls.target));
+    let dTheta = to.theta - from.theta;
+    while (dTheta > Math.PI) dTheta -= 2 * Math.PI;
+    while (dTheta < -Math.PI) dTheta += 2 * Math.PI;
+    if (Math.abs(dTheta) < 1e-4 &&
+        Math.abs(to.phi - from.phi) < 1e-4 &&
+        Math.abs(to.radius - from.radius) < 1e-4) { endCamTween(); return; }
+    // Damping off for the duration: OrbitControls keeps gliding on a decaying
+    // sphericalDelta after the last drag, and that residual would be added on
+    // top of every frame we write. Turning damping off makes update() flush it.
+    controls.enableDamping = false;
+    camTween = { from, dTheta, phi: to.phi, radius: to.radius, t0: performance.now(), dur: duration };
+  }
+
+  function updateCamTween(now) {
+    if (!camTween) return;
+    const k = Math.min(1, (now - camTween.t0) / camTween.dur);
+    const e = easeInOutCubic(k);
+    const s = new THREE.Spherical(
+      camTween.from.radius + (camTween.radius - camTween.from.radius) * e,
+      camTween.from.phi + (camTween.phi - camTween.from.phi) * e,
+      camTween.from.theta + camTween.dTheta * e
+    );
+    s.makeSafe();
+    camera.position.copy(controls.target).add(new THREE.Vector3().setFromSpherical(s));
+    if (k >= 1) endCamTween();
+  }
+
+  // Controls stay live throughout the rotation (per spec) — a drag or a wheel
+  // mid-flight simply wins.
+  controls.addEventListener('start', endCamTween);
+
+  function rotateToSide(side) {
+    const dir = side === 'back' ? BACK_DIR : FRONT_DIR;
+    // Preserve the user's zoom: swing around at the current radius.
+    const radius = camera.position.distanceTo(controls.target);
+    tweenCameraTo(controls.target.clone().addScaledVector(dir, radius), ROTATE_MS);
   }
 
   function resize() {
@@ -856,6 +1052,7 @@ function init() {
     const h = stage.clientHeight;
     if (!w || !h) return;
     renderer.setSize(w, h, false); // false: CSS sizes the canvas, JS only the buffer
+    composer.setSize(w, h);        // resizes every pass's targets, OutlinePass included
     camera.aspect = w / h;
     camera.updateProjectionMatrix();
     // Refit distance along the CURRENT view direction so a resize (or mobile
@@ -892,7 +1089,41 @@ function init() {
     }
   }
 
+  // ---- DEV-41 outline fade
+  // OutlinePass has no opacity of its own, so the fade rides edgeStrength.
+  let outlineAnim = null;
+
+  function fadeOutline(to, dur) {
+    const from = outlinePass.edgeStrength;
+    if (to > 0) outlinePass.enabled = true;
+    if (Math.abs(from - to) < 1e-3) { outlinePass.edgeStrength = to; outlineAnim = null; return; }
+    outlineAnim = { from, to, t0: performance.now(), dur };
+  }
+
+  function updateOutlineAnim(now) {
+    if (!outlineAnim) return;
+    const k = Math.min(1, (now - outlineAnim.t0) / outlineAnim.dur);
+    outlinePass.edgeStrength = outlineAnim.from + (outlineAnim.to - outlineAnim.from) * k;
+    if (k < 1) return;
+    outlineAnim = null;
+    if (outlinePass.edgeStrength <= 0) {
+      // Drop the selection only once fully faded, so the rim dissolves rather
+      // than popping, and skip the pass entirely while nothing is highlighted.
+      outlinePass.selectedObjects = [];
+      outlinePass.enabled = false;
+    }
+  }
+
+  // Re-point the outline at the active layer's mesh in the CURRENT config —
+  // the meshes are per-config, so a size change swaps the object underneath.
+  function syncOutlineTarget() {
+    if (!activeLayer) return;
+    const mesh = panelMeshes[currentKey][activeLayer];
+    outlinePass.selectedObjects = mesh ? [mesh] : [];
+  }
+
   function selectLayer(layer) {
+    const changed = activeLayer !== layer;
     activeLayer = layer;
     applyDim(currentKey, layer);
     stepEls.forEach((el) => {
@@ -900,12 +1131,27 @@ function init() {
       el.classList.toggle('selected', on);
       el.setAttribute('aria-pressed', String(on));
     });
+    if (layer) {
+      syncOutlineTarget();
+      // Stepping straight from one layer to another re-runs the fade rather
+      // than hard-cutting the rim across to the new mesh.
+      if (changed) outlinePass.edgeStrength = 0;
+      fadeOutline(OUTLINE_STRENGTH, OUTLINE_FADE_IN);
+      // Core layers (Frame, Rockwool) have no better side to be seen from — the
+      // spec keeps the camera where the user left it.
+      const side = LAYER_SIDE[layer];
+      if (side) rotateToSide(side);
+    } else {
+      fadeOutline(0, OUTLINE_FADE_OUT);
+    }
   }
 
   function resetSelection() {
     if (activeLayer === null) return;
     selectLayer(null);
-    fitCameraTo(currentKey);
+    // Tween home rather than snapping, to match the 600ms swing on the way in.
+    const fit = computeFit(currentKey);
+    if (fit) tweenCameraTo(fit.center.clone().addScaledVector(fit.view, fit.dist), ROTATE_MS);
   }
 
   function showPanel(key) {
@@ -918,6 +1164,7 @@ function init() {
       }
     }
     applyDim(key, activeLayer); // selection survives a size change
+    syncOutlineTarget();        // ...and so must the outline
     fitCameraTo(key);
     sizeBtns.forEach((b) => b.classList.toggle('active', b.dataset.config === key));
   }
@@ -925,15 +1172,21 @@ function init() {
   // ---- input
   function applyTouchMode() {
     if (narrowMQ.matches) {
-      // One finger must stay free to scroll the page — the viewer is a section
-      // in a long document, not the whole screen.
-      controls.touches.ONE = THREE.TOUCH.NONE;
-      controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
+      // DEV-41: one finger now rotates. touch-action stays pan-y, which splits
+      // the gesture by axis rather than by finger count — the browser claims
+      // vertical drags (the page still scrolls past the viewer, which it must:
+      // this is a section in a long document, not the whole screen) and sends
+      // pointercancel, while horizontal drags reach OrbitControls and orbit the
+      // panel. Yaw is the axis worth having on one finger; pitch stays on two.
       // OrbitControls writes touch-action:none INLINE on the canvas, which beats
-      // the stylesheet — without this override one finger would be swallowed and
-      // the page could not be scrolled past the viewer.
+      // the stylesheet, so this override has to be set on canvas.style.
+      controls.touches.ONE = THREE.TOUCH.ROTATE;
+      // DOLLY_ROTATE, not the spec's DOLLY_PAN: panning is off (it would slide
+      // the panel out of the frame fitCameraTo computes), so DOLLY_PAN would
+      // pinch-zoom only, while DOLLY_ROTATE also gives back full-sphere orbit.
+      controls.touches.TWO = THREE.TOUCH.DOLLY_ROTATE;
       canvas.style.touchAction = 'pan-y';
-      hintEl.textContent = 'Two fingers to rotate · Pinch to zoom';
+      hintEl.textContent = 'Drag to rotate · Pinch to zoom';
     } else {
       controls.touches.ONE = THREE.TOUCH.ROTATE;
       controls.touches.TWO = THREE.TOUCH.DOLLY_PAN;
@@ -1059,8 +1312,11 @@ function init() {
 
   (function loop() {
     requestAnimationFrame(loop);
+    const now = performance.now();
+    updateCamTween(now);
+    updateOutlineAnim(now);
     controls.update();
-    renderer.render(scene, camera);
+    composer.render();
   })();
 }
 </script>

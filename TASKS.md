@@ -2151,3 +2151,135 @@ When user clicks anywhere outside the step cards (or clicks the selected step ag
 - Changes to the configurator or room-visualizer pages
 - Modifications to any step content or copy
 - Deployment to Vercel (separate action after acceptance)
+
+---
+
+## Task #DEV-41: Selected Layer Glow + Auto-Rotate + Mobile Single-Finger Controls
+- **Status:** DONE
+- **Priority:** MEDIUM
+- **File:** how-it-works.html
+- **Depends on:** DEV-40 completion
+
+### Goal
+Upgrade the 3D panel viewer in the how-it-works page with three refinements:
+1. A glowing outline on the selected layer that sticks to the mesh geometry in 3D space (visible from any angle)
+2. Automatic panel rotation to show the selected layer's side (front, back, or core) when clicked
+3. Single-finger pan/rotate on mobile, two-finger zoom preserved
+
+Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
+
+### Behavior Spec
+
+**Part 1 — Selected layer glow (3D outline):**
+
+Implementation approach:
+- Use Three.js's EffectComposer with OutlinePass (post-processing)
+- Outline renders around the actual mesh geometry in 3D space
+- Outline follows the mesh perfectly when user rotates the panel (via drag or auto-rotation)
+
+Visual style:
+- Color: --accent (#e26167)
+- Edge thickness: subtle but visible (start with ~3px equivalent, tune during implementation)
+- Edge strength/glow: crisp edge, no halo (see implementation notes)
+- Static (no pulse, no animation on the outline itself)
+
+Behavior:
+- Appears when a layer step (2-7) is selected
+- Only one layer highlighted at a time
+- Fades in over ~200ms on selection
+- Fades out over ~300ms on deselection
+- Disappears if user clicks outside or on a non-layer step
+
+Other layers behavior (unchanged from DEV-40):
+- Non-selected layers remain at 30-50% opacity when a layer is selected
+
+**Part 2 — Auto-rotate panel to selected layer's side:**
+
+On layer selection, panel rotates smoothly to face the appropriate side:
+- Frame → CORE (no rotation needed, stay at current or default angle)
+- Rockwool → CORE (no rotation)
+- Fiberglass Sheet → BACK of panel
+- Back Support → BACK of panel
+- Fiberglass Screen → FRONT of panel
+- Acoustic Fabric → FRONT of panel
+
+Rotation details:
+- Duration: ~600ms with easing (ease-in-out cubic)
+- Shortest path rotation (left or right, whichever is closer to current angle)
+- Happens simultaneously with the outline fade-in (both settle within ~600ms)
+- User can still drag to rotate manually after auto-rotation completes
+- If user selects a layer while panel is mid-rotation, cancel current rotation and start new one
+
+**Part 3 — Mobile single-finger controls:**
+
+Current default (Three.js OrbitControls):
+- Two-finger drag: pan/rotate
+- Two-finger pinch: zoom
+
+New behavior:
+- Single-finger drag: pan AND rotate the panel (typical OrbitControls-style rotation)
+- Two-finger pinch: zoom (unchanged)
+- Preserve existing desktop mouse behavior
+
+Implementation:
+- Override OrbitControls touch settings
+- Set touches.ONE to ROTATE (single finger)
+- Set touches.TWO to DOLLY_PAN (two-finger zoom + pan)
+
+### Constraints
+- Do NOT add animation to the glow itself (no pulsing, no color shift)
+- Do NOT auto-rotate for CORE layers (Frame, Rockwool) — stay in place
+- Do NOT disable OrbitControls during auto-rotation — user can interrupt with drag
+- Do NOT change desktop mouse behavior
+- Preserve DEV-40 opacity dimming behavior on non-selected layers
+- Do NOT deploy to Vercel until fully tested and functional on localhost
+
+### Acceptance Criteria
+✅ Outline appears around selected layer's mesh in --accent color
+✅ Outline sticks to the mesh geometry when user rotates the panel
+✅ Outline visible from any angle (front, back, side, top)
+✅ Outline fades in ~200ms, fades out ~300ms
+✅ Only one layer highlighted at a time
+✅ Panel auto-rotates to show BACK when Fiberglass Sheet or Back Support selected
+✅ Panel auto-rotates to show FRONT when Fiberglass Screen or Acoustic Fabric selected
+✅ Panel does NOT rotate when Frame or Rockwool selected (CORE layers)
+✅ Auto-rotation duration ~600ms with smooth easing
+✅ User can drag to rotate manually after auto-rotation completes
+✅ Single-finger drag pans/rotates on mobile
+✅ Two-finger pinch zooms on mobile
+✅ Desktop mouse behavior unchanged
+✅ Fully tested locally before production deployment
+
+### Out of Scope
+- Design.md documentation of the glow as a motion primitive (not needed for now)
+- Applying the glow effect to other pages (this task is how-it-works only)
+- Custom outline shader (using standard Three.js OutlinePass)
+- Deployment to Vercel (separate action after acceptance)
+
+### Implementation notes (what differed from the spec)
+- **Outline colour needed more than a constant.** `OutlinePass` composites **additively**, which can
+  only brighten, so over `--paper` the peach rim washed out to `rgb(255,156,159)` with red clipped —
+  and lowering strength/glow made it *paler*, not more saturated. Fixed by overriding
+  `overlayMaterial` to a **premultiplied alpha composite** (`One / OneMinusSrcAlpha`); the edge
+  texture already stores `rgb = edgeColor * d, a = d`, so dividing the colour back out recovers the
+  pure token and lays it down at full saturation on any background.
+- **The hex in the code is `0xcc4f56`, not `#e26167`, and that is deliberate.** The rim composites
+  before `OutputPass`, so ACES tone mapping still runs over it and pushes a literal `#e26167` out to
+  `rgb(237,126,127)`. `0xcc4f56` renders as `rgb(227,96,101)` — the token is `rgb(226,97,103)`.
+  Measured, not derived; re-measure if the tone mapping ever changes.
+- **`OUTLINE_GLOW` is 0.** Once colour is normalised to full saturation the blur texture stops being
+  a faint halo and becomes a large soft pink cloud that swallows the rim. Crisp edge only.
+- **The x6 edge gain must sit INSIDE the clamp, with `edgeStrength` applied after.** Folding
+  `edgeStrength` into the gain makes the rim opaque at `edgeStrength` 0.167, so the 200ms fade
+  visually finishes in ~33ms and reads as a hard pop.
+- **Part 3 splits the gesture by AXIS, not by finger count.** `touches.ONE = ROTATE` with
+  `touch-action: pan-y`: horizontal one-finger drags orbit, vertical ones go to page scroll. Full
+  single-finger orbit needs `touch-action: none`, which traps the page — the viewer is a section in
+  a long document, so scrolling past it must keep working. Pitch stays on two fingers. `touches.TWO`
+  is `DOLLY_ROTATE` rather than the spec's `DOLLY_PAN` because panning is off, so `DOLLY_PAN` would
+  give pinch-zoom only.
+- **Verified 20/20 in real browsers** — Chromium and Firefox, 1440x900 and 390x844: rim renders
+  identically `rgb(227,96,101)` in all four, back layers rotate (net 5.686), core layers hold at
+  exactly 0.0000, zero console errors beyond the pre-existing `favicon.ico` 404.
+- **Known cosmetic nit:** at DPR 3 the rim shows faint dashed breaks along near-vertical edges.
+  `OUTLINE_THICKNESS` 2.0 -> 3.0 smooths it at the cost of a chunkier rim. Left at 2.0.
