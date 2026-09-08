@@ -2416,7 +2416,9 @@ Room dimensions, placed panels, and any future added elements must be stored in 
 ---
 
 ## Task #DEV-43: 3D Viewer Mode for Room Visualizer
-- **Status:** DONE
+- **Status:** IN REVIEW -- built and self-verified, NOT signed off by the founder.
+  Known open item: the artwork glitch (see SESSION CHECKPOINT at the end of this file).
+  Do not mark DONE or deploy until the founder confirms it functions correctly.
 - **Priority:** HIGH
 - **File:** room-visualizer.html
 - **Depends on:** DEV-42 completion
@@ -2825,8 +2827,9 @@ Furniture stored in shared state:
 
 ## Where things stand
 - **DEV-42 DONE** (`549c299`) -- view-mode rail (2D / 3D / Plan) in the room visualizer.
-- **DEV-43 DONE** (`2d80045`, `68af2bb`, `cd34151`, `0b747cd`) -- 3D line-art room view, through
-  four rounds of founder feedback. Read its notes bottom-up: the **Follow-up 3** section is
+- **DEV-43 IN REVIEW** (`2d80045`, `68af2bb`, `cd34151`, `0b747cd`) -- 3D line-art room view,
+  through four rounds of founder feedback. **Built and self-verified, but NOT signed off** --
+  the artwork glitch below is open and the founder wants to confirm it functions well first. Read its notes bottom-up: the **Follow-up 3** section is
   current, Follow-up 2 supersedes the orbit camera, Follow-up 1 is history.
 - **DEV-44 NOT STARTED** -- floor plan view, edit mode, 7 furniture types. Untouched.
 - Working tree clean. **Nothing deployed to Vercel this session** (all three tasks require
