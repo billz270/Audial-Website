@@ -2818,3 +2818,49 @@ Furniture stored in shared state:
 - Advanced 3D furniture models
 - Room templates
 - Saved room projects across sessions (beyond localStorage)
+
+---
+
+# SESSION CHECKPOINT -- 2026-09-09 (end of session)
+
+## Where things stand
+- **DEV-42 DONE** (`549c299`) -- view-mode rail (2D / 3D / Plan) in the room visualizer.
+- **DEV-43 DONE** (`2d80045`, `68af2bb`, `cd34151`, `0b747cd`) -- 3D line-art room view, through
+  four rounds of founder feedback. Read its notes bottom-up: the **Follow-up 3** section is
+  current, Follow-up 2 supersedes the orbit camera, Follow-up 1 is history.
+- **DEV-44 NOT STARTED** -- floor plan view, edit mode, 7 furniture types. Untouched.
+- Working tree clean. **Nothing deployed to Vercel this session** (all three tasks require
+  local sign-off first). Commits are local only; `origin` has not been pushed.
+
+## PICK UP HERE: artwork glitch in the 3D viewer (open, undiagnosed)
+Founder reported "a bit of a glitch in the artwork" at the end of the session and did not
+describe it further. **Ask what they're seeing before changing anything.** Ranked hypotheses:
+
+1. **MOST LIKELY -- the 3D view ignores every saved image transform.** `r3dPanelArt()` stretches
+   the raw `panel.image` to fill the panel quad with `preserveAspectRatio="none"`. But the cart
+   data model carries `imagePosition {x,y}`, `imageScale`, `rotate`, `flipH`, `flipV`,
+   `imageNaturalWidth/Height` and `savedPanelWidth/Height`, and the visualizer already has
+   **`computeArtTransform(panel, targetW, targetH)`** which reproduces the configurator's crop
+   at a different size. **None of it is applied in 3D.** So a design that was zoomed, panned,
+   rotated or flipped will render stretched and uncropped -- visibly wrong versus what was
+   designed. Fix = drive the `<image>` from `computeArtTransform` rather than filling the quad.
+   See CLAUDE.md "Critical functions" for the contract, and note its warning that the
+   configurator's `renderCartCardPreview` and the visualizer's `computeArtTransform` are meant
+   to stay in sync -- a third renderer now exists and should join that rule.
+2. Affine-vs-perspective skew. SVG transforms are affine, so the art is mapped through three
+   projected corners. On a side wall at a steep angle the error grows and the image can look
+   sheared. Would need the quad split into triangles, or a CSS 3D layer instead of SVG.
+3. `preserveAspectRatio="none"` stretches a non-matching aspect; the configurator cover-fits.
+4. Panels with a corner behind the eye fall back to the flat accent fill, so art can pop in and
+   out while panning. Deliberate (that corner has no valid projection) but may read as a bug.
+
+## Two things the founder overrode in the DEV-43 spec -- do not "fix" them back
+- **No +-90 yaw clamp.** Rotation is unlimited so any wall, back wall included, can be faced.
+- **Active rail button is `--accent`**, which contradicts CLAUDE.md's "selection states -> --ink".
+
+## The habit that mattered most this session
+**Three separate bugs passed every automated check and were caught only by looking at a
+screenshot**: the `<nav>` cascade spreading the rail buttons down the whole column; the room
+overflowing the frame at 45 deg because the fit sampled 0/30/60/90; and panels rendering as
+empty outlines while the suite happily confirmed the `<image>` nodes existed. **Asserting a node
+exists is not proof it paints. Screenshot every visual change before believing the tests.**
