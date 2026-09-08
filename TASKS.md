@@ -2416,7 +2416,7 @@ Room dimensions, placed panels, and any future added elements must be stored in 
 ---
 
 ## Task #DEV-43: 3D Viewer Mode for Room Visualizer
-- **Status:** TODO
+- **Status:** DONE
 - **Priority:** HIGH
 - **File:** room-visualizer.html
 - **Depends on:** DEV-42 completion
@@ -2523,6 +2523,59 @@ For this task, ceiling panels are read from state (if present) and displayed. Ac
 - Vertical camera pan (pitch)
 - Free-orbit camera
 - Any visual enhancements to the 2D viewer
+
+### Implementation notes (DEV-43)
+- **Plain SVG, no Three.js.** The page loads no 3D library and this view adds none — it is
+  ~200 lines of projection maths writing `<polygon>`s. Line-art, per-surface opacity and
+  hover labels are all native to SVG; a WebGL context would have been pure weight.
+- **The camera ORBITS the room centre; it does not yaw in place.** This is the central
+  decision and everything else follows from it. Orbiting at a fixed radius with zero pitch,
+  always looking at the centre, means (a) the wall being looked at is the **far** wall, so the
+  room's depth edges radiate *outward* from its corners — the look the spec asked for, and not
+  isometric — and (b) the whole box is always in front of the camera, so **near-plane clipping
+  is never needed**. Yawing in place would have swung the side walls behind the camera at large
+  angles and required segment + polygon clipping against the near plane.
+- **The fit sampling MUST include the diagonal.** First version sampled yaws 0/30/60/90 and
+  scaled the orbit radius to the worst corner. That skips 45 deg, which is the widest view of a
+  box, and the room visibly overflowed the frame there. **Every automated check passed while
+  this was broken** — the clipping assertions only tested 0 deg and 90 deg. Now the fit samples
+  every 15 deg and the harness sweeps **every 5 deg from -90 to +90** (37 angles) asserting no
+  point leaves the stage. Second bug in two tasks caught by a screenshot rather than a test.
+- **The fit is iterative, like DEV-40's.** Projected offset falls off ~1/distance, so scaling
+  the radius by the overshoot converges in 2-3 passes. `R3D_FIT` 0.88, FOV 55 deg.
+- **Stage height is capped at `min(70vh,640px)`.** `.view-pane` is `flex:1` inside a grid row
+  whose height is set by the right sidebar (~860px), so the room's lower half and its width
+  label sat below the fold. The cap is not cosmetic — without it the dimension labels are
+  unreachable without scrolling.
+- **Wall coordinate mapping is mirrored per wall and was derived, not guessed.** Editor `x` runs
+  left-to-right *as seen when facing that wall* and `y` runs down from the ceiling, so:
+  front maps `x` straight to world x; **back mirrors** (`W-x-w`); **left mirrors along depth**
+  (`D-x-w`, because facing the left wall the front of the room is on your right); right maps
+  depth straight. Each mapping comes from the camera's screen-right vector for that facing.
+  Asserted in the harness by checking a panel at `x:1,y:2` lands in the upper-left of its wall.
+- **No occlusion culling, deliberately.** With no fills the view is an x-ray; a panel on the
+  near wall shows through the far one, faded to 18%. That is what "line-art + opacity fading,
+  no blur" produces and it reads as depth. Adding back-face culling would fight the spec.
+- **Ceiling and floor hold a steady 0.5** rather than fading by angle: with a yaw-only camera in
+  a symmetric room, how much of them is visible barely changes, so an angular fade reads as
+  flicker rather than as depth.
+- **`touch-action:pan-y`** — horizontal swipes orbit, vertical swipes go to page scroll, the
+  same trade DEV-40/41 settled on for a viewer embedded in a long page. Verified with **real
+  CDP touch events**, not mouse: a horizontal swipe moved yaw 0 -> 0.99 rad and refocused onto
+  the Right Wall; a vertical swipe left yaw bit-identical and scrolled the page instead.
+- **The rAF loop stops when the easing settles** (asserted: `R3D.raf === null`), so an idle 3D
+  view costs nothing. Damping is a lerp toward `targetYaw`, giving the eased, non-linear
+  tracking the spec asked for.
+- **Ceiling panels are already wired.** `state.ceilingPanels` is read if present and drawn on
+  the ceiling plane, so DEV-44 gets 3D ceiling display for free; absent, the ceiling draws empty.
+- **Verified in real Chromium**: 36 checks, all green except the known favicon 404 — 6 surfaces,
+  fade ladder 1.0 / 0.45 / 0.18 measured off the DOM, panel opacity tracking its wall, front wall
+  smaller than the near wall (proving it is the far one), drag-left-swings-right, easing settling,
+  +-90 clamp, focused-wall label at both limits, the 37-angle clipping sweep, a 30ft room after a
+  dimension change, 2D round trip, ceiling panels, empty state, and mobile.
+- **Trap, again:** a console 404 message carries **no URL**, so `/favicon/`-filtering console text
+  reports a false failure. A `response` listener over the identical sequence shows **zero** failed
+  requests. This view issues no network requests at all.
 
 ---
 
