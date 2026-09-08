@@ -2577,6 +2577,41 @@ For this task, ceiling panels are read from state (if present) and displayed. Ac
   reports a false failure. A `response` listener over the identical sequence shows **zero** failed
   requests. This view issues no network requests at all.
 
+### Follow-up: closer framing (founder request, same session)
+- **The framing fit was silently broken and the request exposed it.** Asking for "bigger" and
+  measuring the result showed raising the fill target made the room *smaller* (61% -> 56% of frame
+  width) and FOV 70 produced a **433 ft** orbit radius. Cause: `rad = rad * worst / FIT` is not a
+  convergent iteration. When a box corner crosses the camera plane `worst` was pinned to a
+  sentinel 4, kicking the radius 4x out; the next pass overshot back, and the loop simply stopped
+  after 8 passes wherever it happened to be. It only ever "worked" for the one FOV/FIT pair it was
+  tuned against. **Replaced with bisection**, which is exact here because the projected extent is
+  monotonically decreasing in radius (Infinity once a corner reaches the camera plane). Even the
+  shipped setting had been mis-fitting -- the same 0.88 target went from 61% to 66% fill once the
+  search was correct.
+- **Horizontal and vertical framing targets are now independent** (`R3D_FIT_X` 0.95,
+  `R3D_FIT_Y` 1.45). Measuring showed **height was the binding axis**: at diagonal yaws the NEAR
+  ceiling/floor corners hit the frame at 88-99% while width sat at only 66%, so no single fill
+  target could make the room meaningfully bigger. Letting those near corners run past the top and
+  bottom -- the founder's explicit "if the side walls almost parallelly align with the window
+  frame, so be it" -- is what unlocked it. **Default view went 66% -> 94% of frame width.**
+  Horizontal remains a hard bound: the room never runs off the sides at any of the 37 swept angles,
+  and vertical overflow is capped at a measured 22% of frame height.
+- `R3D_FIT_Y` doubles as a **safety cap for unusual room shapes** (a tall narrow room binds
+  vertically instead), so the framing degrades sanely rather than exploding.
+- **FOV stays 55.** Widening it was tested (62, 70) and is counter-productive here: a wider lens
+  throws the near corners further out vertically, so the fit pulls back and the room ends up
+  *smaller* at the default angle (55 -> 95%, 62 -> 90%, 70 -> 85%) with more distortion. The
+  camera did move closer regardless -- orbit radius 20.1 ft -> 15.8 ft.
+- **The fit now samples every 5 deg**, matching the harness sweep, so the no-horizontal-overflow
+  guarantee holds at every angle a user can actually reach rather than only at sampled ones.
+- Caption backdrops (`--paper`) were added to the wall name and drag hint, since wall lines now
+  pass behind them at the frame edges.
+- **One assertion of mine was wrong and was corrected, not worked around:** "fills >=88% of frame
+  width at *every* yaw" is unachievable with a fixed radius, because fill necessarily varies with
+  room aspect (14ft wide vs 12ft deep makes the +-90 views narrower). Holding it would have meant
+  letting the room breathe during a pan, which was rejected. The check now asserts the *default*
+  view fills >=88% (measures 94%) and the sweep minimum stays >=70% (measures 75%).
+
 ---
 
 ## Task #DEV-44: Floor Plan View + Edit Mode + Furniture Placement

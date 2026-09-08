@@ -182,13 +182,15 @@
   .room3d-panel{fill:var(--accent);stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;cursor:pointer}
   .room3d-dim{fill:var(--ink);font-family:'Archivo',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase}
   .room3d-hint{
-    position:absolute;left:12px;bottom:10px;z-index:2;pointer-events:none;
+    position:absolute;left:10px;bottom:8px;z-index:2;pointer-events:none;
     font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
-    color:var(--ink);opacity:0.45;
+    color:var(--ink);background:var(--paper);padding:2px 6px;
   }
   .room3d-wallname{
-    position:absolute;left:12px;top:10px;z-index:2;pointer-events:none;
+    position:absolute;left:10px;top:8px;z-index:2;pointer-events:none;
     font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:-0.02em;color:var(--ink);
+    /* the room now reaches the frame edges, so wall lines run behind these captions */
+    background:var(--paper);padding:2px 6px;
   }
   .room3d-empty{
     position:absolute;inset:0;z-index:2;pointer-events:none;
@@ -1074,7 +1076,16 @@ const R3D_FOV = 55 * Math.PI/180;
 const R3D_MAX_YAW = Math.PI/2;        // soft limit: 90 deg each way
 const R3D_SENS = 0.0055;              // radians per px of drag
 const R3D_EASE = 0.16;                // per-frame approach to targetYaw (smooth, not linear tracking)
-const R3D_FIT = 0.88;                 // fraction of the half-viewport the room may fill
+/* Framing targets, as a fraction of the half-viewport.
+   Horizontal is a hard bound -- the room never runs off the sides. Vertical is allowed
+   past 1.0 on purpose: at diagonal yaws the NEAR ceiling/floor corners are what box the
+   view in, and holding them inside forced the room down to ~66% of the frame width at the
+   default angle. Letting them sail off the top and bottom is the immersive interior look
+   (side walls running to the frame edge) and buys ~35% more room on screen.
+   R3D_FIT_Y also acts as a safety cap for unusual room shapes, e.g. tall narrow rooms,
+   where the vertical extent binds first. */
+const R3D_FIT_X = 0.95;
+const R3D_FIT_Y = 1.45;
 
 /* Wall facing angles, matching WALL_ORDER front->right->back->left clockwise. */
 const R3D_WALL_YAW = {front:0, right:Math.PI/2, back:Math.PI, left:-Math.PI/2};
@@ -1110,27 +1121,46 @@ function r3dFitRadius(vw, vh){
   const R = r3dRoom();
   const corners = [];
   for(const x of [0,R.W]) for(const y of [0,R.H]) for(const z of [0,R.D]) corners.push({x:x,y:y,z:z});
-  /* Sample every 15 deg across the reachable range. The DIAGONAL views are the widest
-     -- a coarse 0/30/60/90 sample skips 45 and lets the box overflow there. */
+  /* Sample every 5 deg across the reachable range, matching the harness sweep, so the
+     no-horizontal-overflow guarantee holds at every angle a user can actually reach.
+     The DIAGONAL views are the widest -- a coarse 0/30/60/90 sample skips 45. */
   const yaws = [];
-  for(let a=0; a<=90.001; a+=15) yaws.push(a*Math.PI/180);
-  let rad = Math.max(R.W,R.D,R.H) * 1.8;
-  for(let pass=0; pass<8; pass++){
+  for(let a=0; a<=90.001; a+=5) yaws.push(a*Math.PI/180);
+
+  /* Worst corner offset from frame centre, each axis measured against its own target and
+     normalised so that 1.0 == "exactly on target". Maximised over every reachable yaw;
+     Infinity once a corner reaches the camera plane. */
+  const worstAt = function(rad){
     let worst = 0;
     for(const yaw of yaws){
       const cam = r3dCamera(yaw, rad);
       for(const c of corners){
         const p = r3dProject(c, cam, vw, vh);
-        if(!p){ worst = Math.max(worst, 4); continue; }
-        worst = Math.max(worst, Math.abs(p.x-vw/2)/(vw/2), Math.abs(p.y-vh/2)/(vh/2));
+        if(!p) return Infinity;
+        worst = Math.max(worst,
+          Math.abs(p.x-vw/2)/(vw/2) / R3D_FIT_X,
+          Math.abs(p.y-vh/2)/(vh/2) / R3D_FIT_Y);
       }
     }
-    if(worst < 1e-6) break;
-    const next = rad * worst / R3D_FIT;
-    if(Math.abs(next-rad) < 0.01){ rad = next; break; }
-    rad = next;
+    return worst;
+  };
+
+  /* worstAt() decreases monotonically as the camera pulls back, so bisect for
+     worstAt(rad) === R3D_FIT. The previous Newton-ish step (rad * worst / FIT) was NOT
+     convergent: a corner crossing the camera plane pinned `worst` to a sentinel, kicked
+     the radius 4x out, and the loop then oscillated and simply stopped after 8 passes
+     wherever it happened to be -- so raising FIT could make the room SMALLER, and a
+     wider FOV blew the radius out to hundreds of feet. */
+  const span = Math.max(R.W, R.D, R.H);
+  let hi = span * 4;
+  for(let i=0; i<40 && worstAt(hi) > 1; i++) hi *= 1.5;   // pull back until it fits
+  let lo = hi;
+  for(let i=0; i<60 && worstAt(lo) <= 1; i++) lo *= 0.75; // close in until it does not
+  for(let i=0; i<48; i++){                                 // bisect the crossing
+    const mid = (lo + hi) / 2;
+    if(worstAt(mid) > 1) lo = mid; else hi = mid;
   }
-  return rad;
+  return hi;
 }
 
 /* Angular distance from the camera to a wall's facing angle, 0..PI. */
