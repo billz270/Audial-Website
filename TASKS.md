@@ -2283,3 +2283,387 @@ Implementation:
   exactly 0.0000, zero console errors beyond the pre-existing `favicon.ico` 404.
 - **Known cosmetic nit:** at DPR 3 the rim shows faint dashed breaks along near-vertical edges.
   `OUTLINE_THICKNESS` 2.0 -> 3.0 smooths it at the cost of a chunkier rim. Left at 2.0.
+
+  ---
+
+## Task #DEV-42: Room Visualizer Sidebar + View Mode Structure (Foundation)
+- **Status:** DONE
+- **Priority:** HIGH
+- **File:** room-visualizer.html
+
+### Goal
+Add a left-side function panel to the room visualizer with view mode switching (2D / 3D / Floor Plan) as the architectural foundation for the enhanced visualizer. Only the existing 2D view is functional in this task — the 3D and Floor Plan buttons show "Coming soon" placeholders that DEV-43 and DEV-44 will implement.
+
+This task establishes the sidebar UI, view switching mechanism, and shared state architecture that the next two tasks will build on. All existing 2D viewer functionality must remain untouched and working exactly as it does today.
+
+Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
+
+### Behavior Spec
+
+**Left sidebar (always visible):**
+
+Position: Fixed vertical sidebar on the left edge of the visualizer area. Not the entire page — the visualizer section only.
+
+Visual style:
+- Line-art / blueprint aesthetic consistent with the rest of the page
+- Vertical stack of buttons
+- Thin border (1.5px) separating sidebar from main visualizer area
+- Uses the site's --ink border and --paper background variables
+
+Buttons (in order top to bottom):
+1. **2D Viewer** (default active state on page load)
+2. **3D Viewer** (accessible, shows placeholder message when clicked)
+3. **Floor Plan** (accessible, shows placeholder message when clicked)
+
+Each button:
+- Small icon (line-art style) + short label ("2D", "3D", "PLAN" or similar)
+- Active state uses --accent color background with --paper text
+- Inactive state uses --paper background with --ink text
+- Hover state matches existing hover pattern on similar buttons in the site
+
+**View switching:**
+
+Clicking a sidebar button switches the main visualizer content area:
+- 2D Viewer button → shows the existing 4-wall visualizer (unchanged)
+- 3D Viewer button → shows a placeholder message: "3D Viewer coming soon"
+- Floor Plan button → shows a placeholder message: "Floor Plan coming soon"
+
+State management:
+- Currently active view is tracked in state
+- Only one view visible at a time
+- Switching views is instant (no transition animation needed for MVP)
+- 2D view state (placed panels, room dimensions) is preserved when switching to placeholder views and back
+
+**Shared state architecture:**
+
+Room dimensions, placed panels, and any future added elements must be stored in a way that all three views can read from:
+- Introduce a shared `state` object (if not already present) that holds:
+  - roomDimensions: {length, width, height}
+  - placedPanels: [{wall, x, y, w, h, size, price}]
+  - activeView: '2D' | '3D' | 'floorplan'
+- The existing 2D viewer must continue reading/writing to this shared state
+- Placeholder views can read from state to display "You have X panels placed" or similar
+
+### Constraints
+- Do NOT change any existing 2D viewer functionality
+- Do NOT change existing 2D viewer visuals (that's a separate future enhancement task)
+- Do NOT implement the actual 3D Viewer or Floor Plan views in this task
+- Do NOT add furniture or edit mode in this task
+- Sidebar must be responsive: on mobile, becomes a horizontal button row above the visualizer OR collapses into an icon-only vertical strip (decide during implementation based on layout tests)
+- Preserve all existing localStorage persistence behavior
+- Do NOT deploy to Vercel until fully tested and functional on localhost
+
+### Acceptance Criteria
+- [ ] Left sidebar visible in the visualizer section on desktop
+- [ ] Sidebar has three buttons in correct order: 2D Viewer, 3D Viewer, Floor Plan
+- [ ] 2D Viewer is active by default on page load
+- [ ] Clicking 2D Viewer shows the existing visualizer, fully functional
+- [ ] Clicking 3D Viewer shows "3D Viewer coming soon" placeholder
+- [ ] Clicking Floor Plan shows "Floor Plan coming soon" placeholder
+- [ ] Active button visually distinguished with --accent color background
+- [ ] All existing 2D viewer features work exactly as before (panel placement, room dimensions, presets, stats, etc.)
+- [ ] Placed panels persist when switching between views and back to 2D
+- [ ] Mobile responsive: sidebar adapts appropriately for small screens
+- [ ] No changes to existing CTA strip, footer, or other page sections
+- [ ] Fully tested locally before production deployment
+
+### Out of Scope
+- Actual 3D Viewer implementation (DEV-43)
+- Actual Floor Plan implementation (DEV-44)
+- Furniture placement (DEV-44)
+- Edit mode toggle (DEV-44)
+- Any visual enhancements to the 2D viewer beyond the new sidebar
+
+### Implementation notes (DEV-42)
+- **State: flat, not the nested shape the spec sketched.** `state` already existed and already
+  held everything the spec asked for, just flat (`roomLength/roomWidth/roomHeight`, `panels`).
+  Founder's call was to keep it and add **only `activeView`**. Renaming to
+  `roomDimensions`/`placedPanels` would have touched ~80 call sites across 2,175 lines for zero
+  functional gain and would have drifted further from the `acousticRoomPlan` localStorage schema,
+  which is already nested (`{room:{...}, panels:[...]}`). The spec's actual intent — one shared
+  state all three views read — was already true. DEV-43/44 read `state.panels` directly.
+- **The rail must NOT be a `<nav>`.** First version used `<nav class="view-rail">` and the global
+  `nav{}` rule (line 34) captured it: `justify-content:space-between` spread the three buttons
+  across the full column height (2D at the top, 3D ~400px below it), and `padding:0 32px` +
+  `position:sticky` + `z-index:100` came along too. It is a `<div role="toolbar">` now, and
+  `.view-rail` also pins `justify-content:flex-start`, `padding:0`, `position:static` so no
+  ancestor rule can spread it again. **Caught only by looking at a screenshot** — every
+  functional assertion passed while the layout was visibly broken.
+- **Layout:** `.visualizer-layout` grid went `minmax(0,1fr) 280px` -> `auto minmax(0,1fr) 280px`.
+  Rail is 76px, so the wall canvas loses very little width. Existing 2D content was wrapped
+  in `.view-pane#view2D` with **every id and handler left untouched** — the whole diff is
+  115 insertions / **2 deletions** (the grid-columns line and the `state` line).
+- **Mobile (<=760px):** rail flips to a horizontal 3-button row above the visualizer
+  (48px tall, meets the 44px touch target), reusing the breakpoint that already collapsed
+  the layout to one column.
+- **Active colour is `--accent` per the spec**, which deliberately overrides CLAUDE.md's
+  "selection states -> `--ink`" convention. Founder's call, made explicitly.
+- **Verified in real Chromium** at 1440x900 and 390x844: 32/32 checks — button order, default
+  2D, accent/paper active colours, placeholder text, panel count read from shared state,
+  round-trip 2D->3D->Plan->2D preserving placements, `acousticRoomPlan` schema unchanged,
+  no horizontal overflow, zero failed requests. Plus a 2D regression pass (presets, dimension
+  inputs, wall switching, placement, persistence across reload): 12/13.
+- **The one non-passing regression check is a harness limitation, not a regression:** synthetic
+  `mouse.down/move/up` does not trigger the placed-panel drag. Confirmed by `git stash`-ing the
+  change and running the identical test against the committed baseline — **byte-identical result**
+  (`4.40,4.00 -> 4.40,4.00`, did not move) on both. Panel drag needs a real pointer sequence;
+  do not read this as broken.
+- **Testing traps hit:** sampling `backgroundColor` immediately after a click reads a value
+  mid-`transition` (0.2s) and looks like a broken active state — wait it out. And filtering
+  console text for `/favicon/` does not work because the 404 console message carries no URL;
+  listen on `response` and filter the URL instead.
+
+---
+
+## Task #DEV-43: 3D Viewer Mode for Room Visualizer
+- **Status:** TODO
+- **Priority:** HIGH
+- **File:** room-visualizer.html
+- **Depends on:** DEV-42 completion
+
+### Goal
+Implement the 3D Viewer mode accessible via the sidebar from DEV-42. This is a NEW view (not isometric) that shows the room as line-art with depth: the existing 4-wall rectangle extended with corner lines to create the illusion of side walls, ceiling, and floor. Users pan/swipe to focus on different walls, with adjacent surfaces fading gradually to convey depth without visual clutter.
+
+Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
+
+### Behavior Spec
+
+**View structure:**
+
+Base geometry (pure line-art, no fills):
+- Front wall shown as the primary rectangle (like the current 2D view of one wall)
+- Lines extend from each of the four corners of the front wall outward at consistent angles to suggest the room's depth
+- The extending lines define: left wall, right wall, ceiling, and floor
+- All lines use --ink color, 1.5px stroke consistent with existing blueprint aesthetic
+- Room dimensions labels visible on the appropriate edges (wall length, wall height)
+
+**Panel display:**
+
+Panels placed via the 2D view appear in the 3D view on their respective walls:
+- Front wall panels shown as filled rectangles on the front wall face
+- Side wall (left/right) panels shown in perspective on the extended side walls
+- Ceiling panels shown on the ceiling extension (see also placement notes below)
+- Floor panels not applicable — no floor panels are a product
+
+Panel visual style in 3D view:
+- Same line-art border (1.5px --ink)
+- Filled with --accent color (matching current 2D placed panel style)
+- Panel size label visible on hover
+
+**Camera panning:**
+
+Interaction:
+- Desktop: click and drag the visualizer area horizontally to pan the camera
+- Mobile: swipe left/right with thumb to pan
+
+Behavior:
+- Camera stays roughly centered in the room (does not fly around freely)
+- Panning shifts the focused wall — as user drags left, camera swings to see the right wall more; drag right, camera swings to see the left wall
+- Vertical panning: initially out of scope — camera only rotates horizontally (yaw)
+- Panning has soft limits so users can't rotate past a full spin (max ~90° each direction from center front)
+- Smooth easing during pan, not linear tracking
+
+**Fading behavior:**
+
+To convey depth without cluttering the view, walls fade based on distance from the focused wall:
+- The most-focused wall: full opacity (100%)
+- Adjacent walls (partially visible): fade to ~40-50% opacity
+- Far walls (barely visible): fade to ~15-20% opacity
+- Ceiling and floor: fade similarly based on how much of them is visible from current angle
+
+Panel visibility follows wall visibility:
+- Panels on the focused wall: full opacity
+- Panels on adjacent walls: partially faded matching the wall
+- Panels barely visible: faded to same level as their wall
+
+Fade is a smooth gradient, not a hard cutoff. Uses opacity, not blur.
+
+**Default camera position:**
+
+On entering 3D view, camera is positioned centered facing the front wall of the room. Users must actively pan to see other walls.
+
+**Ceiling panel placement note:**
+
+For this task, ceiling panels are read from state (if present) and displayed. Actual ceiling panel PLACEMENT (adding new ceiling panels) is out of scope — that comes in DEV-44 alongside furniture. If no ceiling panels exist in state, the ceiling extension is simply drawn empty.
+
+### Constraints
+- Do NOT use isometric projection — use the specific "extend lines from corners" approach
+- Do NOT add fills, colors, or rendered surfaces to walls/floor/ceiling — pure line-art only
+- Do NOT implement isometric or perspective camera positioning that changes vertical view angle
+- Do NOT add camera zoom in this task
+- Do NOT allow panel placement in 3D view — placement remains in 2D view only for this task
+- Do NOT touch existing 2D viewer functionality
+- Fading must use opacity only, no blur effects
+- Panel data must remain shared between 2D and 3D views (both read from the same state)
+- Do NOT deploy to Vercel until fully tested and functional on localhost
+
+### Acceptance Criteria
+- [ ] 3D Viewer button in sidebar loads the new 3D view (replaces DEV-42 placeholder)
+- [ ] Room shown as line-art with extended corner lines creating ceiling, floor, and side walls
+- [ ] Panels placed in 2D view visible in 3D view on correct walls
+- [ ] Mouse drag on desktop pans the camera horizontally
+- [ ] Touch swipe on mobile pans the camera horizontally
+- [ ] Camera panning has soft limits (max ~90° each direction)
+- [ ] Focused wall at 100% opacity
+- [ ] Adjacent walls fade gradually as they extend away
+- [ ] Panels fade with their walls
+- [ ] Default view on entering 3D mode: centered facing front wall
+- [ ] All line work uses --ink color and 1.5px stroke
+- [ ] Ceiling panels (if any exist in state) display on ceiling extension
+- [ ] Switching between 2D and 3D views preserves all panel placements
+- [ ] No changes to any other page sections
+- [ ] Fully tested locally before production deployment
+
+### Out of Scope
+- Ceiling panel PLACEMENT (adding new ceiling panels via UI) — deferred to DEV-44
+- Floor Plan view (DEV-44)
+- Furniture placement (DEV-44)
+- Edit mode (DEV-44)
+- Camera zoom
+- Vertical camera pan (pitch)
+- Free-orbit camera
+- Any visual enhancements to the 2D viewer
+
+---
+
+## Task #DEV-44: Floor Plan View + Edit Mode + Furniture Placement
+- **Status:** TODO
+- **Priority:** HIGH
+- **File:** room-visualizer.html
+- **Depends on:** DEV-43 completion
+
+### Goal
+Implement the Floor Plan view (top-down room layout) accessible via the sidebar, add an "Edit Mode" toggle that unlocks furniture placement, and build the furniture placement system. Furniture becomes visible in Floor Plan view and in 3D view (where applicable). This task also enables ceiling panel placement, which is naturally handled in the top-down floor plan.
+
+All elements use pure line-art following the blueprint aesthetic. Furniture uses the same drag/resize interaction pattern as walls in the existing 2D viewer.
+
+Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
+
+### Behavior Spec
+
+**Part 1 — Floor Plan View:**
+
+Base layout:
+- Room shown as a top-down rectangle
+- Rectangle proportions match the room's actual length/width from state
+- Line-art only: --ink borders, 1.5px stroke, no fills
+- Room dimensions labeled on outer edges
+- Grid overlay (subtle, matches existing 2D viewer grid style) for spatial reference
+
+Panel display in Floor Plan:
+- Wall panels shown as thin colored rectangles ON the wall lines (edges of the room rectangle) with slight offset inward showing which side they face
+- Ceiling panels shown as small rectangles INSIDE the room (at their planned floor position)
+- Panels use --accent color fill with --ink border
+- Panel size labels visible on hover or at zoom level
+
+Ceiling panel placement:
+- In Floor Plan view, clicking inside the room (not on a wall edge) adds a ceiling panel at that location
+- Uses the currently selected panel size from the sidebar chip selector (same as existing 2D flow)
+- Ceiling panels are draggable within the room bounds
+- Ceiling panels show in 3D view on the ceiling surface
+
+**Part 2 — Edit Mode:**
+
+New sidebar toggle:
+- Add "Edit Mode" toggle button to the left sidebar (below the three view buttons)
+- Visual style: same as existing sidebar buttons but with a distinct icon (pencil or edit icon in line-art)
+- Toggle state: OFF by default, turns ON when clicked, OFF when clicked again
+- Active state uses --accent color background
+
+When Edit Mode is ON:
+- A furniture picker panel appears below the view buttons
+- Furniture picker shows a list of addable furniture types (see Part 3)
+- Existing furniture in the room becomes draggable and resizable (visible drag handles on hover)
+- Delete button appears on hover over each furniture item
+
+When Edit Mode is OFF:
+- Furniture picker hidden
+- Existing furniture visible but not editable (no drag handles, no delete buttons)
+- Furniture items are not clickable
+
+**Part 3 — Furniture Types:**
+
+Available furniture (each with a default size in feet):
+- **Window** (wall-edge element) — default 4ft wide, 3ft tall, placed on a wall
+- **Door** (wall-edge element) — default 3ft wide, 7ft tall, placed on a wall
+- **Desk** (floor element) — default 4ft × 2ft footprint
+- **Chair** (floor element) — default 2ft × 2ft footprint
+- **Speakers** (floor element) — default 1ft × 1ft footprint, comes as a pair
+- **Bed** (floor element) — default 6ft × 5ft footprint
+- **Couch** (floor element) — default 6ft × 3ft footprint
+
+Furniture interaction (matches existing wall drag/resize pattern):
+- Click furniture type in picker → default-sized item appears in the center of the room
+- Drag from center to reposition
+- Drag from edge handles to resize (edges show handles on hover)
+- Live dimension readout during drag/resize (like existing wall dimensions)
+- Delete button on hover (small × in top-right corner of item)
+- Wall-edge elements (windows, doors) snap to wall edges and can be positioned along that wall
+
+Furniture visual style:
+- Pure line-art in --ink
+- 1.5px stroke
+- Simple footprint shapes (rectangles for most items)
+- Small text label showing furniture type (e.g., "DESK", "WINDOW")
+- Windows and doors visually distinct on wall lines (windows: dashed line indicating opening; doors: line with arc showing swing)
+
+**Part 4 — Furniture display in other views:**
+
+Furniture appears in:
+- **Floor Plan view:** full visibility (this is the primary editing view)
+- **3D view:** basic vertical extrusion — desks/chairs/etc. appear as line-art boxes with reasonable heights, windows/doors appear on the appropriate walls as wall cutouts or marked areas
+- **2D view:** windows and doors appear on wall diagrams (marked with distinct symbol); floor furniture does NOT appear in 2D wall view (irrelevant to that view's purpose)
+
+**Part 5 — State management:**
+
+Furniture stored in shared state:
+- Add `state.furniture: [{type, x, y, w, h, wall (if applicable), rotation (default 0)}]`
+- Add `state.ceilingPanels: [{x, y, w, h, size, price}]` (separate from wall panels)
+- All state persists to localStorage using the existing pattern
+
+### Constraints
+- Furniture visuals must be pure line-art — no fills except selective use of dashed lines for windows/doors
+- Edit Mode toggle only affects furniture editing — panels remain editable in their respective views regardless of Edit Mode
+- Wall-edge elements (windows, doors) can only be placed on walls, not in the middle of the room
+- Floor elements cannot be placed on wall edges
+- Do NOT add rotate functionality for furniture in this task — all furniture is axis-aligned
+- Do NOT add furniture presets or bundles (no "add home studio setup" button)
+- Do NOT change the sidebar button order established in DEV-42
+- Panel data and furniture data must be independent (don't conflate them)
+- Do NOT deploy to Vercel until fully tested and functional on localhost
+
+### Acceptance Criteria
+- [ ] Floor Plan button in sidebar loads the new Floor Plan view (replaces DEV-42 placeholder)
+- [ ] Top-down room rectangle displays with correct proportions from state
+- [ ] Wall panels visible on room edges in Floor Plan
+- [ ] Ceiling panels can be placed by clicking inside room
+- [ ] Ceiling panels draggable within room bounds
+- [ ] Edit Mode toggle appears in sidebar below view buttons
+- [ ] Edit Mode OFF by default
+- [ ] Furniture picker appears when Edit Mode is ON
+- [ ] Furniture picker hidden when Edit Mode is OFF
+- [ ] All 7 furniture types (Window, Door, Desk, Chair, Speakers, Bed, Couch) can be added
+- [ ] Furniture appears with default sizes when added
+- [ ] Furniture draggable to reposition
+- [ ] Furniture resizable via edge handles
+- [ ] Live dimension readout during furniture drag/resize
+- [ ] Delete button appears on hover, removes furniture
+- [ ] Windows and doors snap to wall edges only
+- [ ] Floor furniture cannot be placed on wall edges
+- [ ] Furniture visible in 3D view (basic extrusion)
+- [ ] Windows and doors visible in 2D wall diagram view
+- [ ] All state persists to localStorage
+- [ ] Switching views preserves all placements (panels + furniture)
+- [ ] All line work uses --ink color and 1.5px stroke
+- [ ] Fully tested locally before production deployment
+
+### Out of Scope
+- Furniture rotation (all furniture axis-aligned)
+- Furniture presets or bundles
+- Multiple styles per furniture type
+- Speaker sound cone visualization
+- Ear-height indicators on walls
+- First reflection point calculations
+- Advanced 3D furniture models
+- Room templates
+- Saved room projects across sessions (beyond localStorage)

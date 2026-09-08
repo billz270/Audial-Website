@@ -125,9 +125,43 @@
   /* ============ MAIN: walls + sidebar (right-side panel selector) ============ */
   .visualizer-layout{
     display:grid;
-    grid-template-columns:minmax(0,1fr) 280px;
+    grid-template-columns:auto minmax(0,1fr) 280px;
     border-bottom:1.5px solid var(--ink);
   }
+
+  /* DEV-42: left view-mode rail */
+  .view-rail{
+    display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch;gap:0;
+    padding:0;position:static;
+    width:76px;flex-shrink:0;
+    border-right:1.5px solid var(--ink);
+    background:var(--paper);
+  }
+  .view-rail-btn{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;
+    padding:16px 6px;
+    background:var(--paper);color:var(--ink);
+    border:none;border-bottom:1.5px solid var(--ink);
+    font-family:inherit;font-size:9px;font-weight:700;
+    text-transform:uppercase;letter-spacing:0.1em;
+    cursor:pointer;transition:background 0.2s,color 0.2s;
+    min-height:64px;
+  }
+  .view-rail-btn svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.5}
+  .view-rail-btn:hover:not(.active){background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper)}
+  .view-rail-btn.active{background:var(--accent);color:var(--paper);border-bottom-color:var(--ink)}
+
+  /* DEV-42: view panes */
+  .view-pane{display:none;flex-direction:column;gap:14px;min-width:0;flex:1}
+  .view-pane.active{display:flex}
+  .view-placeholder{
+    display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+    flex:1;min-height:380px;
+    border:1.5px solid var(--ink);background:var(--paper);
+    text-align:center;padding:32px 20px;
+  }
+  .view-placeholder-title{font-family:'Archivo Black',sans-serif;font-size:18px;letter-spacing:-0.02em;color:var(--ink)}
+  .view-placeholder-meta{font-size:11px;text-transform:uppercase;letter-spacing:0.12em;color:var(--ink);opacity:0.55}
 
   .walls-area{
     padding:20px 28px;
@@ -338,6 +372,18 @@
   @media (max-width:760px){
     .visualizer-layout{grid-template-columns:1fr}
     .walls-area{border-right:none;border-bottom:1.5px solid var(--ink)}
+    /* DEV-42: rail becomes a horizontal row above the visualizer */
+    .view-rail{
+      flex-direction:row;width:auto;
+      border-right:none;border-bottom:1.5px solid var(--ink);
+    }
+    .view-rail-btn{
+      flex:1;flex-direction:row;gap:8px;
+      padding:12px 8px;min-height:48px;
+      border-bottom:none;border-right:1.5px solid var(--ink);
+    }
+    .view-rail-btn:last-child{border-right:none}
+    .view-rail-btn svg{width:18px;height:18px}
   }
   @media (max-width:900px){
     nav{padding:0 20px;flex-wrap:wrap}
@@ -508,7 +554,24 @@
 
 <!-- MAIN 70/30: walls + panel sizes sidebar -->
 <section class="visualizer-layout">
+  <!-- DEV-42: view-mode rail -->
+  <div class="view-rail" id="viewRail" role="toolbar" aria-label="Visualizer view mode">
+    <button class="view-rail-btn active" data-view="2D" aria-pressed="true">
+      <svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+      <span>2D</span>
+    </button>
+    <button class="view-rail-btn" data-view="3D" aria-pressed="false">
+      <svg viewBox="0 0 24 24"><path d="M4 7 L12 3 L20 7 L20 17 L12 21 L4 17 Z"/><path d="M4 7 L12 11 L20 7"/><line x1="12" y1="11" x2="12" y2="21"/></svg>
+      <span>3D</span>
+    </button>
+    <button class="view-rail-btn" data-view="floorplan" aria-pressed="false">
+      <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="14" x2="13" y2="14"/><line x1="13" y1="14" x2="13" y2="21"/><line x1="13" y1="3" x2="13" y2="9"/></svg>
+      <span>Plan</span>
+    </button>
+  </div>
+
   <div class="walls-area">
+   <div class="view-pane active" id="view2D">
     <div class="walls-title">
       <div class="subsection-label" style="margin-bottom:0">Place panels on walls</div>
       <div class="walls-hint" id="wallsHint">Select a panel size first</div>
@@ -536,6 +599,22 @@
     </div>
 
     <div class="wall-thumbs" id="wallThumbs"></div>
+   </div>
+
+   <!-- DEV-42: placeholders replaced by DEV-43 / DEV-44 -->
+   <div class="view-pane" id="view3D">
+     <div class="view-placeholder">
+       <div class="view-placeholder-title">3D Viewer coming soon</div>
+       <div class="view-placeholder-meta" id="view3DMeta"></div>
+     </div>
+   </div>
+
+   <div class="view-pane" id="viewFloorplan">
+     <div class="view-placeholder">
+       <div class="view-placeholder-title">Floor Plan coming soon</div>
+       <div class="view-placeholder-meta" id="viewFloorplanMeta"></div>
+     </div>
+   </div>
   </div>
 
   <aside class="sidebar">
@@ -873,7 +952,7 @@ document.getElementById('consultForm').addEventListener('submit',e=>{
   window.location.href = `mailto:support@audial.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
 });
 
-const state = {roomLength:14, roomWidth:12, roomHeight:10, activeWall:'front', selectedSize:null, selectedDesignedId:null, orientation:'horizontal', panels:[], designedCart:[], selectedPanelIds:new Set()};
+const state = {roomLength:14, roomWidth:12, roomHeight:10, activeWall:'front', selectedSize:null, selectedDesignedId:null, orientation:'horizontal', panels:[], designedCart:[], selectedPanelIds:new Set(), activeView:'2D'};
 const PANEL_PRICES = { '1x1':2500, '2x1':3500, '2x2':4500, '4x2':6500, '1x4':5500 };
 const WALL_ORDER = ['front','right','back','left'];
 const WALL_LABELS = {front:'Front Wall', back:'Back Wall', left:'Left Wall', right:'Right Wall'};
@@ -930,8 +1009,43 @@ function loadRoomPlan(){
 }
 
 // Run on initial load
+/* ---- DEV-42: view-mode switching ----
+   The 2D viewer owns state.panels / roomLength / roomWidth / roomHeight; the 3D and
+   Floor Plan panes read the same object, so switching views never touches panel data. */
+const VIEW_PANES = {'2D':'view2D', '3D':'view3D', 'floorplan':'viewFloorplan'};
+
+function viewPanelSummary(){
+  const n = state.panels.length;
+  if(!n) return 'No panels placed yet';
+  return 'You have ' + n + ' panel' + (n === 1 ? '' : 's') + ' placed';
+}
+
+function setView(view){
+  if(!VIEW_PANES[view]) return;
+  state.activeView = view;
+  Object.entries(VIEW_PANES).forEach(([key, id]) => {
+    const pane = document.getElementById(id);
+    if(pane) pane.classList.toggle('active', key === view);
+  });
+  document.querySelectorAll('.view-rail-btn').forEach(btn => {
+    const on = btn.dataset.view === view;
+    btn.classList.toggle('active', on);
+    btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  const summary = viewPanelSummary();
+  const m3 = document.getElementById('view3DMeta');
+  const mf = document.getElementById('viewFloorplanMeta');
+  if(m3) m3.textContent = summary;
+  if(mf) mf.textContent = summary;
+}
+
+document.querySelectorAll('.view-rail-btn').forEach(btn => {
+  btn.addEventListener('click', () => setView(btn.dataset.view));
+});
+
 loadRoomPlan();
 loadDesignedCart();
+setView(state.activeView);
 // Re-run on bfcache restore (browser back/forward) — pageshow fires with persisted=true
 window.addEventListener('pageshow', e => { if(e.persisted) loadDesignedCart(); });
 // Also re-sync if another tab/window updates localStorage
