@@ -2577,6 +2577,29 @@ For this task, ceiling panels are read from state (if present) and displayed. Ac
   reports a false failure. A `response` listener over the identical sequence shows **zero** failed
   requests. This view issues no network requests at all.
 
+### Follow-up 3: full rotation + artwork on panels (founder request) -- CURRENT
+- **The +-90 yaw clamp is gone.** Rotation is unlimited, so ANY wall can be brought to the
+  front -- turn onto the left wall and the right wall becomes the new "back wall" and fades
+  out. This deliberately overrides the task spec's "soft limits (max ~90 deg each direction)";
+  founder's call. The rotation model itself was already right and is unchanged.
+- **Uploaded artwork now renders on placed panels** (`panel.image`). Previously every panel was
+  a flat `--accent` fill, so designs were invisible in 3D.
+- **The clip MUST go on a wrapping `<g>`, not on the `<image>`.** `clip-path` resolves in the
+  element's own POST-transform space, so putting it on the transformed `<image>` ran the
+  screen-space polygon through the matrix a second time and clipped the art away entirely --
+  it rendered as an empty outline.
+- **The art is an affine map, not a true perspective warp**: SVG transforms are affine, so the
+  unit square is mapped through three projected corners. Residual skew is imperceptible at
+  panel scale. Skipped when any corner is behind the eye (that corner projects to a meaningless
+  coordinate and would smear the image); those panels fall back to the accent fill.
+- **Testing lesson, and it bit me here:** the first pass asserted `<image>` nodes existed and
+  passed 13/13 while the panels rendered as **empty outlines**. Node existence is not proof of
+  paint. Caught by looking at the screenshot -- the third time in this task that a screenshot
+  caught what green tests missed.
+- Verified 13/13 over a **full 360 turn**: every wall faceable, back wall reaching full opacity
+  with the former front wall culled, draw-iff-in-front exact at all 72 angles, zero
+  NaN/Infinity or runaway coordinates, artwork visible on the wall being faced.
+
 ### Follow-up 2: camera moved INSIDE the room (founder request, same session) -- CURRENT
 **This supersedes the orbit camera described in the notes above and in Follow-up 1.** The
 `R3D_FIT_X` / `R3D_FIT_Y` / bisection-fit machinery those notes describe is **gone**; read them

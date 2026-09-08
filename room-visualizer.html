@@ -180,6 +180,9 @@
   .room3d-svg{display:block;width:100%;height:100%}
   .room3d-edge{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke}
   .room3d-panel{fill:var(--accent);stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;cursor:pointer}
+  /* a panel carrying uploaded artwork keeps only its outline; the art sits underneath.
+     pointer-events:all so the unfilled outline still hit-tests for the hover label. */
+  .room3d-panel.has-art{fill:none;pointer-events:all}
   .room3d-dim{fill:var(--ink);font-family:'Archivo',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase}
   .room3d-hint{
     position:absolute;left:10px;bottom:8px;z-index:2;pointer-events:none;
@@ -1078,7 +1081,9 @@ const R3D = {
 };
 const R3D_FOV = 70 * Math.PI/180;     // wide-ish, as an interior view needs
 const R3D_NEAR = 0.35;                // ft; geometry closer than this is clipped away
-const R3D_MAX_YAW = Math.PI/2;        // soft limit: 90 deg each way
+/* Rotation is unlimited: any wall can be brought to the front, including the back wall.
+   (The task spec asked for a +-90 soft limit; the founder overrode that so that turning
+   onto a wall makes the wall opposite it the new "back wall" and fade out of view.) */
 const R3D_SENS = 0.0055;              // radians per px of drag
 const R3D_EASE = 0.16;                // per-frame approach to targetYaw (smooth, not linear tracking)
 const R3D_WALL_FILL = 0.66;           // target: focused wall fills ~2/3 of the frame
@@ -1241,6 +1246,32 @@ function r3dPanelPoints(quad, cam, vw, vh, focal){
   }).join(' ');
 }
 
+/* Uploaded artwork, mapped onto the panel's projected quad.
+   SVG transforms are affine, so this maps the unit square through three corners
+   (top-left, top-right, bottom-left) rather than doing a true perspective warp -- the
+   residual skew is imperceptible at panel scale. Skipped entirely unless all four
+   corners are in front of the eye, because a corner behind the camera projects to a
+   meaningless coordinate and would smear the image across the view; such panels fall
+   back to the flat accent fill. */
+function r3dPanelArt(panel, quad, cam, vw, vh, focal, op){
+  const cpts = quad.map(function(q){ return r3dToCam(q, cam); });
+  if(cpts.some(function(c){ return c.d <= R3D_NEAR; })) return '';
+  const P = cpts.map(function(c){ return r3dProjCam(c, vw, vh, focal); });
+  const bl = P[0], tr = P[2], tl = P[3];          // quad order: bl, br, tr, tl
+  const m = [tr.x-tl.x, tr.y-tl.y, bl.x-tl.x, bl.y-tl.y, tl.x, tl.y]
+              .map(function(n){ return n.toFixed(4); }).join(' ');
+  const id = 'r3dart'+String(panel.id).replace(/[^A-Za-z0-9_-]/g,'');
+  /* The clip MUST sit on a wrapping <g>, not on the <image> itself: clip-path is resolved
+     in the element's own post-transform space, so putting it on the transformed <image>
+     runs the screen-space polygon through the matrix a second time and clips the art
+     away completely -- it renders as an empty outline. */
+  return '<clipPath id="'+id+'"><polygon points="'+
+           P.map(function(p){ return p.x.toFixed(1)+','+p.y.toFixed(1); }).join(' ')+'"/></clipPath>'+
+         '<g clip-path="url(#'+id+')"><image href="'+r3dEsc(panel.image)+'" '+
+           'x="0" y="0" width="1" height="1" preserveAspectRatio="none" '+
+           'transform="matrix('+m+')" opacity="'+op+'"/></g>';
+}
+
 function r3dEsc(v){
   return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
@@ -1274,13 +1305,17 @@ function render3D(){
     if(d) parts.push('<path class="room3d-edge" data-surface="'+sf.key+'" d="'+d+'" opacity="'+sf.op.toFixed(3)+'"/>');
   }
 
-  /* Panels, each inheriting its wall's opacity. */
+  /* Panels, each inheriting its wall's opacity, with uploaded artwork drawn onto them. */
   for(const panel of state.panels){
     if(!R3D_WALL_YAW.hasOwnProperty(panel.wall)) continue;
-    const pts = r3dPanelPoints(r3dPanelQuad(panel), cam, vw, vh, focal);
+    const quad = r3dPanelQuad(panel);
+    const pts = r3dPanelPoints(quad, cam, vw, vh, focal);
     if(!pts) continue;
     const label = (panel.size || (panel.w+'×'+panel.h)) + ' · ' + WALL_LABELS[panel.wall];
-    parts.push('<polygon class="room3d-panel" data-pid="'+r3dEsc(panel.id)+'" data-wall="'+panel.wall+'" data-label="'+r3dEsc(label)+'" points="'+pts+'" opacity="'+r3dOpacity(panel.wall).toFixed(3)+'"/>');
+    const op = r3dOpacity(panel.wall).toFixed(3);
+    const art = panel.image ? r3dPanelArt(panel, quad, cam, vw, vh, focal, op) : '';
+    parts.push(art);
+    parts.push('<polygon class="room3d-panel'+(art?' has-art':'')+'" data-pid="'+r3dEsc(panel.id)+'" data-wall="'+panel.wall+'" data-label="'+r3dEsc(label)+'" points="'+pts+'" opacity="'+op+'"/>');
   }
   for(const panel of (state.ceilingPanels||[])){
     const pts = r3dPanelPoints(r3dCeilingQuad(panel), cam, vw, vh, focal);
@@ -1342,9 +1377,9 @@ function initRoom3D(){
   });
   R3D.stage.addEventListener('pointermove', function(e){
     if(R3D.dragging){
-      /* Drag left -> viewer turns right, revealing the right wall. */
-      const next = R3D.dragYaw - (e.clientX - R3D.dragX) * R3D_SENS;
-      R3D.targetYaw = Math.max(-R3D_MAX_YAW, Math.min(R3D_MAX_YAW, next));
+      /* Drag left -> viewer turns right, revealing the right wall. Unclamped: a full
+         turn is allowed so every wall, back wall included, can be faced head-on. */
+      R3D.targetYaw = R3D.dragYaw - (e.clientX - R3D.dragX) * R3D_SENS;
       r3dAnimate();
       return;
     }
