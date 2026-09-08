@@ -1057,12 +1057,16 @@ function loadRoomPlan(){
 
 // Run on initial load
 /* ---- DEV-43: 3D line-art room view ----
-   One-point perspective, drawn as SVG. The camera orbits the room centre at a fixed
-   radius with zero pitch and always looks at the centre, so the wall being looked at is
-   the FAR wall and the room's depth edges radiate outward from its corners -- the
-   "extend lines from the four corners" look the spec asks for, and NOT isometric.
-   Orbiting (rather than yawing in place) also keeps the whole box in front of the
-   camera at every angle, so no near-plane clipping is ever needed.
+   One-point perspective, drawn as SVG. The camera sits INSIDE the room and turns in place
+   (yaw only, zero pitch), so everything behind it is clipped away against the near plane.
+   That is what removes the back wall and makes the view read as standing in the room
+   rather than looking at a box from outside -- no fade or blur is needed for it.
+
+   Why the eye is not at the exact geometric centre: from the centre of a 14x12x10 room the
+   front wall subtends ~119% of the frame, so it overflows and the ceiling, floor and side
+   walls are not visible at all -- the room loses all depth. The eye therefore sits as far
+   back as it can while staying inside the room, which frames the focused wall at ~2/3 of
+   the frame with the other surfaces converging around it. See r3dEyeOffset().
 
    World axes: x 0..W left->right, y 0..H floor->ceiling, z 0..D front wall->back wall.
    W = roomLength (front/back wall width), D = roomWidth (side wall width, i.e. depth). */
@@ -1070,22 +1074,16 @@ function loadRoomPlan(){
 const R3D = {
   svg:null, stage:null, tip:null,
   yaw:0, targetYaw:0,          // radians; 0 = facing front wall, + = turning right
-  radius:0, raf:null, dragging:false, dragX:0, dragYaw:0
+  eye:0, raf:null, dragging:false, dragX:0, dragYaw:0
 };
-const R3D_FOV = 55 * Math.PI/180;
+const R3D_FOV = 70 * Math.PI/180;     // wide-ish, as an interior view needs
+const R3D_NEAR = 0.35;                // ft; geometry closer than this is clipped away
 const R3D_MAX_YAW = Math.PI/2;        // soft limit: 90 deg each way
 const R3D_SENS = 0.0055;              // radians per px of drag
 const R3D_EASE = 0.16;                // per-frame approach to targetYaw (smooth, not linear tracking)
-/* Framing targets, as a fraction of the half-viewport.
-   Horizontal is a hard bound -- the room never runs off the sides. Vertical is allowed
-   past 1.0 on purpose: at diagonal yaws the NEAR ceiling/floor corners are what box the
-   view in, and holding them inside forced the room down to ~66% of the frame width at the
-   default angle. Letting them sail off the top and bottom is the immersive interior look
-   (side walls running to the frame edge) and buys ~35% more room on screen.
-   R3D_FIT_Y also acts as a safety cap for unusual room shapes, e.g. tall narrow rooms,
-   where the vertical extent binds first. */
-const R3D_FIT_X = 0.95;
-const R3D_FIT_Y = 1.45;
+const R3D_WALL_FILL = 0.66;           // target: focused wall fills ~2/3 of the frame
+const R3D_EYE_INSIDE = 0.88;          // hard cap on how far back the eye may go, as a
+                                      //   fraction of the largest offset that stays inside
 
 /* Wall facing angles, matching WALL_ORDER front->right->back->left clockwise. */
 const R3D_WALL_YAW = {front:0, right:Math.PI/2, back:Math.PI, left:-Math.PI/2};
@@ -1094,73 +1092,78 @@ function r3dRoom(){
   return {W:state.roomLength, H:state.roomHeight, D:state.roomWidth};
 }
 
-/* Camera orbits the room centre; forward(yaw) = (sin, 0, -cos), camera sits -R along it. */
-function r3dCamera(yaw, radius){
+/* The eye sits on the room's centre line, backed off from the wall it is facing.
+   Two competing pulls: back far enough that the focused wall only fills ~2/3 of the
+   frame (so the side walls, ceiling and floor are visible around it), but never so far
+   that it leaves the room -- leaving the room is what made this read as a box seen from
+   outside. The offset is constant across yaw so the room does not breathe while panning,
+   which means it must stay inside for EVERY wall, hence min(W,D)/2. */
+function r3dEyeOffset(vw, vh){
+  const R = r3dRoom();
+  const t = Math.tan(R3D_FOV/2);
+  const aspect = vw/vh;
+  let need = 0;
+  for(const wall of WALL_ORDER){
+    const wallW = (wall==='front'||wall==='back') ? R.W : R.D;
+    const half  = (wall==='front'||wall==='back') ? R.D/2 : R.W/2;   // centre -> that wall
+    const dist = Math.max(
+      (R.H/2) / (R3D_WALL_FILL * t),
+      (wallW/2) / (R3D_WALL_FILL * t * aspect)
+    );
+    need = Math.max(need, dist - half);
+  }
+  const maxInside = (Math.min(R.W, R.D)/2) * R3D_EYE_INSIDE;
+  return Math.max(0, Math.min(need, maxInside));
+}
+
+/* Camera turns in place about the room centre, backed off by `eye` along its own forward. */
+function r3dCamera(yaw, eye){
   const R = r3dRoom();
   const f = {x:Math.sin(yaw), y:0, z:-Math.cos(yaw)};
   return {
-    pos:{x:R.W/2 - f.x*radius, y:R.H/2, z:R.D/2 - f.z*radius},
+    pos:{x:R.W/2 - f.x*eye, y:R.H/2, z:R.D/2 - f.z*eye},
     f:f, r:{x:Math.cos(yaw), y:0, z:Math.sin(yaw)}
   };
 }
 
-/* World -> screen. Returns null for points at or behind the camera plane. */
-function r3dProject(pt, cam, vw, vh){
+/* World -> camera space. `d` is depth along forward; <= R3D_NEAR means behind the viewer. */
+function r3dToCam(pt, cam){
   const rx = pt.x-cam.pos.x, ry = pt.y-cam.pos.y, rz = pt.z-cam.pos.z;
-  const d = rx*cam.f.x + ry*cam.f.y + rz*cam.f.z;      // depth along forward
-  if(d <= 0.05) return null;
-  const focal = (vh/2) / Math.tan(R3D_FOV/2);
-  const cx = rx*cam.r.x + ry*cam.r.y + rz*cam.r.z;
-  const cy = ry;                                       // up is world +y (pitch is always 0)
-  return {x: vw/2 + cx*focal/d, y: vh/2 - cy*focal/d, d:d};
+  return {
+    cx: rx*cam.r.x + ry*cam.r.y + rz*cam.r.z,
+    cy: ry,                                        // up is world +y (pitch is always 0)
+    d:  rx*cam.f.x + ry*cam.f.y + rz*cam.f.z
+  };
+}
+function r3dFocal(vh){ return (vh/2) / Math.tan(R3D_FOV/2); }
+function r3dProjCam(c, vw, vh, focal){
+  return {x: vw/2 + c.cx*focal/c.d, y: vh/2 - c.cy*focal/c.d};
 }
 
-/* Orbit radius that keeps the whole box inside the frame at every reachable yaw.
-   Projected offset falls off ~1/distance, so scaling R by the overshoot converges fast. */
-function r3dFitRadius(vw, vh){
-  const R = r3dRoom();
-  const corners = [];
-  for(const x of [0,R.W]) for(const y of [0,R.H]) for(const z of [0,R.D]) corners.push({x:x,y:y,z:z});
-  /* Sample every 5 deg across the reachable range, matching the harness sweep, so the
-     no-horizontal-overflow guarantee holds at every angle a user can actually reach.
-     The DIAGONAL views are the widest -- a coarse 0/30/60/90 sample skips 45. */
-  const yaws = [];
-  for(let a=0; a<=90.001; a+=5) yaws.push(a*Math.PI/180);
+/* Interpolate two camera-space points onto the near plane. */
+function r3dSplit(a, b){
+  const t = (a.d - R3D_NEAR) / (a.d - b.d);
+  return {cx:a.cx + (b.cx-a.cx)*t, cy:a.cy + (b.cy-a.cy)*t, d:R3D_NEAR};
+}
 
-  /* Worst corner offset from frame centre, each axis measured against its own target and
-     normalised so that 1.0 == "exactly on target". Maximised over every reachable yaw;
-     Infinity once a corner reaches the camera plane. */
-  const worstAt = function(rad){
-    let worst = 0;
-    for(const yaw of yaws){
-      const cam = r3dCamera(yaw, rad);
-      for(const c of corners){
-        const p = r3dProject(c, cam, vw, vh);
-        if(!p) return Infinity;
-        worst = Math.max(worst,
-          Math.abs(p.x-vw/2)/(vw/2) / R3D_FIT_X,
-          Math.abs(p.y-vh/2)/(vh/2) / R3D_FIT_Y);
-      }
-    }
-    return worst;
-  };
+/* Clip one segment against the near plane. Returns null when wholly behind the viewer. */
+function r3dClipSeg(a, b){
+  const ina = a.d > R3D_NEAR, inb = b.d > R3D_NEAR;
+  if(!ina && !inb) return null;
+  if(ina && inb) return [a, b];
+  return ina ? [a, r3dSplit(a,b)] : [r3dSplit(b,a), b];
+}
 
-  /* worstAt() decreases monotonically as the camera pulls back, so bisect for
-     worstAt(rad) === R3D_FIT. The previous Newton-ish step (rad * worst / FIT) was NOT
-     convergent: a corner crossing the camera plane pinned `worst` to a sentinel, kicked
-     the radius 4x out, and the loop then oscillated and simply stopped after 8 passes
-     wherever it happened to be -- so raising FIT could make the room SMALLER, and a
-     wider FOV blew the radius out to hundreds of feet. */
-  const span = Math.max(R.W, R.D, R.H);
-  let hi = span * 4;
-  for(let i=0; i<40 && worstAt(hi) > 1; i++) hi *= 1.5;   // pull back until it fits
-  let lo = hi;
-  for(let i=0; i<60 && worstAt(lo) <= 1; i++) lo *= 0.75; // close in until it does not
-  for(let i=0; i<48; i++){                                 // bisect the crossing
-    const mid = (lo + hi) / 2;
-    if(worstAt(mid) > 1) lo = mid; else hi = mid;
+/* Sutherland-Hodgman against the single near plane, for filled panels. */
+function r3dClipPoly(pts){
+  const out = [];
+  for(let i=0; i<pts.length; i++){
+    const a = pts[i], b = pts[(i+1)%pts.length];
+    const ina = a.d > R3D_NEAR, inb = b.d > R3D_NEAR;
+    if(ina) out.push(a);
+    if(ina !== inb) out.push(ina ? r3dSplit(a,b) : r3dSplit(b,a));
   }
-  return hi;
+  return out.length >= 3 ? out : null;
 }
 
 /* Angular distance from the camera to a wall's facing angle, 0..PI. */
@@ -1214,14 +1217,28 @@ function r3dCeilingQuad(panel){
   return [{x:a,y:H,z:c},{x:b,y:H,z:c},{x:b,y:H,z:d},{x:a,y:H,z:d}];
 }
 
-function r3dPolyPoints(quad, cam, vw, vh){
-  const pts = [];
-  for(const q of quad){
-    const p = r3dProject(q, cam, vw, vh);
-    if(!p) return null;                 // camera always orbits outside the box, so this is a guard
-    pts.push(p.x.toFixed(1)+','+p.y.toFixed(1));
+/* A surface is drawn as four independently clipped edges, never as a closed polygon:
+   closing a near-clipped polygon would draw a spurious edge straight across the view
+   along the near plane. */
+function r3dSurfacePath(quad, cam, vw, vh, focal){
+  const cpts = quad.map(function(q){ return r3dToCam(q, cam); });
+  let d = '';
+  for(let i=0; i<cpts.length; i++){
+    const seg = r3dClipSeg(cpts[i], cpts[(i+1)%cpts.length]);
+    if(!seg) continue;
+    const p0 = r3dProjCam(seg[0], vw, vh, focal), p1 = r3dProjCam(seg[1], vw, vh, focal);
+    d += 'M'+p0.x.toFixed(1)+' '+p0.y.toFixed(1)+'L'+p1.x.toFixed(1)+' '+p1.y.toFixed(1);
   }
-  return pts.join(' ');
+  return d;
+}
+
+function r3dPanelPoints(quad, cam, vw, vh, focal){
+  const clipped = r3dClipPoly(quad.map(function(q){ return r3dToCam(q, cam); }));
+  if(!clipped) return null;
+  return clipped.map(function(c){
+    const p = r3dProjCam(c, vw, vh, focal);
+    return p.x.toFixed(1)+','+p.y.toFixed(1);
+  }).join(' ');
 }
 
 function r3dEsc(v){
@@ -1234,12 +1251,14 @@ function render3D(){
   const vw = rect.width, vh = rect.height;
   if(vw < 2 || vh < 2) return;          // pane is hidden; setView re-renders once it is visible
   R3D.svg.setAttribute('viewBox', '0 0 '+vw+' '+vh);
-  if(!R3D.radius) R3D.radius = r3dFitRadius(vw, vh);
-  const cam = r3dCamera(R3D.yaw, R3D.radius);
+  if(!R3D.eye) R3D.eye = r3dEyeOffset(vw, vh);
+  const cam = r3dCamera(R3D.yaw, R3D.eye);
+  const focal = r3dFocal(vh);
   const R = r3dRoom(), W = R.W, H = R.H, D = R.D;
   const parts = [];
 
-  /* Surfaces, most-faded first so the focused wall's lines sit on top. */
+  /* Surfaces, most-faded first so the focused wall's lines sit on top. The wall behind
+     the viewer needs no special case: it is entirely past the near plane and clips away. */
   const surfaces = WALL_ORDER.map(function(w){
     return {key:w, quad:r3dWallQuad(w), op:r3dOpacity(w)};
   });
@@ -1251,35 +1270,41 @@ function render3D(){
   surfaces.sort(function(a,b){ return a.op - b.op; });
 
   for(const sf of surfaces){
-    const pts = r3dPolyPoints(sf.quad, cam, vw, vh);
-    if(pts) parts.push('<polygon class="room3d-edge" data-surface="'+sf.key+'" points="'+pts+'" opacity="'+sf.op.toFixed(3)+'"/>');
+    const d = r3dSurfacePath(sf.quad, cam, vw, vh, focal);
+    if(d) parts.push('<path class="room3d-edge" data-surface="'+sf.key+'" d="'+d+'" opacity="'+sf.op.toFixed(3)+'"/>');
   }
 
   /* Panels, each inheriting its wall's opacity. */
   for(const panel of state.panels){
     if(!R3D_WALL_YAW.hasOwnProperty(panel.wall)) continue;
-    const pts = r3dPolyPoints(r3dPanelQuad(panel), cam, vw, vh);
+    const pts = r3dPanelPoints(r3dPanelQuad(panel), cam, vw, vh, focal);
     if(!pts) continue;
     const label = (panel.size || (panel.w+'×'+panel.h)) + ' · ' + WALL_LABELS[panel.wall];
     parts.push('<polygon class="room3d-panel" data-pid="'+r3dEsc(panel.id)+'" data-wall="'+panel.wall+'" data-label="'+r3dEsc(label)+'" points="'+pts+'" opacity="'+r3dOpacity(panel.wall).toFixed(3)+'"/>');
   }
   for(const panel of (state.ceilingPanels||[])){
-    const pts = r3dPolyPoints(r3dCeilingQuad(panel), cam, vw, vh);
+    const pts = r3dPanelPoints(r3dCeilingQuad(panel), cam, vw, vh, focal);
     if(!pts) continue;
     const label = (panel.size || (panel.w+'×'+panel.h)) + ' · Ceiling';
     parts.push('<polygon class="room3d-panel" data-pid="c'+r3dEsc(panel.id)+'" data-wall="ceiling" data-label="'+r3dEsc(label)+'" points="'+pts+'" opacity="0.5"/>');
   }
 
-  /* Dimension labels on the focused wall: width along its base, height up its near edge. */
+  /* Dimension labels on the focused wall: width along its base, height up its near edge.
+     Only drawn when the anchor is genuinely in front of the viewer. */
   const focus = r3dFocusedWall();
   const fq = r3dWallQuad(focus);
   const wid = (focus==='front'||focus==='back') ? W : D;
   const mid = function(a,b){ return {x:(a.x+b.x)/2, y:(a.y+b.y)/2, z:(a.z+b.z)/2}; };
-  const pBase = r3dProject(mid(fq[0],fq[1]), cam, vw, vh);
-  const pSide = r3dProject(mid(fq[0],fq[3]), cam, vw, vh);
+  const cBase = r3dToCam(mid(fq[0],fq[1]), cam), cSide = r3dToCam(mid(fq[0],fq[3]), cam);
   const fop = r3dOpacity(focus).toFixed(3);
-  if(pBase) parts.push('<text class="room3d-dim" x="'+pBase.x.toFixed(1)+'" y="'+(pBase.y+16).toFixed(1)+'" text-anchor="middle" opacity="'+fop+'">'+wid+' ft</text>');
-  if(pSide) parts.push('<text class="room3d-dim" x="'+(pSide.x-8).toFixed(1)+'" y="'+pSide.y.toFixed(1)+'" text-anchor="end" opacity="'+fop+'">'+H+' ft</text>');
+  if(cBase.d > R3D_NEAR){
+    const p = r3dProjCam(cBase, vw, vh, focal);
+    parts.push('<text class="room3d-dim" x="'+p.x.toFixed(1)+'" y="'+(p.y+16).toFixed(1)+'" text-anchor="middle" opacity="'+fop+'">'+wid+' ft</text>');
+  }
+  if(cSide.d > R3D_NEAR){
+    const p = r3dProjCam(cSide, vw, vh, focal);
+    parts.push('<text class="room3d-dim" x="'+(p.x-8).toFixed(1)+'" y="'+p.y.toFixed(1)+'" text-anchor="end" opacity="'+fop+'">'+H+' ft</text>');
+  }
 
   R3D.svg.innerHTML = parts.join('');
   const nameEl = $('room3dWallName');
@@ -1317,7 +1342,7 @@ function initRoom3D(){
   });
   R3D.stage.addEventListener('pointermove', function(e){
     if(R3D.dragging){
-      /* Drag left -> camera swings right, revealing the right wall. */
+      /* Drag left -> viewer turns right, revealing the right wall. */
       const next = R3D.dragYaw - (e.clientX - R3D.dragX) * R3D_SENS;
       R3D.targetYaw = Math.max(-R3D_MAX_YAW, Math.min(R3D_MAX_YAW, next));
       r3dAnimate();
@@ -1344,13 +1369,13 @@ function initRoom3D(){
 
   if(window.ResizeObserver){
     new ResizeObserver(function(){
-      if(state.activeView==='3D'){ R3D.radius = 0; render3D(); }
+      if(state.activeView==='3D'){ R3D.eye = 0; render3D(); }
     }).observe(R3D.stage);
   }
 }
 
-/* Room dimensions changed -> the fit radius is stale. */
-function invalidate3D(){ R3D.radius = 0; if(state.activeView==='3D') render3D(); }
+/* Room dimensions changed -> the eye offset is stale. */
+function invalidate3D(){ R3D.eye = 0; if(state.activeView==='3D') render3D(); }
 
 /* ---- DEV-42: view-mode switching ----
    The 2D viewer owns state.panels / roomLength / roomWidth / roomHeight; the 3D and
@@ -1380,7 +1405,7 @@ function setView(view){
   /* The pane has a zero-size box while display:none, so the 3D view can only be measured
      once it is visible -- the same reflow trap as DEV-13. Reset the fit and draw after
      the class flip above. */
-  if(view === '3D'){ R3D.radius = 0; render3D(); }
+  if(view === '3D'){ R3D.eye = 0; render3D(); }
 }
 
 document.querySelectorAll('.view-rail-btn').forEach(btn => {

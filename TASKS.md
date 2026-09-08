@@ -2577,6 +2577,46 @@ For this task, ceiling panels are read from state (if present) and displayed. Ac
   reports a false failure. A `response` listener over the identical sequence shows **zero** failed
   requests. This view issues no network requests at all.
 
+### Follow-up 2: camera moved INSIDE the room (founder request, same session) -- CURRENT
+**This supersedes the orbit camera described in the notes above and in Follow-up 1.** The
+`R3D_FIT_X` / `R3D_FIT_Y` / bisection-fit machinery those notes describe is **gone**; read them
+as history. What remains true from them: the wall coordinate mappings, the fade ladder, the
+touch handling, and the lesson about sampling the diagonal.
+
+- **The camera now sits inside the room and turns in place**, instead of orbiting outside it.
+  Everything behind the eye is clipped against a near plane, which is what removes the back wall
+  -- **no fade or blur is applied to it, and none is needed**. (Worth noting the original spec
+  forbids blur outright: "Uses opacity, not blur." Clipping satisfies the founder's "blur out the
+  back wall" intent without violating that.)
+- **The eye is NOT at the exact geometric centre, and cannot be.** Measured: from the centre of a
+  14x12x10 room the front wall subtends **119% of the frame** -- it overflows, so the ceiling,
+  floor and side walls are not visible at all and the room loses all depth. The usable band is
+  z ~10-11 in a 12ft-deep room. `r3dEyeOffset()` therefore backs the eye off until the focused
+  wall fills ~2/3 of the frame (`R3D_WALL_FILL` 0.66), then **clamps so it always stays inside
+  the room** (`R3D_EYE_INSIDE` 0.88 of the largest offset that fits). It lands at z=10.82 of 12.
+  The offset is constant across yaw so the room does not breathe while panning, which is why the
+  clamp uses `min(W,D)/2` -- it has to stay inside for every wall, not just the front one.
+- **Surfaces are drawn as four independently clipped EDGES, never as a closed polygon.** Closing
+  a near-clipped polygon draws a spurious edge straight across the view along the near plane.
+  Panels, being filled, do use polygon clipping (Sutherland-Hodgman against the single plane).
+- **A wall is drawn iff part of it is in front of the eye** -- verified exactly across all 37
+  swept angles. **The tempting assertion "the wall opposite the focus is never drawn" is FALSE**
+  and was written and then withdrawn: past ~15 deg of turn a sliver of the wall behind genuinely
+  re-enters view at the frame edge, exactly as it would standing in a real room. It is faded by
+  the existing ladder (peaks at 0.315, the curve's value at 140 deg).
+- **Trade-off accepted, and it is inherent to an interior view:** you can no longer see all four
+  walls at once, and panels near the back of a side wall sit behind you at yaw 0 -- they are
+  reached by panning. In a long room (30ft wall seen from ~7ft away) a wall no longer fits the
+  frame at all. That is what being inside the room means; the orbit camera could show everything
+  precisely because it was outside.
+- FOV widened to **70** for the interior look; `R3D_NEAR` 0.35 ft.
+- **Verified in real Chromium, 35/35**, including: the eye inside the room at all 37 angles and
+  after a dimension change; back wall absent at the default view; exact draw-iff-in-front culling;
+  **zero NaN/Infinity and zero runaway (>1e6) coordinates** across the sweep, which is the failure
+  mode near-plane division invites; at most 4 sub-paths per surface (proving no spurious closing
+  edge); focused wall fully visible at 66% of frame height; the fade ladder; panel placement and
+  mirroring; panning, easing, clamps; ceiling panels; empty state; and mobile.
+
 ### Follow-up: closer framing (founder request, same session)
 - **The framing fit was silently broken and the request exposed it.** Asking for "bigger" and
   measuring the result showed raising the fill target made the room *smaller* (61% -> 56% of frame
