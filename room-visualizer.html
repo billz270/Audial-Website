@@ -183,6 +183,10 @@
   /* a panel carrying uploaded artwork keeps only its outline; the art sits underneath.
      pointer-events:all so the unfilled outline still hit-tests for the hover label. */
   .room3d-panel.has-art{fill:none;pointer-events:all}
+  /* DEV-45: the extruded sides of a panel. Filled with the panel's own finish so the wood
+     varnish / fabric wrap the customer chose is visible, but still stroked in ink so a
+     panel reads as a line-art object that happens to have material. */
+  .room3d-side{stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;cursor:pointer}
   .room3d-dim{fill:var(--ink);font-family:'Archivo',sans-serif;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase}
   .room3d-hint{
     position:absolute;left:10px;bottom:8px;z-index:2;pointer-events:none;
@@ -1077,7 +1081,8 @@ function loadRoomPlan(){
 const R3D = {
   svg:null, stage:null, tip:null,
   yaw:0, targetYaw:0,          // radians; 0 = facing front wall, + = turning right
-  eye:0, raf:null, dragging:false, dragX:0, dragYaw:0
+  eye:0, raf:null, dragging:false, dragX:0, dragYaw:0,
+  snapping:false               // a release-time wall snap is easing; see r3dSnapToWall
 };
 const R3D_FOV = 70 * Math.PI/180;     // wide-ish, as an interior view needs
 const R3D_NEAR = 0.35;                // ft; geometry closer than this is clipped away
@@ -1086,12 +1091,40 @@ const R3D_NEAR = 0.35;                // ft; geometry closer than this is clippe
    onto a wall makes the wall opposite it the new "back wall" and fade out of view.) */
 const R3D_SENS = 0.0055;              // radians per px of drag
 const R3D_EASE = 0.16;                // per-frame approach to targetYaw (smooth, not linear tracking)
+/* Release-time wall snap. 13 deg is wide enough that landing square on a wall takes no
+   care, and narrow enough that an angled view you chose on purpose is left alone. The
+   snap eases more gently than a drag settles, so it reads as the view coming to rest
+   rather than as a click into place. */
+const R3D_SNAP = 13 * Math.PI/180;
+/* Tuned in FRAMES, not milliseconds -- an exponential ease has no fixed duration, and a
+   headless browser does not run rAF at 60fps, so timing it there reports whatever the
+   harness felt like. Frames for a full 13 deg snap to close to within half a degree is
+   ln(0.5/13) / ln(1 - ease): at 0.13 that is ~23 frames, near enough 390ms on a 60Hz
+   display. 0.10 measured ~31 frames (about a second) and read as sluggish rather than
+   gentle; the drag's own 0.16 settles in ~19 and reads as a click into place. */
+const R3D_SNAP_EASE = 0.13;
 const R3D_WALL_FILL = 0.66;           // target: focused wall fills ~2/3 of the frame
 const R3D_EYE_INSIDE = 0.88;          // hard cap on how far back the eye may go, as a
                                       //   fraction of the largest offset that stays inside
 
 /* Wall facing angles, matching WALL_ORDER front->right->back->left clockwise. */
 const R3D_WALL_YAW = {front:0, right:Math.PI/2, back:Math.PI, left:-Math.PI/2};
+/* Panels are mounted ON the wall, so the quad r3dPanelQuad returns is the panel's BACK face
+   and the front face stands this far into the room. The real panel is 2.7in thick. */
+const R3D_PANEL_DEPTH = 2.7/12;       // ft
+/* Which way "into the room" points, per wall. */
+const R3D_WALL_NORMAL = {front:{x:0,y:0,z:1}, back:{x:0,y:0,z:-1}, left:{x:1,y:0,z:0}, right:{x:-1,y:0,z:0}};
+/* Local pixels per foot for the artwork's own coordinate space. The value is arbitrary:
+   artTransformParts is homogeneous in it, so the projection matrix divides it back out. */
+const R3D_ART_PPF = 100;
+/* Which quad corners are the panel's own top-left / top-right / bottom-left in EDITOR space.
+   r3dPanelQuad mirrors the back and left walls so panels land in the right place when you
+   face them, and that mirroring also swaps which vertex is the editor's left edge -- so the
+   artwork must read its axes from here rather than from a fixed corner order, or it renders
+   MIRROR-IMAGED on those two walls. (Measured: on back and left the local +x basis pointed
+   83px LEFT across a panel that should run right.) */
+const R3D_ART_CORNERS = {front:[3,2,0], right:[3,2,0], back:[2,3,1], left:[2,3,1], ceiling:[3,2,0]};
+
 
 function r3dRoom(){
   return {W:state.roomLength, H:state.roomHeight, D:state.roomWidth};
@@ -1222,6 +1255,81 @@ function r3dCeilingQuad(panel){
   return [{x:a,y:H,z:c},{x:b,y:H,z:c},{x:b,y:H,z:d},{x:a,y:H,z:d}];
 }
 
+/* --- Panel extrusion (DEV-45) -------------------------------------------------------
+   A placed panel is a box, not a decal: r3dPanelQuad gives the face flush against the wall,
+   and the visible front face stands R3D_PANEL_DEPTH into the room. */
+function r3dOffsetQuad(quad, nrm, dist){
+  return quad.map(function(q){
+    return {x:q.x + nrm.x*dist, y:q.y + nrm.y*dist, z:q.z + nrm.z*dist};
+  });
+}
+function r3dCentroid(pts){
+  let x = 0, y = 0, z = 0;
+  for(const p of pts){ x += p.x; y += p.y; z += p.z; }
+  return {x:x/pts.length, y:y/pts.length, z:z/pts.length};
+}
+/* The four quads joining the back face to the front face, each tagged with its outward
+   normal's orientation.
+
+   Facing is decided in WORLD space, not by projected winding: the outward normal is the
+   direction from the box centre to the face centre with the wall-normal component removed,
+   which is exact for a rectangular box and carries no winding-order assumption. A face is
+   drawn iff it turns toward the eye -- which is why a panel sitting to your left shows its
+   right-hand edge even when you are looking straight down the room. */
+function r3dSideFaces(back, front, nrm, eye){
+  const c = r3dCentroid(back.concat(front));
+  const faces = [];
+  for(let i = 0; i < 4; i++){
+    const quad = [back[i], back[(i+1)%4], front[(i+1)%4], front[i]];
+    const fc = r3dCentroid(quad);
+    let o = {x:fc.x-c.x, y:fc.y-c.y, z:fc.z-c.z};
+    const along = o.x*nrm.x + o.y*nrm.y + o.z*nrm.z;          // strip the wall-normal part
+    o = {x:o.x - nrm.x*along, y:o.y - nrm.y*along, z:o.z - nrm.z*along};
+    const len = Math.hypot(o.x, o.y, o.z);
+    if(len < 1e-9) continue;
+    o = {x:o.x/len, y:o.y/len, z:o.z/len};
+    const view = {x:fc.x-eye.x, y:fc.y-eye.y, z:fc.z-eye.z};
+    if(o.x*view.x + o.y*view.y + o.z*view.z >= 0) continue;   // turned away from the eye
+    faces.push({quad:quad, horizontal:Math.abs(o.y) > 0.5});
+  }
+  return faces;
+}
+/* The finish those faces are painted with. Placed panels snapshot woodVarnish/fabricWrap
+   (DEV-45); plans saved before that fall back to the cart item they came from, and a bare
+   panel placed from a size chip falls back to the configurator's own defaults.
+   Full wrap takes the fabric over the sides, so no wood shows at all. */
+function r3dPanelFinish(panel){
+  let varnish = panel.woodVarnish, wrap = panel.fabricWrap;
+  if((!varnish || !wrap) && panel.designedId !== null && panel.designedId !== undefined){
+    const src = (state.designedCart||[]).find(function(d){ return d.id === panel.designedId; });
+    if(src){ varnish = varnish || src.woodVarnish; wrap = wrap || src.fabricWrap; }
+  }
+  if(wrap === 'full')    return {face:'var(--wrap-black)', shade:'var(--wood-edge)'};
+  if(varnish === 'dark') return {face:'var(--wood-mid)',   shade:'var(--wood-dark)'};
+  return                        {face:'var(--wood)',       shade:'var(--wood-mid)'};
+}
+/* One panel, back-to-front: its visible side faces, then its artwork, then its front face.
+   Returns null when the front face is entirely behind the near plane. */
+function r3dPanelParts(panel, back, nrm, cam, vw, vh, focal, op, label, pid, wall){
+  const front = r3dOffsetQuad(back, nrm, R3D_PANEL_DEPTH);
+  const pts = r3dPanelPoints(front, cam, vw, vh, focal);
+  if(!pts) return null;
+  const fin = r3dPanelFinish(panel);
+  const out = [];
+  for(const f of r3dSideFaces(back, front, nrm, cam.pos)){
+    const sp = r3dPanelPoints(f.quad, cam, vw, vh, focal);
+    if(!sp) continue;
+    out.push('<polygon class="room3d-side" data-pid="'+pid+'" data-wall="'+wall+'" data-label="'+label+
+             '" data-face="'+(f.horizontal ? 'cap' : 'side')+'" points="'+sp+
+             '" fill="'+(f.horizontal ? fin.shade : fin.face)+'" opacity="'+op+'"/>');
+  }
+  const art = panel.image ? r3dPanelArt(panel, front, cam, vw, vh, focal, op, wall, pts) : '';
+  if(art) out.push(art);
+  out.push('<polygon class="room3d-panel'+(art?' has-art':'')+'" data-pid="'+pid+'" data-wall="'+wall+
+           '" data-label="'+label+'" points="'+pts+'" opacity="'+op+'"/>');
+  return out;
+}
+
 /* A surface is drawn as four independently clipped edges, never as a closed polygon:
    closing a near-clipped polygon would draw a spurious edge straight across the view
    along the near plane. */
@@ -1246,30 +1354,118 @@ function r3dPanelPoints(quad, cam, vw, vh, focal){
   }).join(' ');
 }
 
-/* Uploaded artwork, mapped onto the panel's projected quad.
-   SVG transforms are affine, so this maps the unit square through three corners
-   (top-left, top-right, bottom-left) rather than doing a true perspective warp -- the
-   residual skew is imperceptible at panel scale. Skipped entirely unless all four
-   corners are in front of the eye, because a corner behind the camera projects to a
-   meaningless coordinate and would smear the image across the view; such panels fall
-   back to the flat accent fill. */
-function r3dPanelArt(panel, quad, cam, vw, vh, focal, op){
-  const cpts = quad.map(function(q){ return r3dToCam(q, cam); });
-  if(cpts.some(function(c){ return c.d <= R3D_NEAR; })) return '';
-  const P = cpts.map(function(c){ return r3dProjCam(c, vw, vh, focal); });
-  const bl = P[0], tr = P[2], tl = P[3];          // quad order: bl, br, tr, tl
-  const m = [tr.x-tl.x, tr.y-tl.y, bl.x-tl.x, bl.y-tl.y, tl.x, tl.y]
-              .map(function(n){ return n.toFixed(4); }).join(' ');
-  const id = 'r3dart'+String(panel.id).replace(/[^A-Za-z0-9_-]/g,'');
-  /* The clip MUST sit on a wrapping <g>, not on the <image> itself: clip-path is resolved
-     in the element's own post-transform space, so putting it on the transformed <image>
-     runs the screen-space polygon through the matrix a second time and clips the art
-     away completely -- it renders as an empty outline. */
-  return '<clipPath id="'+id+'"><polygon points="'+
-           P.map(function(p){ return p.x.toFixed(1)+','+p.y.toFixed(1); }).join(' ')+'"/></clipPath>'+
-         '<g clip-path="url(#'+id+')"><image href="'+r3dEsc(panel.image)+'" '+
-           'x="0" y="0" width="1" height="1" preserveAspectRatio="none" '+
-           'transform="matrix('+m+')" opacity="'+op+'"/></g>';
+/* Uploaded artwork, mapped onto the panel's projected FRONT face.
+
+   The art is drawn in the panel's own local space (feet x R3D_ART_PPF) so that
+   artTransformParts -- the same maths the 2D wall and the design cards use -- reproduces the
+   exact crop the customer composed in the configurator. Before DEV-45 this drew the raw image
+   into a unit square, which threw away imagePosition/imageScale/rotate/flip entirely and
+   stretched the whole image over the panel.
+
+   THE PROJECTION IS A HOMOGRAPHY, AND AN SVG TRANSFORM CANNOT EXPRESS ONE. A wall seen at an
+   angle projects to a TRAPEZOID and an affine map can only produce a parallelogram, so mapping
+   the art through three corners twists it against the panel it sits on -- measured at 9% of
+   the panel diagonal and 5.8 degrees of edge twist at 30 deg of yaw, 19% and 12 deg at 60.
+   Slicing into affine strips was tried and REJECTED: it fixes the twist but cannot be made
+   continuous, because an affine map matches both vertical edges of a strip only if their
+   projected heights are equal, which perspective guarantees they are not. Every strip boundary
+   became a visible break in any straight line crossing it.
+
+   So the art is handed to the one engine that does perspective exactly: a CSS 3D transform.
+   The homography is packed into a matrix3d -- CSS performs the perspective divide after the
+   matrix, which is precisely what a homography needs -- and the whole thing is wrapped in a
+   foreignObject so it keeps its place in the SVG's painting order rather than floating above
+   it in a separate layer. The inner element is an <img> under an overflow:hidden box, the same
+   markup shape the 2D wall itself uses.
+
+   `pts` is the panel's already near-plane-clipped outline, and it is what bounds and clips the
+   art -- so a panel only PARTLY in front of the eye still shows the part you can see, instead
+   of dropping to a flat fill the moment one corner passes behind you. */
+function r3dPanelArt(panel, quad, cam, vw, vh, focal, op, wall, pts){
+  if(!pts) return '';
+  const t = artTransformParts(panel, panel.w * R3D_ART_PPF, panel.h * R3D_ART_PPF);
+  if(!t) return '';
+  const LW = panel.w * R3D_ART_PPF, LH = panel.h * R3D_ART_PPF;
+
+  const idx = R3D_ART_CORNERS[wall] || R3D_ART_CORNERS.front;
+  const TL = quad[idx[0]], TR = quad[idx[1]], BL = quad[idx[2]];
+
+  /* Bounds and clip come from the visible outline, not from the four corners: a corner behind
+     the eye has no meaningful projection. */
+  const P = pts.split(' ').map(function(s){
+    const xy = s.split(','); return {x:parseFloat(xy[0]), y:parseFloat(xy[1])};
+  });
+  if(P.length < 3 || P.some(function(p){ return !isFinite(p.x) || !isFinite(p.y); })) return '';
+  const pad = 2;
+  const x0 = Math.floor(Math.min.apply(null, P.map(function(p){ return p.x; }))) - pad;
+  const y0 = Math.floor(Math.min.apply(null, P.map(function(p){ return p.y; }))) - pad;
+  const fw = Math.ceil(Math.max.apply(null, P.map(function(p){ return p.x; }))) - x0 + pad;
+  const fh = Math.ceil(Math.max.apply(null, P.map(function(p){ return p.y; }))) - y0 + pad;
+  if(!(fw > 0 && fh > 0) || !isFinite(fw) || !isFinite(fh)) return '';
+
+  const H = r3dPlaneHomography(TL, TR, BL, cam, vw, vh, focal, x0, y0);
+  if(!H) return '';
+  /* Local space is 0..LW x 0..LH; the homography is in unit-square terms, so fold the scale in.
+     CSS matrix3d is column-major: columns are the coefficients of x, y, z and the constant. */
+  const m = [
+    H.Xu/LW, H.Yu/LW, 0, H.Wu/LW,
+    H.Xv/LH, H.Yv/LH, 0, H.Wv/LH,
+    0,       0,       1, 0,
+    H.X1,    H.Y1,    0, H.W1
+  ].map(function(v){ return v.toFixed(8); }).join(',');
+
+  const inner = t.useObjectFit
+    /* Designs saved without natural dimensions: cover-fit them, as the 2D wall does. */
+    ? '<img src="' + r3dEsc(panel.image) + '" alt="" style="position:absolute;inset:0;' +
+        'width:100%;height:100%;object-fit:cover"/>'
+    : '<img src="' + r3dEsc(panel.image) + '" alt="" style="position:absolute;top:0;left:0;width:' +
+        t.naturalW + 'px;height:' + t.naturalH + 'px;max-width:none;max-height:none;' +
+        'transform-origin:0 0;transform:translate(' + t.tx + 'px,' + t.ty + 'px) scale(' + t.zoom +
+        ') rotate(' + t.rotate + 'deg) scaleX(' + t.sx + ') scaleY(' + t.sy + ')"/>';
+
+  /* Clipping the foreignObject to the visible outline is what keeps a partly-behind-you panel
+     honest: the browser clips the transformed content at its own camera plane, which sits at
+     w=0 rather than at R3D_NEAR, so without this the art could spill a sliver past the panel
+     edge the SVG outline already stops at. Safe to put here: the foreignObject carries no
+     transform of its own (the matrix is on the div inside), so the clip resolves in SVG user
+     space, not in the transformed space. */
+  const cid = 'r3dclip' + String(panel.id).replace(/[^A-Za-z0-9_-]/g, '');
+  return '<clipPath id="' + cid + '"><polygon points="' + pts + '"/></clipPath>' +
+         '<foreignObject x="' + x0 + '" y="' + y0 + '" width="' + fw + '" height="' + fh +
+           '" clip-path="url(#' + cid + ')" opacity="' + op + '">' +
+         '<div xmlns="http://www.w3.org/1999/xhtml" style="position:absolute;top:0;left:0;width:' +
+           LW + 'px;height:' + LH + 'px;overflow:hidden;transform-origin:0 0;' +
+           'transform:matrix3d(' + m + ')">' + inner + '</div></foreignObject>';
+}
+
+/* The homography taking the panel's local (u,v) square to screen pixels, derived from the
+   PLANE rather than from four projected corners.
+
+   That distinction is the whole point. Camera-space cx, cy and depth are each affine in (u,v),
+   and screen x is (vw/2 * d + focal * cx) / d -- a ratio of two affine functions, i.e. exactly
+   a homography. Building it this way needs no corner to be in front of the eye, so a panel
+   crossing the near plane still maps correctly over the part of it you can see; deriving it
+   from projected corners instead would divide by a depth at or behind zero and produce
+   garbage, which is why the art used to be dropped entirely in that case.
+
+   Returned already offset by (ox, oy) so the caller's foreignObject origin is the pixel origin. */
+function r3dPlaneHomography(TL, TR, BL, cam, vw, vh, focal, ox, oy){
+  const U = {x:TR.x-TL.x, y:TR.y-TL.y, z:TR.z-TL.z};      // local +x edge
+  const V = {x:BL.x-TL.x, y:BL.y-TL.y, z:BL.z-TL.z};      // local +y edge
+  const O = {x:TL.x-cam.pos.x, y:TL.y-cam.pos.y, z:TL.z-cam.pos.z};
+  const dot = function(a, b){ return a.x*b.x + a.y*b.y + a.z*b.z; };
+  /* Depth (along forward) and screen-right, each affine in u and v. Up is world +y: pitch is
+     always zero, so camera-space cy is just the world y difference. */
+  const Wu = dot(U, cam.f), Wv = dot(V, cam.f), W1 = dot(O, cam.f);
+  const Ru = dot(U, cam.r), Rv = dot(V, cam.r), R1 = dot(O, cam.r);
+  const cx = vw/2, cy = vh/2;
+  const H = {
+    Xu: (cx - ox)*Wu + focal*Ru,  Xv: (cx - ox)*Wv + focal*Rv,  X1: (cx - ox)*W1 + focal*R1,
+    Yu: (cy - oy)*Wu - focal*U.y, Yv: (cy - oy)*Wv - focal*V.y, Y1: (cy - oy)*W1 - focal*O.y,
+    Wu: Wu, Wv: Wv, W1: W1
+  };
+  for(const k in H) if(!isFinite(H[k])) return null;
+  return H;
 }
 
 function r3dEsc(v){
@@ -1305,23 +1501,39 @@ function render3D(){
     if(d) parts.push('<path class="room3d-edge" data-surface="'+sf.key+'" d="'+d+'" opacity="'+sf.op.toFixed(3)+'"/>');
   }
 
-  /* Panels, each inheriting its wall's opacity, with uploaded artwork drawn onto them. */
+  /* Panels, each inheriting its wall's opacity, extruded off the wall with their artwork
+     on the front face. Collected first and drawn far-to-near: the side faces are opaque
+     fills, so unlike the old flat quads two panels can genuinely overlap and order matters. */
+  const drawn = [];
   for(const panel of state.panels){
     if(!R3D_WALL_YAW.hasOwnProperty(panel.wall)) continue;
-    const quad = r3dPanelQuad(panel);
-    const pts = r3dPanelPoints(quad, cam, vw, vh, focal);
-    if(!pts) continue;
-    const label = (panel.size || (panel.w+'×'+panel.h)) + ' · ' + WALL_LABELS[panel.wall];
-    const op = r3dOpacity(panel.wall).toFixed(3);
-    const art = panel.image ? r3dPanelArt(panel, quad, cam, vw, vh, focal, op) : '';
-    parts.push(art);
-    parts.push('<polygon class="room3d-panel'+(art?' has-art':'')+'" data-pid="'+r3dEsc(panel.id)+'" data-wall="'+panel.wall+'" data-label="'+r3dEsc(label)+'" points="'+pts+'" opacity="'+op+'"/>');
+    drawn.push({
+      panel: panel,
+      back:  r3dPanelQuad(panel),
+      nrm:   R3D_WALL_NORMAL[panel.wall],
+      op:    r3dOpacity(panel.wall),
+      wall:  panel.wall,
+      pid:   r3dEsc(panel.id),
+      label: r3dEsc((panel.size || (panel.w+'×'+panel.h)) + ' · ' + WALL_LABELS[panel.wall])
+    });
   }
   for(const panel of (state.ceilingPanels||[])){
-    const pts = r3dPanelPoints(r3dCeilingQuad(panel), cam, vw, vh, focal);
-    if(!pts) continue;
-    const label = (panel.size || (panel.w+'×'+panel.h)) + ' · Ceiling';
-    parts.push('<polygon class="room3d-panel" data-pid="c'+r3dEsc(panel.id)+'" data-wall="ceiling" data-label="'+r3dEsc(label)+'" points="'+pts+'" opacity="0.5"/>');
+    drawn.push({
+      panel: panel,
+      back:  r3dCeilingQuad(panel),
+      nrm:   {x:0, y:-1, z:0},                 // ceiling panels hang down into the room
+      op:    0.5,
+      wall:  'ceiling',
+      pid:   'c'+r3dEsc(panel.id),
+      label: r3dEsc((panel.size || (panel.w+'×'+panel.h)) + ' · Ceiling')
+    });
+  }
+  for(const item of drawn) item.depth = r3dToCam(r3dCentroid(item.back), cam).d;
+  drawn.sort(function(a, b){ return b.depth - a.depth; });
+  for(const item of drawn){
+    const built = r3dPanelParts(item.panel, item.back, item.nrm, cam, vw, vh, focal,
+                                item.op.toFixed(3), item.label, item.pid, item.wall);
+    if(built) parts.push.apply(parts, built);
   }
 
   /* Dimension labels on the focused wall: width along its base, height up its near edge.
@@ -1352,15 +1564,35 @@ function r3dTick(){
   const diff = R3D.targetYaw - R3D.yaw;
   if(Math.abs(diff) < 0.0004){
     R3D.yaw = R3D.targetYaw;
+    R3D.snapping = false;
     render3D();
     R3D.raf = null;
     return;
   }
-  R3D.yaw += diff * R3D_EASE;
+  R3D.yaw += diff * (R3D.snapping ? R3D_SNAP_EASE : R3D_EASE);
   render3D();
   R3D.raf = requestAnimationFrame(r3dTick);
 }
 function r3dAnimate(){ if(R3D.raf === null) R3D.raf = requestAnimationFrame(r3dTick); }
+
+/* Let go near a wall and the view eases the rest of the way to face it square.
+
+   Deliberately a RELEASE-time snap with a threshold, not a detent that pulls while you
+   drag: a detent fights the hand, and it makes deliberately parking at an off-axis angle
+   into work. Outside R3D_SNAP the view stays exactly where it was left.
+
+   The nearest wall is the nearest multiple of 90 deg rather than a lookup in R3D_WALL_YAW,
+   because yaw is unclamped -- a full turn is allowed, so this has to hold for a yaw of
+   -540 deg as readily as for one of 3. */
+function r3dSnapToWall(){
+  const quarter = Math.PI / 2;
+  const snapped = Math.round(R3D.targetYaw / quarter) * quarter;
+  const off = Math.abs(snapped - R3D.targetYaw);
+  if(off > R3D_SNAP || off < 1e-6) return;      // too far to snap, or already square
+  R3D.targetYaw = snapped;
+  R3D.snapping = true;
+  r3dAnimate();
+}
 
 function initRoom3D(){
   R3D.stage = $('room3dStage');
@@ -1370,7 +1602,11 @@ function initRoom3D(){
 
   R3D.stage.addEventListener('pointerdown', function(e){
     if(e.button !== undefined && e.button !== 0) return;
-    R3D.dragging = true; R3D.dragX = e.clientX; R3D.dragYaw = R3D.targetYaw;
+    /* Anchor the drag to what is actually on screen and abandon any snap still easing,
+       so grabbing the view mid-snap never jumps. */
+    R3D.snapping = false;
+    R3D.targetYaw = R3D.yaw;
+    R3D.dragging = true; R3D.dragX = e.clientX; R3D.dragYaw = R3D.yaw;
     R3D.stage.classList.add('dragging');
     if(R3D.tip) R3D.tip.classList.remove('on');
     try{ R3D.stage.setPointerCapture(e.pointerId); }catch(err){}
@@ -1383,7 +1619,7 @@ function initRoom3D(){
       r3dAnimate();
       return;
     }
-    const hit = e.target && e.target.closest ? e.target.closest('.room3d-panel') : null;
+    const hit = e.target && e.target.closest ? e.target.closest('.room3d-panel,.room3d-side') : null;
     if(hit && R3D.tip){
       const r = R3D.stage.getBoundingClientRect();
       R3D.tip.textContent = hit.getAttribute('data-label');
@@ -1397,6 +1633,7 @@ function initRoom3D(){
     R3D.dragging = false;
     R3D.stage.classList.remove('dragging');
     try{ R3D.stage.releasePointerCapture(e.pointerId); }catch(err){}
+    r3dSnapToWall();
   };
   R3D.stage.addEventListener('pointerup', endDrag);
   R3D.stage.addEventListener('pointercancel', endDrag);
@@ -2164,48 +2401,38 @@ document.addEventListener('keydown', e => {
 // Given a designed panel (with imagePosition, imageScale, flipH, flipV, rotate, savedPanelWidth, etc.)
 // and a target panel size in PIXELS, compute the CSS transform to apply to the <img> so the
 // composition matches what the user designed. Returns null if the panel has no transform data.
-function computeArtTransform(panel, targetW, targetH){
+/* The numeric core of the saved-design transform, shared by every renderer that draws a
+   customer's composition: the 2D wall, the design cards, and the 3D room view (DEV-45).
+   It returns raw numbers rather than a formatted string because each caller needs a
+   different syntax -- CSS wants `px` units and scaleX(), and SVG's transform attribute
+   accepts neither. Keeping the maths here is what stops the renderers drifting apart. */
+function artTransformParts(panel, targetW, targetH){
   if(!panel.image) return null;
   const naturalW = panel.imageNaturalWidth || 0;
   const naturalH = panel.imageNaturalHeight || 0;
-  if(naturalW === 0 || naturalH === 0){
-    // Old cart entry without natural dimensions — fall back to object-fit:cover (centered, fills panel)
-    return {transform:'none', useObjectFit:true};
-  }
-  // savedPanelWidth/Height should be present for new cart entries; if missing, derive a
-  // proxy from the panel's effective feet dimensions assuming the configurator's pxPerFt scale.
-  // For old entries we assume savedPanel had same aspect as targetPanel — so scale becomes 1.
+  // Old cart entry without natural dimensions — the caller should cover-fit instead.
+  if(naturalW === 0 || naturalH === 0) return {useObjectFit:true};
+  // savedPanelWidth/Height should be present for new cart entries; for old ones assume the
+  // saved panel had the same aspect as the target panel, so the scale below becomes 1.
   let savedW = panel.savedPanelWidth;
   let savedH = panel.savedPanelHeight;
-  if(!savedW || !savedH){
-    savedW = targetW;
-    savedH = targetH;
-  }
-  // CRITICAL: use a single uniform scale. We pick the AVERAGE of the two ratios to handle
-  // any pxPerFt non-uniformity in the wall display, then trust the panel's overflow:hidden
-  // to clip if needed. Falling back to targetW/savedW only would distort vertically when
-  // the wall has non-uniform pxPerFt.
-  const scaleX = targetW / savedW;
-  const scaleY = targetH / savedH;
-  // Use min(scaleX, scaleY) so the rendered art never appears LARGER than what fit in the
-  // configurator (prevents overflow on stretched walls). Then re-center.
-  const scale = Math.min(scaleX, scaleY);
-  const imgPos = panel.imagePosition || {x:0,y:0};
+  if(!savedW || !savedH){ savedW = targetW; savedH = targetH; }
+  // CRITICAL: a single uniform scale. min() so the art never renders LARGER than what fit
+  // in the configurator (which would overflow on a stretched wall); the margins re-centre.
+  const scale = Math.min(targetW / savedW, targetH / savedH);
+  const imgPos = panel.imagePosition || {x:0, y:0};
   const imgScale = panel.imageScale || 1;
-  // Effective image scale at target panel size
   const finalZoom = imgScale * scale;
-  // Re-center: account for any difference between scaleX and scaleY by adding margin
   const marginX = (targetW - savedW * scale) / 2;
   const marginY = (targetH - savedH * scale) / 2;
   const finalPosX = imgPos.x * scale + marginX;
   const finalPosY = imgPos.y * scale + marginY;
-  // Reproduce the same bounding-box correction the configurator uses
+  // Reproduce the same bounding-box correction the configurator uses, so rotation and
+  // flips keep the visible image inside the panel.
   const r = panel.rotate || 0;
-  const fh = panel.flipH || false;
-  const fv = panel.flipV || false;
+  const sx = panel.flipH ? -1 : 1, sy = panel.flipV ? -1 : 1;
   const rad = r * Math.PI / 180;
   const cos = Math.cos(rad), sin = Math.sin(rad);
-  const sx = fh ? -1 : 1, sy = fv ? -1 : 1;
   const corners = [[0,0],[naturalW,0],[0,naturalH],[naturalW,naturalH]];
   let minX = Infinity, minY = Infinity;
   corners.forEach(([x,y])=>{
@@ -2216,11 +2443,26 @@ function computeArtTransform(panel, targetW, targetH){
     if(szx<minX) minX = szx;
     if(szy<minY) minY = szy;
   });
-  const cssTx = finalPosX - minX;
-  const cssTy = finalPosY - minY;
   return {
-    transform: `translate(${cssTx}px, ${cssTy}px) scale(${finalZoom}) rotate(${r}deg) scaleX(${sx}) scaleY(${sy})`,
+    tx: finalPosX - minX,
+    ty: finalPosY - minY,
+    zoom: finalZoom,
+    rotate: r,
+    sx, sy,
     naturalW, naturalH,
+    useObjectFit: false
+  };
+}
+
+/* CSS formatting of the above, for the DOM-based renderers. */
+function computeArtTransform(panel, targetW, targetH){
+  const p = artTransformParts(panel, targetW, targetH);
+  if(!p) return null;
+  if(p.useObjectFit) return {transform:'none', useObjectFit:true};
+  return {
+    transform: `translate(${p.tx}px, ${p.ty}px) scale(${p.zoom}) rotate(${p.rotate}deg) scaleX(${p.sx}) scaleY(${p.sy})`,
+    naturalW: p.naturalW,
+    naturalH: p.naturalH,
     useObjectFit: false
   };
 }
@@ -2273,7 +2515,10 @@ function placePanelAt(clientX, clientY){
       flipV: designed.flipV,
       rotate: designed.rotate,
       savedPanelWidth: designed.savedPanelWidth,
-      savedPanelHeight: designed.savedPanelHeight
+      savedPanelHeight: designed.savedPanelHeight,
+      // DEV-45: the 3D view paints the panel's extruded sides with its real finish.
+      woodVarnish: designed.woodVarnish,
+      fabricWrap: designed.fabricWrap
     };
   } else {
     const sz = state.selectedSize;

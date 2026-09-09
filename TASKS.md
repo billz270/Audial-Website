@@ -2416,9 +2416,8 @@ Room dimensions, placed panels, and any future added elements must be stored in 
 ---
 
 ## Task #DEV-43: 3D Viewer Mode for Room Visualizer
-- **Status:** IN REVIEW -- built and self-verified, NOT signed off by the founder.
-  Known open item: the artwork glitch (see SESSION CHECKPOINT at the end of this file).
-  Do not mark DONE or deploy until the founder confirms it functions correctly.
+- **Status:** DONE -- signed off by the founder after reviewing the build locally.
+  Its one open item, the artwork glitch, is fixed in DEV-45. Not yet deployed.
 - **Priority:** HIGH
 - **File:** room-visualizer.html
 - **Depends on:** DEV-42 completion
@@ -2821,49 +2820,249 @@ Furniture stored in shared state:
 - Room templates
 - Saved room projects across sessions (beyond localStorage)
 
+
+---
+
+## Task #DEV-45: Correct Artwork, Panel Depth, and Wall Snap in the 3D Viewer
+- **Status:** DONE -- built, verified in Chromium and Firefox, signed off by the founder.
+  Not yet deployed.
+- **Priority:** HIGH
+- **File:** room-visualizer.html
+- **Depends on:** DEV-43 completion. Closes DEV-43's open artwork glitch.
+
+### Goal
+Make the 3D room view show what the customer actually designed, and give the panels enough
+physical presence to read as objects on a wall rather than decals printed on it.
+
+Three parts: the artwork must render with the exact crop composed in the configurator and
+follow the wall's perspective; panels must carry their real 2.7in depth with the wood varnish
+or fabric wrap the customer chose on the visible edges; and letting go of a pan near a wall
+should ease the view square to it.
+
+Since the website is live, all changes must be developed and tested locally, then deployed
+only after full functionality is confirmed.
+
+### Behavior Spec
+
+**Part 1 -- Artwork renders the customer's actual composition:**
+- The art on a placed panel reproduces the crop composed in the configurator: `imagePosition`,
+  `imageScale`, `rotate`, `flipH` and `flipV` all apply, scaled from `savedPanelWidth/Height`
+  to the panel's size on screen.
+- It must match the 2D wall exactly -- the same design must not look different between views.
+- The art must follow the wall's perspective, not shear against the panel it sits on.
+- It must not be mirrored on any wall.
+- A panel only partly in front of the viewer still shows the part that is visible.
+
+**Part 2 -- Panels have depth and their real finish:**
+- A placed panel stands 2.7in off its wall (the real panel thickness) instead of lying flat.
+- The visible side faces are filled with that panel's own finish: light or dark varnish, or
+  black fabric where the customer chose full wrap. A panel placed from a size chip, with no
+  design, falls back to the configurator's defaults (light / half).
+- Only faces genuinely turned toward the viewer are drawn, so a panel dead ahead at eye height
+  shows none, and one above eye level shows its underside.
+- Panels keep their wall's opacity so DEV-43's fade ladder still carries the depth reading.
+- Panels stay line-art objects: every face keeps its ink stroke.
+
+**Part 3 -- Wall snap:**
+- Releasing a pan within a small angle of a wall eases the view the rest of the way to face
+  that wall square.
+- Releasing outside that angle leaves the view exactly where it was left -- an angled view
+  chosen on purpose must survive.
+- The snap must be an easing settle, not a click into place, and grabbing the view while it is
+  snapping must cancel it without jumping.
+
+### Out of Scope (Do Not Implement)
+- Ceiling panel placement (DEV-44)
+- Furniture (DEV-44)
+- Changing the fade ladder, the wall coordinate mapping, or the interior camera model
+- Real wood textures on the panel edges (the pine JPEGs inside `Panels-web.glb`); flat tokens
+  are deliberate against a line-art room
+- Any change to the 2D viewer's behaviour
+
+### Acceptance Criteria
+- [x] A design's crop in 3D is numerically identical to the same design on the 2D wall
+- [x] Rotation and flips carry into 3D
+- [x] Art follows true perspective at every angle, with no shear against the panel
+- [x] Art is not mirrored on the back or left walls
+- [x] A panel crossing the near plane still shows the visible part of its art
+- [x] Panels stand 2.7in off the wall with correctly-chosen visible side faces
+- [x] Side faces show the panel's real varnish / wrap, with a sane default for bare panels
+- [x] Side faces inherit their wall's opacity
+- [x] Hovering the artwork still identifies the panel
+- [x] Releasing a pan within 13 deg of a wall snaps; outside it does not
+- [x] The snap eases and can be interrupted by grabbing the view
+- [x] The render loop still stops when the view settles
+- [x] No console errors beyond the pre-existing favicon 404
+- [x] The 2D viewer is unchanged
+
+### Implementation notes (DEV-45)
+
+**One source of transform maths, three renderers.** `computeArtTransform` did the maths *and*
+formatted a CSS string in one step, which is why the 3D renderer could not reuse it -- an SVG
+transform attribute takes no `px` units and has no `scaleX()`. It is now split: `artTransformParts`
+returns the raw numbers and `computeArtTransform` is a thin CSS formatter over it, byte-identical
+in output, so the 2D wall, the design cards and the thumbnails are untouched. CLAUDE.md's note
+that these renderers "should stay in sync" is now structural rather than a convention.
+
+**The bug was that the 3D view ignored every saved transform.** `r3dPanelArt` drew the raw image
+into a 1x1 unit square with `preserveAspectRatio="none"` and stretched it over the panel, so
+`imagePosition` / `imageScale` / `rotate` / `flipH` / `flipV` were all discarded. The founder
+described it exactly: "the entire image loads in the centre with some slight warping."
+
+**THE PROJECTION IS A HOMOGRAPHY AND AN SVG TRANSFORM CANNOT EXPRESS ONE.** This is the central
+finding. A wall seen at an angle projects to a trapezoid; an affine map can only make a
+parallelogram. Mapping the art through three corners therefore twists it against its own panel --
+**measured at 9% of the panel diagonal and 5.8 deg of edge twist at 30 deg of yaw, 19% and 12 deg
+at 60**. The comment inherited from DEV-43 calling this "imperceptible at panel scale" was wrong.
+
+**Affine strips were built, measured, and REJECTED -- do not retry.** Slicing the panel into
+vertical strips (correct axis: with zero pitch, depth is constant down a vertical line on a wall
+and varies only across it) cut the error to 0.65% at 30 deg. But it cannot be made continuous:
+an affine map matches both vertical edges of a strip only if their projected heights are equal,
+which perspective guarantees they never are. Every strip boundary became a visible break in any
+straight line crossing it -- invisible on a solid-colour test image, obvious the moment a grid
+was rendered. **Centring each strip's fit made it worse**, not better: it lowered peak error but
+spread the discontinuity across both edges instead of confining it to one. Continuity beats peak
+error for the eye.
+
+**The fix is a CSS 3D transform inside a foreignObject.** The homography is packed into a
+`matrix3d` -- CSS performs the perspective divide after the matrix, which is exactly what a
+homography needs -- inside a `foreignObject` so it keeps its place in the SVG's painting order
+instead of floating above it in a separate layer. The inner element is an `<img>` under an
+`overflow:hidden` box, the same markup shape the 2D wall already uses. **Result: worst error
+0.0004px at every angle out to 75 deg, versus 55px before.** Not "close" -- exact, because the
+projection of a plane *is* a homography.
+
+**It is also cheaper than what it replaced:** 24 SVG nodes instead of 256, ~1ms per `render3D()`
+on desktop (strips cost 5-9ms), and 7.8ms at 4x mobile CPU throttle (strips cost 15ms).
+
+**The homography is derived from the PLANE, not from four projected corners**, and that is what
+lets a panel crossing the near plane keep its artwork. Camera-space cx, cy and depth are each
+affine in the panel's local (u,v), and screen x is `(vw/2 * d + focal * cx) / d` -- a ratio of two
+affine functions, i.e. a homography. Built this way it needs no corner to be in front of the eye.
+**31 (angle, panel) pairs across a full turn straddle the near plane** and all now paint, with the
+mapping still exact (worst 0.0092px) over the visible part; previously all 31 dropped to a flat
+accent fill. Worth knowing: such panels are always at the extreme frame edge -- a panel straddling
+the near plane is beside your head -- so the visible gain is peripheral, not central.
+
+**Art was MIRRORED on the back and left walls, and this was a separate latent bug.** `r3dPanelQuad`
+mirrors those two walls so panels land in the right place when you face them, and that mirroring
+also swaps which vertex is the panel's own top-left. Measured: the local +x basis pointed 83px
+LEFT across a panel that should run right. `R3D_ART_CORNERS` now holds the per-wall corner order.
+The old stretched-image code hid this completely; correct crops would have made it obvious on any
+design with text or a face.
+
+**Panel depth is real geometry, not a shadow.** `r3dPanelQuad` now gives the panel's BACK face and
+the front stands `R3D_PANEL_DEPTH` (2.7in, the true thickness) into the room along the wall's
+inward normal. Side faces are chosen by **world-space facing, not projected winding**: the outward
+normal is the direction from box centre to face centre with the wall-normal component removed,
+which is exact for a rectangular box and carries no winding-order assumption. That is why a panel
+sitting to your left correctly shows its right-hand edge even when you are looking straight ahead.
+
+**Panels are depth-sorted now that side faces are opaque fills.** Before, art panels were
+`fill:none` and the view was pure x-ray, so draw order did not matter. It does now.
+
+**Finish resolution has three tiers**, because placed panels never snapshotted it: the panel's own
+`woodVarnish`/`fabricWrap` (added to `designedSnap` here), then a lookup by `designedId` in
+`state.designedCart` for plans saved before that, then the configurator's own light/half defaults.
+Full wrap paints the sides `--wrap-black`, since fabric covers the wood on a full-wrap panel.
+
+**The snap is a RELEASE-time snap with a threshold, deliberately not a detent.** A detent that
+pulls while you drag fights the hand and makes parking at an off-axis angle into work. 13 deg is
+wide enough that landing square takes no care and narrow enough to leave a deliberate angle alone.
+The nearest wall is the nearest multiple of 90 deg rather than a lookup in `R3D_WALL_YAW`, because
+yaw is unclamped -- it has to hold at -445 deg as readily as at 3 deg (verified).
+
+**Snap easing was tuned in FRAMES, not milliseconds, and the first attempt was wrong.** An
+exponential ease has no fixed duration, and **a headless browser does not run rAF at 60fps**, so
+timing it there measures the harness. The first measurement reported "476ms" for what was actually
+59 frames -- nearly a second on a real display, and sluggish. `R3D_SNAP_EASE` 0.13 is visually
+complete in 22 frames (~370ms at 60Hz); the drag's own 0.16 reads as a click into place.
+
+**A drag now anchors to the visible yaw, not the target yaw.** It used to anchor to `targetYaw`,
+so grabbing the view mid-ease jumped. Latent before; the snap makes an ease in flight common.
+
+**Traps hit, all of which produced confident wrong answers:**
+- **`clip-path` resolves in the element's own post-transform space.** The clip `<g>` and the
+  transform `<g>` must stay separate nested elements or the art clips itself away entirely.
+- **Digit runs inside artwork data URIs are not coordinates.** A NaN/runaway-coordinate scan
+  reported 197 failures that were all `%23111111` and friends inside an `href`. Strip `href`
+  and `src` before scanning. This is the second time this trap has appeared in a different guise.
+- **Puppeteer element screenshots resize the viewport**, which leaves a then-hidden view pane
+  measuring zero and its panels unrendered. This reads exactly like a regression in the 2D view
+  after switching back from 3D. It is not: the real 2D -> 3D -> 2D flow keeps every panel,
+  verified on both this build and the committed baseline.
+- **Reading state from outside the page races input events.** A touch-snap test reported releasing
+  at 70 deg and snapping 20 deg -- outside the threshold, apparently a bug. Instrumented from
+  inside, the snap was handed 84 deg, correctly 6 deg out. Instrument, do not sample.
+- **A solid-colour test image cannot reveal a geometry bug.** The strip seams were invisible until
+  a grid with straight lines was rendered. Test fixtures need structure that the artifact would
+  disturb.
+
+**Verified in real Chromium and real Firefox** (3D transforms inside `foreignObject` are
+historically a Firefox weak spot; they render identically, same computed matrix, same geometry).
+32 checks on the main suite, 18 on the snap, 3 on the near-plane case, all green, no console errors
+beyond the pre-existing favicon 404.
+
+**Cosmetic, left alone:** at wide yaw the room stretches toward the frame edges. That is wide-angle
+distortion from `R3D_FOV` 70, which DEV-43 chose deliberately when the camera moved inside the
+room -- a narrower lens cannot see the side walls, ceiling and floor at once from in there.
+Measured at 35 deg of yaw: the focused wall fills 82.8% of frame width at 55 deg of FOV, 71.7% at
+62, 64.2% at 70. Narrowing it trades peripheral awareness for less edge stretch.
+
 ---
 
 # SESSION CHECKPOINT -- 2026-09-09 (end of session)
 
+## NEXT SESSION: start DEV-44 (floor plan view, edit mode, furniture)
+The room-visualizer arc is DEV-42 -> DEV-43 -> DEV-44. The first two are finished and signed
+off; DEV-44 is untouched and is the whole of the next session.
+
 ## Where things stand
 - **DEV-42 DONE** (`549c299`) -- view-mode rail (2D / 3D / Plan) in the room visualizer.
-- **DEV-43 IN REVIEW** (`2d80045`, `68af2bb`, `cd34151`, `0b747cd`) -- 3D line-art room view,
-  through four rounds of founder feedback. **Built and self-verified, but NOT signed off** --
-  the artwork glitch below is open and the founder wants to confirm it functions well first. Read its notes bottom-up: the **Follow-up 3** section is
-  current, Follow-up 2 supersedes the orbit camera, Follow-up 1 is history.
-- **DEV-44 NOT STARTED** -- floor plan view, edit mode, 7 furniture types. Untouched.
-- Working tree clean. **Nothing deployed to Vercel this session** (all three tasks require
-  local sign-off first). Commits are local only; `origin` has not been pushed.
+- **DEV-43 DONE** -- 3D line-art room view, through four rounds of founder feedback. Signed off
+  after local review. Read its notes **bottom-up**: Follow-up 3 is current, Follow-up 2
+  supersedes the orbit camera entirely, Follow-up 1 is history.
+- **DEV-45 DONE** -- correct artwork, 2.7in panel depth with the real finish, 13 deg wall snap.
+  Closes DEV-43's artwork glitch. Verified in Chromium and Firefox.
+- **DEV-44 NOT STARTED.**
 
-## PICK UP HERE: artwork glitch in the 3D viewer (open, undiagnosed)
-Founder reported "a bit of a glitch in the artwork" at the end of the session and did not
-describe it further. **Ask what they're seeing before changing anything.** Ranked hypotheses:
+## NOT COMMITTED, NOT DEPLOYED
+`room-visualizer.html` and `TASKS.md` are dirty in the working tree, and `master` is 13 commits
+ahead of `origin`. The founder's plan is to commit, push and deploy to Vercel only once DEV-44
+lands, so **do not commit, push or deploy without asking** -- but equally, be aware that
+everything from this session exists only in the working tree.
 
-1. **MOST LIKELY -- the 3D view ignores every saved image transform.** `r3dPanelArt()` stretches
-   the raw `panel.image` to fill the panel quad with `preserveAspectRatio="none"`. But the cart
-   data model carries `imagePosition {x,y}`, `imageScale`, `rotate`, `flipH`, `flipV`,
-   `imageNaturalWidth/Height` and `savedPanelWidth/Height`, and the visualizer already has
-   **`computeArtTransform(panel, targetW, targetH)`** which reproduces the configurator's crop
-   at a different size. **None of it is applied in 3D.** So a design that was zoomed, panned,
-   rotated or flipped will render stretched and uncropped -- visibly wrong versus what was
-   designed. Fix = drive the `<image>` from `computeArtTransform` rather than filling the quad.
-   See CLAUDE.md "Critical functions" for the contract, and note its warning that the
-   configurator's `renderCartCardPreview` and the visualizer's `computeArtTransform` are meant
-   to stay in sync -- a third renderer now exists and should join that rule.
-2. Affine-vs-perspective skew. SVG transforms are affine, so the art is mapped through three
-   projected corners. On a side wall at a steep angle the error grows and the image can look
-   sheared. Would need the quad split into triangles, or a CSS 3D layer instead of SVG.
-3. `preserveAspectRatio="none"` stretches a non-matching aspect; the configurator cover-fits.
-4. Panels with a corner behind the eye fall back to the flat accent fill, so art can pop in and
-   out while panning. Deliberate (that corner has no valid projection) but may read as a bug.
+## What DEV-44 inherits for free (and what to check)
+- **`state.ceilingPanels` is already read and drawn** by the 3D view: `r3dCeilingQuad` feeds the
+  same extrusion path as wall panels, with a downward normal, so ceiling panels get depth and
+  finish the moment DEV-44 can place one.
+- **It has never been rendered with real data.** Nothing can place a ceiling panel yet, so this
+  path is asserted but unseen. Two specific things to verify the first time one exists:
+  1. `R3D_ART_CORNERS.ceiling` is `[3,2,0]`, copied from the front wall and **unverified**.
+     Artwork on the back and left walls turned out to be mirrored for exactly this reason
+     (see DEV-45 notes) -- check the ceiling's handedness before trusting it.
+  2. Ceiling panels currently hold a fixed 0.5 opacity, matching the ceiling surface.
+- The 2D wall's `computeArtTransform` and the 3D view's renderer now share one numeric core,
+  `artTransformParts`. **A floor-plan renderer that draws artwork should use it too** rather
+  than starting a fourth copy of the maths.
 
-## Two things the founder overrode in the DEV-43 spec -- do not "fix" them back
+## Open, deliberately not done
+- **Wide-angle stretch at the frame edges.** `R3D_FOV` is 70. Measured at 35 deg of yaw the
+  focused wall fills 82.8% of frame width at FOV 55, 71.7% at 62, 64.2% at 70. Comparison
+  renders were shown to the founder; no decision taken. One constant, `room-visualizer.html`.
+- **Mobile at 6x CPU throttle** drags at roughly 56fps. Fine at 4x (128fps). Not acted on.
+- **The cover-fit fallback** for carts saved before DEV-37 is asserted but never looked at.
+
+## Things the founder overrode -- do not "fix" them back
 - **No +-90 yaw clamp.** Rotation is unlimited so any wall, back wall included, can be faced.
 - **Active rail button is `--accent`**, which contradicts CLAUDE.md's "selection states -> --ink".
+- **Panels are no longer pure x-ray.** Side faces are opaque fills at full opacity, so panels on
+  the focused wall genuinely occlude. Accepted as an improvement over DEV-43's see-through look.
 
-## The habit that mattered most this session
-**Three separate bugs passed every automated check and were caught only by looking at a
-screenshot**: the `<nav>` cascade spreading the rail buttons down the whole column; the room
-overflowing the frame at 45 deg because the fit sampled 0/30/60/90; and panels rendering as
-empty outlines while the suite happily confirmed the `<image>` nodes existed. **Asserting a node
-exists is not proof it paints. Screenshot every visual change before believing the tests.**
+## The habit that keeps paying
+**Every real defect across DEV-43 and DEV-45 was caught by looking at a rendered image, never by
+a passing assertion.** Affine strip seams passed 32 green checks and were obvious the instant a
+grid was rendered instead of a solid colour; before that, panels rendered as empty outlines while
+the suite happily confirmed the nodes existed. Green tests plus a featureless fixture prove almost
+nothing about geometry -- **render something with structure in it and look at the pixels.**
