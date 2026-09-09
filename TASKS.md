@@ -2636,7 +2636,8 @@ state and mobile), then 13/13 over a full 360 turn. Only the pre-existing favico
 ---
 
 ## Task #DEV-44: Floor Plan View (Top-Down, Display Only)
-- **Status:** TODO
+- **Status:** IN REVIEW -- built and verified in Chromium (27 checks), screenshots reviewed.
+  Awaiting founder sign-off on localhost. Not yet deployed.
 - **Priority:** HIGH
 - **File:** room-visualizer.html
 - **Depends on:** DEV-43 / DEV-45 completion
@@ -2949,74 +2950,233 @@ Measured at 35 deg of yaw: the focused wall fills 82.8% of frame width at 55 deg
 ---
 
 ## Task #DEV-46: Ceiling Panel Placement
-- **Status:** TODO
+- **Status:** TODO -- specced, awaiting founder review
 - **Priority:** MEDIUM
 - **File:** room-visualizer.html
-- **Depends on:** DEV-44 (the Floor Plan must exist to show and later rearrange them)
+- **Depends on:** DEV-44 (the Floor Plan must exist to show and rearrange them)
 
 ### Goal
-Give ceiling panels a way to be created, and let the Floor Plan rearrange them.
+Give ceiling panels a way to be created, shown, and moved.
 
 Ceiling clouds are a real acoustic product, and **the 3D rendering path for them is already
 built and has never once run.** `render3D` already loops `state.ceilingPanels` through
 `r3dCeilingQuad` with a downward normal, the DEV-45 extrusion, the depth sort and the artwork
 pipeline. Nothing anywhere can create one, so it is dead code today.
 
-### Approach (agreed 2026-09-09, not yet specced in detail)
-**Ceiling becomes a fifth surface in the 2D view**, alongside Front / Back / Left / Right in the
-wall thumbnails. This holds the DEV-44 view model exactly: you place it in 2D, you rearrange it in
-the Plan, you see it in 3D. It reuses `placePanelAt`, the size chips, designed panels, pricing and
-the marquee/snap tooling wholesale -- a ceiling is just a surface whose dimensions are
-`roomLength x roomWidth` instead of `wallWidth x wallHeight`.
+### Decisions taken (yours to confirm)
 
-### Known traps to carry in
-- **`R3D_ART_CORNERS.ceiling` is an unverified copy of the front wall's corner order.** The back
-  and left walls turned out mirrored for exactly this reason (DEV-45). The first real ceiling panel
-  is the moment to check its handedness, by screenshot.
-- **The designed-panel quantity cap counts `state.panels.filter(...)`.** If ceiling panels live in
-  their own array, that cap silently breaks -- placing on the ceiling would not count against the
-  quantity bought. Decide deliberately whether ceiling panels share `state.panels` (with
-  `wall:'ceiling'`) or get their own array, and fix the counting either way.
-- **`saveRoomPlan()` persists only `{room, panels}`.** Ceiling panels need adding there and a
-  back-compat path in `loadRoomPlan()`, the way DEV-45 handled plans saved before its snapshot fields.
+**1. Ceiling panels live in `state.panels` as `wall:'ceiling'` -- NOT in a separate array.**
 
-### To spec before building
-- Whether ceiling panels join `state.panels` as `wall:'ceiling'` or a separate `state.ceilingPanels`
-- Whether the Floor Plan gains dragging in this task or in DEV-47
-- How a ceiling surface reads in the 2D view (it is a plan, not an elevation -- it may want the
-  Floor Plan's own renderer rather than the wall surface)
+The existing 3D loop reads a separate `state.ceilingPanels`, so this means changing that loop.
+Do it anyway. Every piece of cross-cutting machinery in this file already runs on `state.panels`:
+the designed-panel quantity cap (`state.panels.filter(p => p.designedId === id).length`),
+`saveRoomPlan()`, `loadRoomPlan()`, the stats/area totals, Clear All Panels, and the checkout
+subtotal. A second array means bridging *every one* of those, and each bridge is a place to
+silently forget one -- the quantity cap especially, where forgetting means a customer places a
+panel on the ceiling and it never counts against the quantity they bought.
+
+The two shapes are already uniform, which is what makes this cheap: a wall panel's `(x, y)` is a
+position on its wall surface, and a ceiling panel's `(x, y)` is a position on the ceiling surface.
+Same idea, different surface. `r3dPanelQuad` gains a `ceiling` case returning the horizontal quad
+at `y = H` (i.e. what `r3dCeilingQuad` returns today), and `r3dCeilingQuad` is deleted.
+
+**2. The ceiling is a fifth surface in the 2D view, using the existing `.wall-surface-big`.**
+
+Sized `roomLength x roomWidth` instead of `wallWidth x wallHeight`. This holds the DEV-44 view
+model exactly -- created in 2D, rearranged in the Plan, seen in 3D -- and reuses `placePanelAt`,
+the size chips, designed panels, pricing, marquee select, snapping and the alignment arrows
+wholesale, because to all of them a surface is just a rectangle with dimensions.
+
+It needs an orientation hint that walls don't: looking at a ceiling top-down, the viewer has to be
+told which edge is the front of the room. Label the four edges of the ceiling surface.
+
+**3. The Floor Plan's drag mechanism is built HERE, with ceiling panels as its first client.**
+
+DEV-44 was deliberately display-only because a wall panel is only half-editable from above.
+A ceiling panel is the first element fully described by an `(x, y)` on the floor plane, so it is
+the first thing the plan can honestly edit. Building the generic drag here means DEV-47 only has
+to register furniture with a mechanism that already works, rather than inventing one inside an
+already-large task.
+
+Wall panels stay display-only in the plan. That does not change.
+
+### Behavior Spec
+
+**Part 1 -- Ceiling as a surface in 2D**
+- A fifth entry alongside Front / Back / Left / Right in the wall thumbnail strip, labelled Ceiling
+- Selecting it sizes `.wall-surface-big` to `roomLength x roomWidth` and sets `data-wall="ceiling"`
+- Placement, marquee select, drag, snap, alignment arrows and delete all work as they do on a wall
+- The four edges are labelled (Front / Back / Left / Right of room) so the top-down read is never
+  left to assumption
+- The thumbnail shows a ceiling panel count like the wall thumbnails do
+
+**Part 2 -- Ceiling panels in the Floor Plan**
+- Drawn as rectangles INSIDE the room outline, at their `(x, y)`, distinguishable from the wall
+  panels sitting on the edges (they are a different plane, and should not read as the same object)
+- Draggable within the room bounds, clamped so a panel cannot leave the room
+- Live dimension readout during the drag, matching the existing wall-resize readout idiom
+- The drag mechanism is written generically -- it moves *an object with x/y/w/h in floor-plane
+  feet*, so DEV-47's furniture is a registration, not a rewrite
+
+**Part 3 -- 3D**
+- Already built. Once `r3dPanelQuad` handles `ceiling`, the existing loop draws them with depth,
+  finish and artwork for free.
+- **Verify `R3D_ART_CORNERS.ceiling` the first time a real ceiling panel carries artwork.** It is
+  an unverified copy of the front wall's corner order, and this is precisely how the back and left
+  walls came to be mirrored (DEV-45). Verify by screenshot with a deliberately asymmetric image,
+  not by assertion.
+
+**Part 4 -- Persistence**
+- Because ceiling panels are in `state.panels`, `saveRoomPlan()` and `loadRoomPlan()` carry them
+  with no change. Confirm this rather than assume it.
+- Plans saved before this task contain no ceiling panels, so there is nothing to migrate.
+
+### Traps carried in
+- **The quantity cap counts `state.panels`.** This is the whole reason for decision 1. If you
+  override that decision and use a separate array, fix the cap in the same change.
+- **`r3dCeilingQuad` currently takes `(x, y)` as floor-plane coordinates** -- confirm the ceiling
+  surface in 2D writes them in the same orientation, or ceiling panels will place mirrored.
+- **A plan renderer that draws artwork must use `artTransformParts`**, not a fourth copy of the
+  image-transform maths (DEV-45). Only relevant if ceiling panels show their art in the plan --
+  they are seen from behind up there, so the default is that they do not.
+
+### Acceptance Criteria
+- [ ] Ceiling appears as a fifth surface in the 2D wall thumbnails
+- [ ] Selecting it shows a `roomLength x roomWidth` surface with its four edges labelled
+- [ ] Panels can be placed on it using both a size chip and a designed panel
+- [ ] Designed-panel quantity cap counts ceiling placements against the quantity bought
+- [ ] Marquee select, drag, delete and Clear All Panels all work on ceiling panels
+- [ ] Ceiling panels appear in the Floor Plan inside the room, visually distinct from wall panels
+- [ ] Ceiling panels drag in the plan, clamped to the room, with a live readout
+- [ ] Wall panels remain non-draggable in the plan
+- [ ] Ceiling panels appear in the 3D view with depth and finish
+- [ ] **Ceiling artwork handedness verified by screenshot with an asymmetric image**
+- [ ] Ceiling panels survive save/reload and a 2D -> 3D -> Plan round trip
+- [ ] Stats and checkout subtotal include ceiling panels
+- [ ] Works at 1440x900 and 390x844; no console errors beyond the known favicon 404
+
+### Out of Scope
+- Furniture of any kind (DEV-47)
+- Dragging wall panels in the plan
+- Rotating ceiling panels
+- Zoom or pan of the plan
+- Any suggestion of where ceiling panels *should* go acoustically
 
 ---
 
 ## Task #DEV-47: Furniture + Edit Mode
-- **Status:** TODO
+- **Status:** TODO -- specced, awaiting founder review
 - **Priority:** MEDIUM
 - **File:** room-visualizer.html
-- **Depends on:** DEV-44 (the Floor Plan is where furniture lives)
+- **Depends on:** DEV-44, and DEV-46 for the plan's drag mechanism
 
 ### Goal
-Place furniture in the room so the listening space reads as a room rather than a set of bare walls,
-and so panel placement can eventually be judged against where people and speakers actually are.
+Place furniture in the room so the listening space reads as a room rather than a set of bare
+walls, and so panel placement can be judged against where people and speakers actually are.
 
-Carried forward from the original DEV-44 spec: an **Edit Mode** toggle in the sidebar that gates a
-furniture picker, and seven types -- **Window** and **Door** (wall-edge, snap to a wall) plus
-**Desk, Chair, Speakers, Bed, Couch** (floor elements). Drag to reposition, edge handles to resize,
-live dimension readout, hover delete. Pure line art, axis-aligned, no rotation.
+Seven types, carried forward from the original DEV-44 spec: **Window** and **Door** (wall-edge,
+snap to a wall) plus **Desk, Chair, Speakers, Bed, Couch** (floor elements). Pure line art,
+axis-aligned, no rotation.
 
-### Known traps to carry in
-- **Furniture in 3D is not free.** The room reads as x-ray line art with no occlusion culling, but
-  DEV-45 made panels *opaque* depth-sorted boxes. Furniture standing in the middle of the room lands
-  in the middle of that sort and has to be reasoned about, not just appended.
-- **"Windows/doors as wall cutouts" in 3D is under-specified.** A cutout means subtracting from a
-  wall surface that is currently drawn as four independently clipped *edges*, never a closed polygon
-  (closing a near-clipped polygon draws a spurious edge across the view -- DEV-43). Decide what a
-  window actually looks like in the 3D view before building it.
-- **A floor-plan renderer that draws artwork must use `artTransformParts`**, not start a fourth copy
-  of the image-transform maths (DEV-45).
-- Furniture state must stay independent of panel data; do not conflate the two arrays.
+### Decisions taken (yours to confirm)
 
-### To spec before building
-- The full Edit Mode interaction, and whether it gates panel editing too (original spec said no)
-- What furniture looks like in the 3D view, given the trap above
-- Whether windows/doors appear in the 2D wall diagrams, and how
-- Where the Edit Mode toggle sits, given the view rail goes horizontal below 900px
+**1. Furniture is created from the SIDEBAR, and positioned in the Plan.**
+
+This is worth flagging because it bends the DEV-44 rule that nothing is created in the Plan.
+Furniture is the one element with no 2D home -- there is no wall it belongs to. The nearest
+honest reading of the existing model: a size chip in the sidebar *arms* a panel and the surface
+*places* it. So a furniture type in the sidebar arms a piece of furniture, and it lands in the
+room centre for you to drag. The creating act is a sidebar click, not a plan click. **The rule
+becomes "the Plan positions, it does not originate" rather than "nothing is created here".**
+
+**2. Recommend DROPPING the Edit Mode toggle.**
+
+The original spec had furniture editable only inside an Edit Mode, to stop accidental drags.
+Under the view model we settled on, the Plan's entire purpose is rearranging what exists -- so a
+mode gating editing in the editing view is a toggle protecting you from the thing you opened the
+view to do. The furniture picker can simply live in the sidebar and show only while the Plan is
+active. Fewer states, one less thing to explain.
+
+Keep it only if you want the Plan to have a safe "just looking" state. **Say so in review and it
+goes back in** -- it is a small addition, but a hard one to remove later once it is habitual.
+
+**3. Furniture in 3D is line-art boxes with NO fill.**
+
+DEV-45 made panels opaque, depth-sorted boxes. Filling furniture the same way would put large
+solid objects in the middle of the room and start occluding the walls and panels behind them --
+destroying the x-ray read that DEV-43 chose deliberately ("no occlusion culling, deliberately --
+the x-ray read is what line-art + opacity fading produces"). Unfilled boxes still depth-sort
+correctly for edge ordering but let the room stay legible through them.
+
+**4. Windows and doors are NOT cutouts in 3D.**
+
+The original spec said "wall cutouts or marked areas". Reject cutouts. A cutout means subtracting
+from a wall that DEV-43 draws as **four independently clipped edges, never a closed polygon** --
+closing a near-clipped polygon draws a spurious edge straight across the view. Reworking that to
+support boolean subtraction is a large change to the riskiest code in the file, for a decorative
+gain. Instead: draw them as line-art rectangles on the wall plane at zero depth, using the panel
+quad machinery -- a window as a double-stroked rectangle, a door as a rectangle with a swing arc.
+
+### Behavior Spec
+
+**Part 1 -- The picker**
+- A sidebar section listing the seven types, visible only while the Plan view is active
+- Clicking a type adds one at the room centre, at its default size, already selected
+- Defaults in feet: Window 4x3 (wall), Door 3x7 (wall), Desk 4x2, Chair 2x2, Speakers 1x1 (added
+  as a pair), Bed 6x5, Couch 6x3
+- Note Window and Door defaults are `width x HEIGHT` -- their footprint depth on the plan is
+  nominal, since a window has no floor area
+
+**Part 2 -- Interaction in the Plan** (reusing DEV-46's drag mechanism)
+- Drag from the middle to reposition, clamped inside the room
+- Drag from an edge handle to resize; handles appear on hover
+- Live dimension readout during drag and resize
+- Delete via a small x on hover
+- Wall-edge elements (Window, Door) snap to the nearest wall and then slide only along it
+- Floor elements cannot be dropped onto a wall edge
+
+**Part 3 -- Visual style**
+- Pure line art in `--ink`, 1.5px, `vector-effect:non-scaling-stroke` (the plan's viewBox is in
+  feet -- a bare stroke-width of 1.5 means one and a half FEET)
+- A short uppercase type label inside each footprint
+- Windows dashed; doors drawn with a swing arc
+
+**Part 4 -- Other views**
+- **3D:** unfilled line-art boxes at sensible heights, depth-sorted (see decision 3); windows and
+  doors flat on their wall plane (decision 4)
+- **2D:** windows and doors appear on the wall diagram they belong to, as a distinct symbol, so
+  you can see what you are placing panels around. Floor furniture does NOT appear in 2D.
+
+**Part 5 -- State**
+- `state.furniture: [{id, type, x, y, w, h, wall, rotation:0}]`, kept **separate from
+  `state.panels`** -- unlike ceiling panels, furniture shares none of the panel machinery
+  (no price, no quantity cap, no artwork, not in the checkout subtotal)
+- Persisted in `acousticRoomPlan` alongside `panels`
+- `loadRoomPlan()` must tolerate plans saved before this task, which have no `furniture` key --
+  the same back-compat shape DEV-45 used for `woodVarnish`/`fabricWrap`
+
+### Acceptance Criteria
+- [ ] Furniture picker appears in the sidebar while the Plan view is active
+- [ ] All seven types can be added, at their default sizes
+- [ ] Speakers add as a pair
+- [ ] Furniture drags to reposition, clamped inside the room
+- [ ] Furniture resizes via edge handles, with a live dimension readout
+- [ ] Delete on hover removes a piece
+- [ ] Windows and doors snap to a wall and slide only along it
+- [ ] Floor furniture cannot be placed on a wall edge
+- [ ] Furniture appears in 3D as unfilled line-art boxes without occluding the room
+- [ ] Windows and doors appear in the 2D wall diagrams; floor furniture does not
+- [ ] Furniture persists to localStorage and survives reload
+- [ ] A room plan saved before this task still loads
+- [ ] Panel data and furniture data stay independent -- furniture never reaches the checkout total
+- [ ] All line work `--ink` 1.5px with non-scaling-stroke
+- [ ] Works at 1440x900 and 390x844; no console errors beyond the known favicon 404
+
+### Out of Scope
+- Furniture rotation (everything axis-aligned)
+- Furniture presets or bundles ("add a home studio")
+- Multiple styles per type
+- Speaker sound cones, ear-height indicators, first-reflection-point maths
+- Advanced 3D furniture models
+- Room templates
+- Saved room projects beyond localStorage
