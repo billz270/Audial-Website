@@ -214,6 +214,35 @@
   }
   .room3d-tip.on{opacity:1}
 
+  /* ---- DEV-44: floor plan (top-down, display only) ---- */
+  .fp-stage{
+    position:relative;flex:1;min-height:380px;max-height:min(70vh,640px);
+    border:1.5px solid var(--ink);background:var(--paper);
+    overflow:hidden;
+  }
+  .fp-svg{display:block;width:100%;height:100%}
+  /* The viewBox is in FEET, so every stroke needs non-scaling-stroke -- a bare
+     stroke-width:1.5 would otherwise mean one and a half FEET. */
+  .fp-room{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+  .fp-grid{fill:none;stroke:var(--ink);stroke-width:1;opacity:0.10;vector-effect:non-scaling-stroke}
+  .fp-panel{fill:var(--accent);stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;cursor:pointer}
+  .fp-txt{font-family:'Archivo',sans-serif;font-weight:700;text-transform:uppercase;
+    letter-spacing:0.12em;text-anchor:middle;dominant-baseline:middle;fill:var(--ink)}
+  .fp-txt.mute{fill:var(--mute)}
+  .fp-empty{
+    position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+    font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;
+    color:var(--mute);pointer-events:none;text-align:center;white-space:nowrap;
+  }
+  .fp-tip{
+    position:absolute;z-index:3;pointer-events:none;opacity:0;transition:opacity 0.12s;
+    background:var(--ink);color:var(--paper);
+    padding:4px 8px;font-size:9px;font-weight:700;
+    text-transform:uppercase;letter-spacing:0.1em;white-space:nowrap;
+    transform:translate(-50%,-140%);
+  }
+  .fp-tip.on{opacity:1}
+
   .walls-area{
     padding:20px 28px;
     border-right:1.5px solid var(--ink);
@@ -664,9 +693,10 @@
    </div>
 
    <div class="view-pane" id="viewFloorplan">
-     <div class="view-placeholder">
-       <div class="view-placeholder-title">Floor Plan coming soon</div>
-       <div class="view-placeholder-meta" id="viewFloorplanMeta"></div>
+     <div class="fp-stage" id="fpStage">
+       <svg class="fp-svg" id="fpSvg" aria-label="Floor plan"></svg>
+       <div class="fp-empty" id="fpEmpty">No panels placed yet &middot; add them in 2D view</div>
+       <div class="fp-tip" id="fpTip"></div>
      </div>
    </div>
   </div>
@@ -1649,16 +1679,131 @@ function initRoom3D(){
 /* Room dimensions changed -> the eye offset is stale. */
 function invalidate3D(){ R3D.eye = 0; if(state.activeView==='3D') render3D(); }
 
+/* ---- DEV-44: floor plan (top-down, display only) -----------------------------------
+   THE PLAN IS r3dPanelQuad() WITH THE y COMPONENT DROPPED. That function already carries
+   every wall's mirroring, derived and then corrected in DEV-45, so reusing it makes the
+   plan agree with the 3D view by construction. A second per-wall mapping here is exactly
+   how the back and left walls came to be mirrored in the first place -- don't write one.
+
+   World space (r3dRoom): x = roomLength, z = roomWidth, y = roomHeight.
+   The plan maps x -> right and z -> down, so the front wall (z=0) is at the TOP of the
+   plan and the back wall (z=D) at the bottom. Every wall is labelled, so the reading is
+   never left to the viewer's assumption.
+
+   The viewBox is in FEET. Two consequences worth keeping in mind:
+     - strokes need vector-effect:non-scaling-stroke (see the .fp-* rules)
+     - text does NOT get the same free ride. A font-size set as a fraction of the viewBox
+       looks like it should render at a constant pixel size, but that only holds when the
+       WIDTH is the fitting axis. This stage is wider than it is tall, so preserveAspectRatio
+       fits by HEIGHT, and label size then grows with room length -- measured at 19px in a
+       14ft room and 24px in a 30ft one. So fpFontFt() converts a target pixel size back
+       through the actual fitted scale, and a ResizeObserver re-renders when the stage
+       changes shape. */
+const FP = {stage:null, svg:null, empty:null, tip:null};
+
+/* Feet per pixel, from the scale preserveAspectRatio="meet" will actually use: it fits by
+   whichever axis runs out first. Returns the viewBox-unit font size that lands on targetPx
+   on screen. Falls back to a proportional guess if the stage has no box yet (hidden pane). */
+function fpFontFt(targetPx, vbW, vbH){
+  const r = FP.stage ? FP.stage.getBoundingClientRect() : null;
+  if(!r || r.width < 2 || r.height < 2) return vbW * 0.024;
+  const scale = Math.min(r.width / vbW, r.height / vbH);
+  return scale > 0 ? targetPx / scale : vbW * 0.024;
+}
+
+function fpRect(cls, x, y, w, h, extra){
+  return '<rect class="'+cls+'" x="'+x.toFixed(4)+'" y="'+y.toFixed(4)+
+         '" width="'+w.toFixed(4)+'" height="'+h.toFixed(4)+'"'+(extra||'')+'/>';
+}
+
+/* A wall panel is flush against a vertical wall, so from directly above its quad collapses
+   to a line. Give it the panel's REAL thickness by extruding along the same wall normal the
+   3D view extrudes along, using the same constant -- so the two views agree rather than
+   merely resembling each other. */
+function fpPanelBox(panel){
+  const q = r3dPanelQuad(panel);
+  const n = R3D_WALL_NORMAL[panel.wall];
+  const d = R3D_PANEL_DEPTH;
+  const xs = q.map(function(pt){ return pt.x; }), zs = q.map(function(pt){ return pt.z; });
+  const x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+  const z0 = Math.min.apply(null, zs), z1 = Math.max.apply(null, zs);
+  const ax0 = Math.min(x0, x0 + n.x*d), ax1 = Math.max(x1, x1 + n.x*d);
+  const az0 = Math.min(z0, z0 + n.z*d), az1 = Math.max(z1, z1 + n.z*d);
+  return {x:ax0, y:az0, w:ax1-ax0, h:az1-az0};
+}
+
+function renderFloorplan(){
+  if(!FP.svg) return;
+  const R = r3dRoom(), W = R.W, D = R.D;
+  const pad = Math.max(W, D) * 0.15;
+  const vbW = W + pad*2, vbH = D + pad*2;
+  const fs = fpFontFt(13, vbW, vbH);
+  const dimFs = fpFontFt(14, vbW, vbH);
+  const parts = [];
+
+  /* Scale grid at 1ft, stepping to 2ft in a large room so it stays a blueprint rather
+     than graph paper. Drawn as one path: dozens of <line> nodes for a static backdrop
+     is a lot of DOM for no gain. */
+  const step = Math.max(W, D) > 22 ? 2 : 1;
+  let gd = '';
+  for(let gx = step; gx < W - 1e-9; gx += step) gd += 'M'+gx.toFixed(3)+' 0V'+D.toFixed(3);
+  for(let gy = step; gy < D - 1e-9; gy += step) gd += 'M0 '+gy.toFixed(3)+'H'+W.toFixed(3);
+  if(gd) parts.push('<path class="fp-grid" d="'+gd+'"/>');
+
+  parts.push(fpRect('fp-room', 0, 0, W, D));
+
+  /* Wall names sit just INSIDE their edge; room dimensions sit outside, so the two
+     never collide however narrow the room gets. */
+  const inset = Math.min(W, D) * 0.075 + fs*0.6;
+  parts.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" x="'+(W/2).toFixed(3)+'" y="'+inset.toFixed(3)+'">Front Wall</text>');
+  parts.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" x="'+(W/2).toFixed(3)+'" y="'+(D-inset).toFixed(3)+'">Back Wall</text>');
+  parts.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" transform="translate('+inset.toFixed(3)+','+(D/2).toFixed(3)+') rotate(-90)">Left Wall</text>');
+  parts.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" transform="translate('+(W-inset).toFixed(3)+','+(D/2).toFixed(3)+') rotate(90)">Right Wall</text>');
+
+  parts.push('<text class="fp-txt" font-size="'+dimFs.toFixed(4)+'" x="'+(W/2).toFixed(3)+'" y="'+(-pad*0.45).toFixed(3)+'">'+W.toFixed(1)+' ft</text>');
+  parts.push('<text class="fp-txt" font-size="'+dimFs.toFixed(4)+'" transform="translate('+(-pad*0.45).toFixed(3)+','+(D/2).toFixed(3)+') rotate(-90)">'+D.toFixed(1)+' ft</text>');
+
+  let shown = 0;
+  for(const panel of state.panels){
+    if(!R3D_WALL_YAW.hasOwnProperty(panel.wall)) continue;
+    const b = fpPanelBox(panel);
+    const label = r3dEsc((panel.size || (panel.w+'x'+panel.h)) + ' · ' + WALL_LABELS[panel.wall]);
+    parts.push(fpRect('fp-panel', b.x, b.y, b.w, b.h, ' data-label="'+label+'"'));
+    shown++;
+  }
+
+  FP.svg.setAttribute('viewBox', (-pad).toFixed(3)+' '+(-pad).toFixed(3)+' '+vbW.toFixed(3)+' '+vbH.toFixed(3));
+  FP.svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  FP.svg.innerHTML = parts.join('');
+  if(FP.empty) FP.empty.style.display = shown ? 'none' : '';
+}
+
+function invalidateFloorplan(){ if(state.activeView === 'floorplan') renderFloorplan(); }
+
+function initFloorplan(){
+  FP.stage = $('fpStage'); FP.svg = $('fpSvg'); FP.empty = $('fpEmpty'); FP.tip = $('fpTip');
+  if(!FP.stage) return;
+  FP.stage.addEventListener('pointermove', function(e){
+    const hit = e.target && e.target.closest ? e.target.closest('.fp-panel') : null;
+    if(hit && FP.tip){
+      const r = FP.stage.getBoundingClientRect();
+      FP.tip.textContent = hit.getAttribute('data-label');
+      FP.tip.style.left = (e.clientX - r.left)+'px';
+      FP.tip.style.top  = (e.clientY - r.top)+'px';
+      FP.tip.classList.add('on');
+    } else if(FP.tip){ FP.tip.classList.remove('on'); }
+  });
+  FP.stage.addEventListener('pointerleave', function(){ if(FP.tip) FP.tip.classList.remove('on'); });
+  /* Label sizing depends on the stage's fitted scale, so a reshape needs a redraw. */
+  if(window.ResizeObserver){
+    new ResizeObserver(function(){ if(state.activeView === 'floorplan') renderFloorplan(); }).observe(FP.stage);
+  }
+}
+
 /* ---- DEV-42: view-mode switching ----
    The 2D viewer owns state.panels / roomLength / roomWidth / roomHeight; the 3D and
    Floor Plan panes read the same object, so switching views never touches panel data. */
 const VIEW_PANES = {'2D':'view2D', '3D':'view3D', 'floorplan':'viewFloorplan'};
-
-function viewPanelSummary(){
-  const n = state.panels.length;
-  if(!n) return 'No panels placed yet';
-  return 'You have ' + n + ' panel' + (n === 1 ? '' : 's') + ' placed';
-}
 
 function setView(view){
   if(!VIEW_PANES[view]) return;
@@ -1672,12 +1817,10 @@ function setView(view){
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
-  const mf = document.getElementById('viewFloorplanMeta');
-  if(mf) mf.textContent = viewPanelSummary();
-  /* The pane has a zero-size box while display:none, so the 3D view can only be measured
-     once it is visible -- the same reflow trap as DEV-13. Reset the fit and draw after
-     the class flip above. */
+  /* A pane has a zero-size box while display:none, so neither view can be measured until
+     it is visible -- the same reflow trap as DEV-13. Draw after the class flip above. */
   if(view === '3D'){ R3D.eye = 0; render3D(); }
+  if(view === 'floorplan') renderFloorplan();
 }
 
 document.querySelectorAll('.view-rail-btn').forEach(btn => {
@@ -1685,6 +1828,7 @@ document.querySelectorAll('.view-rail-btn').forEach(btn => {
 });
 
 initRoom3D();
+initFloorplan();
 loadRoomPlan();
 loadDesignedCart();
 setView(state.activeView);
@@ -1728,6 +1872,7 @@ function updateDimensions(){
   renderThumbnails();
   updateStats();
   invalidate3D();
+  invalidateFloorplan();
 }
 
 $('sideLabelLeft').addEventListener('click',()=>setActiveWall(WALL_ADJACENTS[state.activeWall].left));
