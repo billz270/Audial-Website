@@ -2526,100 +2526,38 @@ For this task, ceiling panels are read from state (if present) and displayed. Ac
 - Any visual enhancements to the 2D viewer
 
 ### Implementation notes (DEV-43)
-- **Plain SVG, no Three.js.** The page loads no 3D library and this view adds none — it is
-  ~200 lines of projection maths writing `<polygon>`s. Line-art, per-surface opacity and
-  hover labels are all native to SVG; a WebGL context would have been pure weight.
-- **The camera ORBITS the room centre; it does not yaw in place.** This is the central
-  decision and everything else follows from it. Orbiting at a fixed radius with zero pitch,
-  always looking at the centre, means (a) the wall being looked at is the **far** wall, so the
-  room's depth edges radiate *outward* from its corners — the look the spec asked for, and not
-  isometric — and (b) the whole box is always in front of the camera, so **near-plane clipping
-  is never needed**. Yawing in place would have swung the side walls behind the camera at large
-  angles and required segment + polygon clipping against the near plane.
-- **The fit sampling MUST include the diagonal.** First version sampled yaws 0/30/60/90 and
-  scaled the orbit radius to the worst corner. That skips 45 deg, which is the widest view of a
-  box, and the room visibly overflowed the frame there. **Every automated check passed while
-  this was broken** — the clipping assertions only tested 0 deg and 90 deg. Now the fit samples
-  every 15 deg and the harness sweeps **every 5 deg from -90 to +90** (37 angles) asserting no
-  point leaves the stage. Second bug in two tasks caught by a screenshot rather than a test.
-- **The fit is iterative, like DEV-40's.** Projected offset falls off ~1/distance, so scaling
-  the radius by the overshoot converges in 2-3 passes. `R3D_FIT` 0.88, FOV 55 deg.
+Consolidated after the task closed. It was built in four passes and each one changed the
+fundamentals, so these notes describe **where it landed**; what was superseded along the way is
+listed at the bottom so nobody reintroduces it.
+
+**The view**
+- **Plain SVG, no Three.js.** The page loads no 3D library and this view adds none -- it is
+  ~200 lines of projection maths writing `<polygon>`s. Line-art, per-surface opacity and hover
+  labels are all native to SVG; a WebGL context would have been pure weight.
 - **Stage height is capped at `min(70vh,640px)`.** `.view-pane` is `flex:1` inside a grid row
   whose height is set by the right sidebar (~860px), so the room's lower half and its width
-  label sat below the fold. The cap is not cosmetic — without it the dimension labels are
+  label sat below the fold. The cap is not cosmetic -- without it the dimension labels are
   unreachable without scrolling.
-- **Wall coordinate mapping is mirrored per wall and was derived, not guessed.** Editor `x` runs
-  left-to-right *as seen when facing that wall* and `y` runs down from the ceiling, so:
-  front maps `x` straight to world x; **back mirrors** (`W-x-w`); **left mirrors along depth**
-  (`D-x-w`, because facing the left wall the front of the room is on your right); right maps
-  depth straight. Each mapping comes from the camera's screen-right vector for that facing.
-  Asserted in the harness by checking a panel at `x:1,y:2` lands in the upper-left of its wall.
-- **No occlusion culling, deliberately.** With no fills the view is an x-ray; a panel on the
-  near wall shows through the far one, faded to 18%. That is what "line-art + opacity fading,
-  no blur" produces and it reads as depth. Adding back-face culling would fight the spec.
-- **Ceiling and floor hold a steady 0.5** rather than fading by angle: with a yaw-only camera in
-  a symmetric room, how much of them is visible barely changes, so an angular fade reads as
-  flicker rather than as depth.
-- **`touch-action:pan-y`** — horizontal swipes orbit, vertical swipes go to page scroll, the
-  same trade DEV-40/41 settled on for a viewer embedded in a long page. Verified with **real
-  CDP touch events**, not mouse: a horizontal swipe moved yaw 0 -> 0.99 rad and refocused onto
-  the Right Wall; a vertical swipe left yaw bit-identical and scrolled the page instead.
-- **The rAF loop stops when the easing settles** (asserted: `R3D.raf === null`), so an idle 3D
-  view costs nothing. Damping is a lerp toward `targetYaw`, giving the eased, non-linear
-  tracking the spec asked for.
-- **Ceiling panels are already wired.** `state.ceilingPanels` is read if present and drawn on
-  the ceiling plane, so DEV-44 gets 3D ceiling display for free; absent, the ceiling draws empty.
-- **Verified in real Chromium**: 36 checks, all green except the known favicon 404 — 6 surfaces,
-  fade ladder 1.0 / 0.45 / 0.18 measured off the DOM, panel opacity tracking its wall, front wall
-  smaller than the near wall (proving it is the far one), drag-left-swings-right, easing settling,
-  +-90 clamp, focused-wall label at both limits, the 37-angle clipping sweep, a 30ft room after a
-  dimension change, 2D round trip, ceiling panels, empty state, and mobile.
-- **Trap, again:** a console 404 message carries **no URL**, so `/favicon/`-filtering console text
-  reports a false failure. A `response` listener over the identical sequence shows **zero** failed
-  requests. This view issues no network requests at all.
 
-### Follow-up 3: full rotation + artwork on panels (founder request) -- CURRENT
-- **The +-90 yaw clamp is gone.** Rotation is unlimited, so ANY wall can be brought to the
-  front -- turn onto the left wall and the right wall becomes the new "back wall" and fades
-  out. This deliberately overrides the task spec's "soft limits (max ~90 deg each direction)";
-  founder's call. The rotation model itself was already right and is unchanged.
-- **Uploaded artwork now renders on placed panels** (`panel.image`). Previously every panel was
-  a flat `--accent` fill, so designs were invisible in 3D.
-- **The clip MUST go on a wrapping `<g>`, not on the `<image>`.** `clip-path` resolves in the
-  element's own POST-transform space, so putting it on the transformed `<image>` ran the
-  screen-space polygon through the matrix a second time and clipped the art away entirely --
-  it rendered as an empty outline.
-- **The art is an affine map, not a true perspective warp**: SVG transforms are affine, so the
-  unit square is mapped through three projected corners. Residual skew is imperceptible at
-  panel scale. Skipped when any corner is behind the eye (that corner projects to a meaningless
-  coordinate and would smear the image); those panels fall back to the accent fill.
-- **Testing lesson, and it bit me here:** the first pass asserted `<image>` nodes existed and
-  passed 13/13 while the panels rendered as **empty outlines**. Node existence is not proof of
-  paint. Caught by looking at the screenshot -- the third time in this task that a screenshot
-  caught what green tests missed.
-- Verified 13/13 over a **full 360 turn**: every wall faceable, back wall reaching full opacity
-  with the former front wall culled, draw-iff-in-front exact at all 72 angles, zero
-  NaN/Infinity or runaway coordinates, artwork visible on the wall being faced.
-
-### Follow-up 2: camera moved INSIDE the room (founder request, same session) -- CURRENT
-**This supersedes the orbit camera described in the notes above and in Follow-up 1.** The
-`R3D_FIT_X` / `R3D_FIT_Y` / bisection-fit machinery those notes describe is **gone**; read them
-as history. What remains true from them: the wall coordinate mappings, the fade ladder, the
-touch handling, and the lesson about sampling the diagonal.
-
-- **The camera now sits inside the room and turns in place**, instead of orbiting outside it.
-  Everything behind the eye is clipped against a near plane, which is what removes the back wall
-  -- **no fade or blur is applied to it, and none is needed**. (Worth noting the original spec
-  forbids blur outright: "Uses opacity, not blur." Clipping satisfies the founder's "blur out the
-  back wall" intent without violating that.)
+**The camera sits INSIDE the room and turns in place**
+- Everything behind the eye is clipped against a near plane, and that is what removes the wall
+  behind you -- **no fade or blur is applied to it, and none is needed**. (The spec forbids blur
+  outright: "Uses opacity, not blur." Clipping satisfies the founder's "blur out the back wall"
+  intent without violating that.)
 - **The eye is NOT at the exact geometric centre, and cannot be.** Measured: from the centre of a
   14x12x10 room the front wall subtends **119% of the frame** -- it overflows, so the ceiling,
   floor and side walls are not visible at all and the room loses all depth. The usable band is
-  z ~10-11 in a 12ft-deep room. `r3dEyeOffset()` therefore backs the eye off until the focused
-  wall fills ~2/3 of the frame (`R3D_WALL_FILL` 0.66), then **clamps so it always stays inside
-  the room** (`R3D_EYE_INSIDE` 0.88 of the largest offset that fits). It lands at z=10.82 of 12.
-  The offset is constant across yaw so the room does not breathe while panning, which is why the
-  clamp uses `min(W,D)/2` -- it has to stay inside for every wall, not just the front one.
+  z ~10-11 in a 12ft-deep room. `r3dEyeOffset()` backs the eye off until the focused wall fills
+  ~2/3 of the frame (`R3D_WALL_FILL` 0.66), then **clamps so it always stays inside the room**
+  (`R3D_EYE_INSIDE` 0.88 of the largest offset that fits). It lands at z=10.82 of 12. The offset
+  is constant across yaw so the room does not breathe while panning, which is why the clamp uses
+  `min(W,D)/2` -- it has to stay inside for every wall, not just the front one.
+- FOV **70** for the interior look; `R3D_NEAR` 0.35 ft.
+- **Trade-off accepted, inherent to an interior view:** you can no longer see all four walls at
+  once, and panels near the back of a side wall sit behind you at yaw 0 -- they are reached by
+  panning. In a long room (30ft wall seen from ~7ft away) a wall no longer fits the frame at all.
+
+**Drawing rules**
 - **Surfaces are drawn as four independently clipped EDGES, never as a closed polygon.** Closing
   a near-clipped polygon draws a spurious edge straight across the view along the near plane.
   Panels, being filled, do use polygon clipping (Sutherland-Hodgman against the single plane).
@@ -2628,53 +2566,72 @@ touch handling, and the lesson about sampling the diagonal.
   and was written and then withdrawn: past ~15 deg of turn a sliver of the wall behind genuinely
   re-enters view at the frame edge, exactly as it would standing in a real room. It is faded by
   the existing ladder (peaks at 0.315, the curve's value at 140 deg).
-- **Trade-off accepted, and it is inherent to an interior view:** you can no longer see all four
-  walls at once, and panels near the back of a side wall sit behind you at yaw 0 -- they are
-  reached by panning. In a long room (30ft wall seen from ~7ft away) a wall no longer fits the
-  frame at all. That is what being inside the room means; the orbit camera could show everything
-  precisely because it was outside.
-- FOV widened to **70** for the interior look; `R3D_NEAR` 0.35 ft.
-- **Verified in real Chromium, 35/35**, including: the eye inside the room at all 37 angles and
-  after a dimension change; back wall absent at the default view; exact draw-iff-in-front culling;
-  **zero NaN/Infinity and zero runaway (>1e6) coordinates** across the sweep, which is the failure
-  mode near-plane division invites; at most 4 sub-paths per surface (proving no spurious closing
-  edge); focused wall fully visible at 66% of frame height; the fade ladder; panel placement and
-  mirroring; panning, easing, clamps; ceiling panels; empty state; and mobile.
+- **Wall coordinate mapping is mirrored per wall and was derived, not guessed.** Editor `x` runs
+  left-to-right *as seen when facing that wall* and `y` runs down from the ceiling, so: front
+  maps `x` straight to world x; **back mirrors** (`W-x-w`); **left mirrors along depth**
+  (`D-x-w`, because facing the left wall the front of the room is on your right); right maps
+  depth straight. Each mapping comes from the camera's screen-right vector for that facing.
+  Asserted by checking a panel at `x:1,y:2` lands in the upper-left of its wall. **DEV-45 later
+  found this mirroring also swaps which corner is a panel's own top-left**, which is why artwork
+  needs `R3D_ART_CORNERS` rather than a fixed corner order.
+- **Ceiling and floor hold a steady 0.5** rather than fading by angle: with a yaw-only camera in
+  a symmetric room, how much of them is visible barely changes, so an angular fade reads as
+  flicker rather than as depth.
+- **No occlusion culling, deliberately** -- with no fills the view is an x-ray and a panel on the
+  near wall shows through the far one, faded to 18%. **DEV-45 partially changed this:** panels
+  now carry opaque extruded side faces, so they genuinely occlude on the focused wall. The walls
+  themselves remain x-ray.
 
-### Follow-up: closer framing (founder request, same session)
-- **The framing fit was silently broken and the request exposed it.** Asking for "bigger" and
-  measuring the result showed raising the fill target made the room *smaller* (61% -> 56% of frame
-  width) and FOV 70 produced a **433 ft** orbit radius. Cause: `rad = rad * worst / FIT` is not a
-  convergent iteration. When a box corner crosses the camera plane `worst` was pinned to a
-  sentinel 4, kicking the radius 4x out; the next pass overshot back, and the loop simply stopped
-  after 8 passes wherever it happened to be. It only ever "worked" for the one FOV/FIT pair it was
-  tuned against. **Replaced with bisection**, which is exact here because the projected extent is
-  monotonically decreasing in radius (Infinity once a corner reaches the camera plane). Even the
-  shipped setting had been mis-fitting -- the same 0.88 target went from 61% to 66% fill once the
-  search was correct.
-- **Horizontal and vertical framing targets are now independent** (`R3D_FIT_X` 0.95,
-  `R3D_FIT_Y` 1.45). Measuring showed **height was the binding axis**: at diagonal yaws the NEAR
-  ceiling/floor corners hit the frame at 88-99% while width sat at only 66%, so no single fill
-  target could make the room meaningfully bigger. Letting those near corners run past the top and
-  bottom -- the founder's explicit "if the side walls almost parallelly align with the window
-  frame, so be it" -- is what unlocked it. **Default view went 66% -> 94% of frame width.**
-  Horizontal remains a hard bound: the room never runs off the sides at any of the 37 swept angles,
-  and vertical overflow is capped at a measured 22% of frame height.
-- `R3D_FIT_Y` doubles as a **safety cap for unusual room shapes** (a tall narrow room binds
-  vertically instead), so the framing degrades sanely rather than exploding.
-- **FOV stays 55.** Widening it was tested (62, 70) and is counter-productive here: a wider lens
-  throws the near corners further out vertically, so the fit pulls back and the room ends up
-  *smaller* at the default angle (55 -> 95%, 62 -> 90%, 70 -> 85%) with more distortion. The
-  camera did move closer regardless -- orbit radius 20.1 ft -> 15.8 ft.
-- **The fit now samples every 5 deg**, matching the harness sweep, so the no-horizontal-overflow
-  guarantee holds at every angle a user can actually reach rather than only at sampled ones.
-- Caption backdrops (`--paper`) were added to the wall name and drag hint, since wall lines now
-  pass behind them at the frame edges.
-- **One assertion of mine was wrong and was corrected, not worked around:** "fills >=88% of frame
-  width at *every* yaw" is unachievable with a fixed radius, because fill necessarily varies with
-  room aspect (14ft wide vs 12ft deep makes the +-90 views narrower). Holding it would have meant
-  letting the room breathe during a pan, which was rejected. The check now asserts the *default*
-  view fills >=88% (measures 94%) and the sweep minimum stays >=70% (measures 75%).
+**Interaction**
+- **`touch-action:pan-y`** -- horizontal swipes turn the view, vertical swipes go to page scroll,
+  the same trade DEV-40/41 settled on for a viewer embedded in a long page. Verified with **real
+  CDP touch events**, not mouse: a horizontal swipe moved yaw 0 -> 0.99 rad and refocused onto
+  the Right Wall; a vertical swipe left yaw bit-identical and scrolled the page instead.
+- **The rAF loop stops when the easing settles** (asserted: `R3D.raf === null`), so an idle 3D
+  view costs nothing. Damping is a lerp toward `targetYaw`.
+- **Ceiling panels are already wired.** `state.ceilingPanels` is read if present and drawn on the
+  ceiling plane, so DEV-44 gets 3D ceiling display for free; absent, the ceiling draws empty.
+
+**Founder overrides -- do not "fix" these back**
+- **No +-90 yaw clamp.** Rotation is unlimited, so ANY wall can be brought to the front: turn
+  onto the left wall and the right wall becomes the new "back wall" and clips out. This
+  deliberately overrides the spec's "soft limits (max ~90 deg each direction)".
+- **The active view-rail button is `--accent`**, which contradicts CLAUDE.md's "selection states
+  -> --ink" rule.
+
+**Superseded along the way -- do not resurrect**
+- **The camera originally ORBITED the room from outside it**, and the base notes used to open by
+  calling that "the central decision". It is gone. So is all of its framing machinery
+  (`R3D_FIT`, then `R3D_FIT_X` 0.95 / `R3D_FIT_Y` 1.45, and the bisection search that fitted the
+  orbit radius). Nothing in the current code fits a radius, because the eye no longer sits on one.
+- **Two lessons from that machinery are worth keeping.** First: `rad = rad * worst / FIT` **is not
+  a convergent iteration** -- when a box corner crossed the camera plane `worst` was pinned to a
+  sentinel and kicked the radius 4x out, the next pass overshot back, and the loop simply stopped
+  after 8 passes wherever it happened to be; it only ever "worked" for the one FOV/FIT pair it was
+  tuned against. Bisection was correct because projected extent is monotonic in radius. Second:
+  **a fit that samples yaws 0/30/60/90 skips 45 deg, which is the widest view of a box** -- the
+  room visibly overflowed there while **every automated check passed**, because the clipping
+  assertions only tested 0 and 90.
+- **Artwork on panels was originally an affine map through three projected corners**, with a note
+  claiming the residual skew was "imperceptible at panel scale". That was wrong -- see DEV-45,
+  which measured it at 9% of the panel diagonal at 30 deg of yaw and replaced the whole approach
+  with a homography. Panels that were partly behind the eye used to drop their art entirely;
+  DEV-45 fixed that too.
+
+**Testing traps**
+- **A console 404 message carries no URL**, so filtering console text for `/favicon/` reports a
+  false failure. A `response` listener over the identical sequence shows **zero** failed requests.
+  This view issues no network requests at all.
+- **Asserting a node exists is not proof that it paints.** A pass asserted `<image>` nodes existed
+  and went 13/13 while every panel rendered as an empty outline. Caught by looking at a
+  screenshot -- as were the other two real defects in this task.
+
+**Verified in real Chromium** across the passes: 36 checks on the original build, then 35/35 on
+the interior camera (eye inside the room at all 37 swept angles and after a dimension change,
+exact draw-iff-in-front culling, zero NaN/Infinity and zero runaway coordinates -- the failure
+mode near-plane division invites -- at most 4 sub-paths per surface proving no spurious closing
+edge, the fade ladder, panel placement and mirroring, panning, easing, ceiling panels, empty
+state and mobile), then 13/13 over a full 360 turn. Only the pre-existing favicon 404 in console.
 
 ---
 
