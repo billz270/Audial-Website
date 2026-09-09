@@ -246,6 +246,13 @@
   .fp-ceiling:hover{fill-opacity:0.3}
   .fp-stage.dragging .fp-ceiling{cursor:grabbing}
   .fp-stage.dragging .fp-ceiling.moving{fill-opacity:0.34}
+  /* DEV-47: furniture in the plan. The viewBox is in FEET, so every stroke needs
+     non-scaling-stroke -- a bare stroke-width of 1.5 would mean one and a half feet. */
+  .fp-furn-box,.fp-furn-line,.fp-furn-swing{fill:none;stroke:var(--ink);stroke-width:1.5;vector-effect:non-scaling-stroke}
+  .fp-furn[data-furn-type="window"] .fp-furn-box{stroke-dasharray:6 4}
+  .fp-furn-label{fill:var(--ink);font-family:'Archivo',sans-serif;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;text-anchor:middle;dominant-baseline:middle;pointer-events:none;opacity:0.65}
+  .fp-furn-box{cursor:grab}
+  .fp-stage.dragging .fp-furn-box{cursor:grabbing}
   .fp-txt{font-family:'Archivo',sans-serif;font-weight:700;text-transform:uppercase;
     letter-spacing:0.12em;text-anchor:middle;dominant-baseline:middle;fill:var(--ink)}
   .fp-txt.mute{fill:var(--mute);paint-order:stroke fill;stroke:var(--paper);stroke-width:3;
@@ -1947,6 +1954,105 @@ function fpPanelBox(panel){
   return {x:ax0, y:az0, w:ax1-ax0, h:az1-az0};
 }
 
+/* Origin and axes of a wall in PLAN space (x right, y down = front wall -> back wall).
+   `a` runs along the wall in the direction editor x increases and `n` points INTO the room.
+   Derived from r3dPanelQuad's per-wall mapping -- including the back/left mirroring DEV-45
+   had to discover -- so a window placed at x=1 sits at the same end of the wall in the plan,
+   in 3D and in the 2D wall editor, by construction rather than by a second implementation. */
+function fpWallAxes(wall){
+  const R = r3dRoom(), W = R.W, D = R.D;
+  switch(wall){
+    case 'front': return {o:{x:0, y:0}, a:{x: 1,y: 0}, n:{x: 0,y: 1}};
+    case 'back':  return {o:{x:W, y:D}, a:{x:-1,y: 0}, n:{x: 0,y:-1}};
+    case 'left':  return {o:{x:0, y:D}, a:{x: 0,y:-1}, n:{x: 1,y: 0}};
+    default:      return {o:{x:W, y:0}, a:{x: 0,y: 1}, n:{x:-1,y: 0}};
+  }
+}
+
+/* Which wall a plan-space point is nearest. Used at drag time, so dragging a window across
+   a corner RE-HOMES it to the new wall rather than pulling it off the wall entirely --
+   a window always belongs to some wall, so there is no off-wall state to land in. */
+function furnNearestWall(px, py){
+  const R = r3dRoom();
+  const d = {front:py, back:R.D - py, left:px, right:R.W - px};
+  return WALL_ORDER.reduce(function(a,b){ return d[a] <= d[b] ? a : b; });
+}
+
+/* A furniture piece's axis-aligned footprint in plan feet. A floor piece already is one;
+   a wall piece is w along its wall by FURN_WALL_DEPTH into the room. */
+function fpFurnBox(f){
+  if(!f.wall) return {x:f.x, y:f.y, w:f.w, h:f.h};
+  const ax = fpWallAxes(f.wall);
+  const p0 = {x:ax.o.x + ax.a.x*f.x, y:ax.o.y + ax.a.y*f.x};
+  const p1 = {x:p0.x + ax.a.x*f.w + ax.n.x*FURN_WALL_DEPTH,
+              y:p0.y + ax.a.y*f.w + ax.n.y*FURN_WALL_DEPTH};
+  return {x:Math.min(p0.x,p1.x), y:Math.min(p0.y,p1.y),
+          w:Math.abs(p1.x-p0.x), h:Math.abs(p1.y-p0.y)};
+}
+
+/* Top-down symbols -- the standard floor-plan reading, and more legible than a labelled
+   rectangle. Every extra line stays INSIDE the footprint, so a piece never draws outside
+   the box the pointer hit-tests. The door's swing arc is the one exception and is
+   deliberate: a swing describes floor sweep, which is exactly what this view shows. */
+function fpFurnSymbol(f, b){
+  const line = function(x1,y1,x2,y2){
+    return '<line class="fp-furn-line" x1="'+x1.toFixed(3)+'" y1="'+y1.toFixed(3)+
+           '" x2="'+x2.toFixed(3)+'" y2="'+y2.toFixed(3)+'"/>';
+  };
+  if(f.type === 'door'){
+    /* Hinge at the piece's leading end on the room side; the leaf swings a quarter turn
+       inward. cross(a, n) is +1 for all four walls in this y-down plan space, so the arc's
+       sweep flag is a constant rather than a per-wall case. */
+    const ax = fpWallAxes(f.wall);
+    const h  = {x:ax.o.x + ax.a.x*f.x + ax.n.x*FURN_WALL_DEPTH,
+                y:ax.o.y + ax.a.y*f.x + ax.n.y*FURN_WALL_DEPTH};
+    const shut = {x:h.x + ax.a.x*f.w, y:h.y + ax.a.y*f.w};
+    const open = {x:h.x + ax.n.x*f.w, y:h.y + ax.n.y*f.w};
+    return line(h.x, h.y, open.x, open.y) +
+           '<path class="fp-furn-swing" d="M'+shut.x.toFixed(3)+' '+shut.y.toFixed(3)+
+           'A'+f.w.toFixed(3)+' '+f.w.toFixed(3)+' 0 0 1 '+open.x.toFixed(3)+' '+open.y.toFixed(3)+'"/>';
+  }
+  if(f.type === 'window') return '';   // the dashed box is the symbol
+  const band = Math.min(0.45, Math.min(b.w, b.h) * 0.28);
+  const inset = function(dx, dy, dw, dh){
+    return fpRect('fp-furn-line', b.x+dx, b.y+dy, dw, dh);
+  };
+  switch(f.type){
+    case 'desk':    // a working surface: one line inset from the back edge
+      return line(b.x, b.y+band, b.x+b.w, b.y+band);
+    /* A chair needs more than the desk's single line or the two are the same drawing at
+       different sizes -- which is exactly the "pile of crates" decision 9 rejected. The
+       back band plus an inset seat reads as something you sit in. */
+    case 'chair':
+      return line(b.x, b.y+band, b.x+b.w, b.y+band) +
+             inset(band*0.6, band*1.5, Math.max(0.1, b.w-band*1.2), Math.max(0.1, b.h-band*2.1));
+    case 'couch':   // a back band along one long edge, and an arm band at each end
+      return line(b.x, b.y+band, b.x+b.w, b.y+band) +
+             line(b.x+band, b.y+band, b.x+band, b.y+b.h) +
+             line(b.x+b.w-band, b.y+band, b.x+b.w-band, b.y+b.h);
+    /* A pillow, not a line: an inset rectangle across the head end reads as bedding where
+       a full-width rule just reads as another edge. */
+    case 'bed':
+      return inset(band*0.5, band*0.5, Math.max(0.1, b.w-band), Math.max(0.1, band*1.6));
+    case 'speaker': // the driver
+      return '<circle class="fp-furn-line" cx="'+(b.x+b.w/2).toFixed(3)+'" cy="'+(b.y+b.h/2).toFixed(3)+
+             '" r="'+(Math.min(b.w,b.h)*0.28).toFixed(3)+'"/>';
+  }
+  return '';
+}
+
+function fpFurnGroup(f, fs){
+  const b = fpFurnBox(f);
+  const sel = String(state.selectedFurnitureId) === String(f.id) ? ' selected' : '';
+  const name = FURN_TYPES[f.type].label + (f.side ? ' ' + f.side : '');
+  return '<g class="fp-furn'+sel+'" data-furn-type="'+f.type+'" data-drag-id="'+r3dEsc(f.id)+
+         '" data-label="'+r3dEsc(name+' · '+f.w.toFixed(1)+'×'+(f.wall?f.tall:f.h).toFixed(1)+' ft')+'">'+
+         fpRect('fp-furn-box', b.x, b.y, b.w, b.h) +
+         fpFurnSymbol(f, b) +
+         '<text class="fp-furn-label" font-size="'+(fs*0.8).toFixed(4)+'" x="'+(b.x+b.w/2).toFixed(3)+
+         '" y="'+(b.y+b.h/2).toFixed(3)+'">'+r3dEsc(name)+'</text></g>';
+}
+
 function renderFloorplan(){
   if(!FP.svg) return;
   const R = r3dRoom(), W = R.W, D = R.D;
@@ -1996,13 +2102,18 @@ function renderFloorplan(){
     (ceil ? ceilings : parts).push(rect);
     shown++;
   }
+  /* Furniture sits on the floor, so it draws above the wall panels but BELOW the ceiling
+     clouds -- from above, a cloud is the nearer plane. */
+  for(const f of state.furniture) parts.push(fpFurnGroup(f, fs));
   parts.push.apply(parts, ceilings);
   parts.push.apply(parts, wallNames);
 
   FP.svg.setAttribute('viewBox', (-pad).toFixed(3)+' '+(-pad).toFixed(3)+' '+vbW.toFixed(3)+' '+vbH.toFixed(3));
   FP.svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   FP.svg.innerHTML = parts.join('');
-  if(FP.empty) FP.empty.style.display = shown ? 'none' : '';
+  /* DEV-47: furniture counts as content. The plan is only empty when there is nothing at
+     all in it -- otherwise the overlay sits on top of a room that plainly has things in it. */
+  if(FP.empty) FP.empty.style.display = (shown + state.furniture.length) ? 'none' : '';
 }
 
 function invalidateFloorplan(){ if(state.activeView === 'floorplan') renderFloorplan(); }
