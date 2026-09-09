@@ -253,6 +253,18 @@
   .fp-furn-label{fill:var(--ink);font-family:'Archivo',sans-serif;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;text-anchor:middle;dominant-baseline:middle;pointer-events:none;opacity:0.65}
   .fp-furn-box{cursor:grab}
   .fp-stage.dragging .fp-furn-box{cursor:grabbing}
+  /* Handles and the delete control appear on hover OR when the piece is selected. Doing it
+     in CSS rather than by re-rendering means a hover costs nothing -- the plan SVG is
+     rebuilt wholesale on every change, so a JS hover state would redraw the lot. */
+  .fp-furn-handles{opacity:0;pointer-events:none;transition:opacity 0.12s}
+  .fp-furn:hover .fp-furn-handles,.fp-furn.selected .fp-furn-handles{opacity:1;pointer-events:auto}
+  .fp-furn-h{fill:var(--paper);stroke:var(--ink);stroke-width:1.5;vector-effect:non-scaling-stroke}
+  .fp-furn-h[data-resize-edge="n"],.fp-furn-h[data-resize-edge="s"]{cursor:ns-resize}
+  .fp-furn-h[data-resize-edge="e"],.fp-furn-h[data-resize-edge="w"]{cursor:ew-resize}
+  .fp-furn-h[data-resize-edge="start"],.fp-furn-h[data-resize-edge="end"]{cursor:move}
+  .fp-furn-del{fill:var(--accent);stroke:var(--ink);stroke-width:1.5;vector-effect:non-scaling-stroke;cursor:pointer}
+  .fp-furn-delx{stroke:var(--paper);stroke-width:1.5;vector-effect:non-scaling-stroke;fill:none;pointer-events:none}
+  .fp-furn.selected .fp-furn-box{stroke-width:2.5}
   .fp-txt{font-family:'Archivo',sans-serif;font-weight:700;text-transform:uppercase;
     letter-spacing:0.12em;text-anchor:middle;dominant-baseline:middle;fill:var(--ink)}
   .fp-txt.mute{fill:var(--mute);paint-order:stroke fill;stroke:var(--paper);stroke-width:3;
@@ -2041,16 +2053,42 @@ function fpFurnSymbol(f, b){
   return '';
 }
 
-function fpFurnGroup(f, fs){
+function fpFurnGroup(f, fs, hs){
   const b = fpFurnBox(f);
   const sel = String(state.selectedFurnitureId) === String(f.id) ? ' selected' : '';
   const name = FURN_TYPES[f.type].label + (f.side ? ' ' + f.side : '');
-  return '<g class="fp-furn'+sel+'" data-furn-type="'+f.type+'" data-drag-id="'+r3dEsc(f.id)+
+  const id = r3dEsc(f.id);
+  const handle = function(edge, cx, cy){
+    return '<rect class="fp-furn-h" data-drag-id="'+id+'" data-resize-edge="'+edge+
+           '" x="'+(cx-hs/2).toFixed(3)+'" y="'+(cy-hs/2).toFixed(3)+
+           '" width="'+hs.toFixed(3)+'" height="'+hs.toFixed(3)+'"/>';
+  };
+  let handles;
+  if(f.wall){
+    /* Only the two ends along the wall -- height and sill are not editable in a top view. */
+    const ax = fpWallAxes(f.wall);
+    const p0 = {x:ax.o.x + ax.a.x*f.x + ax.n.x*FURN_WALL_DEPTH/2,
+                y:ax.o.y + ax.a.y*f.x + ax.n.y*FURN_WALL_DEPTH/2};
+    handles = handle('start', p0.x, p0.y) +
+              handle('end', p0.x + ax.a.x*f.w, p0.y + ax.a.y*f.w);
+  } else {
+    handles = handle('n', b.x+b.w/2, b.y) + handle('s', b.x+b.w/2, b.y+b.h) +
+              handle('w', b.x, b.y+b.h/2) + handle('e', b.x+b.w, b.y+b.h/2);
+  }
+  const dr = hs*0.7, dx = b.x + b.w, dy = b.y, k = dr*0.4;
+  const del = '<circle class="fp-furn-del" data-furn-del="'+id+
+              '" cx="'+dx.toFixed(3)+'" cy="'+dy.toFixed(3)+'" r="'+dr.toFixed(3)+'"/>'+
+              '<path class="fp-furn-delx" d="M'+(dx-k).toFixed(3)+' '+(dy-k).toFixed(3)+
+              'L'+(dx+k).toFixed(3)+' '+(dy+k).toFixed(3)+
+              'M'+(dx+k).toFixed(3)+' '+(dy-k).toFixed(3)+
+              'L'+(dx-k).toFixed(3)+' '+(dy+k).toFixed(3)+'"/>';
+  return '<g class="fp-furn'+sel+'" data-furn-type="'+f.type+'" data-drag-id="'+id+
          '" data-label="'+r3dEsc(name+' · '+f.w.toFixed(1)+'×'+(f.wall?f.tall:f.h).toFixed(1)+' ft')+'">'+
          fpRect('fp-furn-box', b.x, b.y, b.w, b.h) +
          fpFurnSymbol(f, b) +
          '<text class="fp-furn-label" font-size="'+(fs*0.8).toFixed(4)+'" x="'+(b.x+b.w/2).toFixed(3)+
-         '" y="'+(b.y+b.h/2).toFixed(3)+'">'+r3dEsc(name)+'</text></g>';
+         '" y="'+(b.y+b.h/2).toFixed(3)+'">'+r3dEsc(name)+'</text>'+
+         '<g class="fp-furn-handles">'+handles+del+'</g></g>';
 }
 
 function renderFloorplan(){
@@ -2060,6 +2098,8 @@ function renderFloorplan(){
   const vbW = W + pad*2, vbH = D + pad*2;
   const fs = fpFontFt(13, vbW, vbH);
   const dimFs = fpFontFt(14, vbW, vbH);
+  /* A resize handle must be a constant size ON SCREEN, and this viewBox is in feet. */
+  const hs = fpFontFt(10, vbW, vbH);
   const parts = [];
 
   /* Scale grid at 1ft, stepping to 2ft in a large room so it stays a blueprint rather
@@ -2104,7 +2144,7 @@ function renderFloorplan(){
   }
   /* Furniture sits on the floor, so it draws above the wall panels but BELOW the ceiling
      clouds -- from above, a cloud is the nearer plane. */
-  for(const f of state.furniture) parts.push(fpFurnGroup(f, fs));
+  for(const f of state.furniture) parts.push(fpFurnGroup(f, fs, hs));
   parts.push.apply(parts, ceilings);
   parts.push.apply(parts, wallNames);
 
@@ -2229,12 +2269,30 @@ function initFloorplan(){
   /* Capture is taken on the STAGE, not on the rect: every move re-renders the SVG and
      destroys the element under the pointer, so a capture on the rect would die instantly. */
   FP.stage.addEventListener('pointerdown', function(e){
+    /* Delete first: the control sits inside the piece's own group, so a hit on it would
+       otherwise read as a hit on the piece and start a drag. */
+    const del = e.target && e.target.closest ? e.target.closest('[data-furn-del]') : null;
+    if(del){
+      e.preventDefault();
+      const did = del.getAttribute('data-furn-del');
+      state.furniture = state.furniture.filter(function(f){ return String(f.id) !== String(did); });
+      if(String(state.selectedFurnitureId) === String(did)) state.selectedFurnitureId = null;
+      renderFloorplan(); invalidate3D(); renderActivePanels(); saveRoomPlan();
+      return;
+    }
     const hit = e.target && e.target.closest ? e.target.closest('[data-drag-id]') : null;
-    if(!hit) return;
+    if(!hit){
+      /* A press on empty plan clears the selection, so the handles go away. */
+      if(state.selectedFurnitureId !== null){ state.selectedFurnitureId = null; renderFloorplan(); }
+      return;
+    }
     const found = fpFindDraggable(hit.getAttribute('data-drag-id'));
     const ppf = fpPxPerFt();
     if(!found || !(ppf > 0)) return;
     e.preventDefault();
+    /* Pressing a piece selects it, so a press-and-drag selects and moves in one gesture. */
+    state.selectedFurnitureId =
+      (found.kind === 'furniture' || found.kind === 'furnitureWall') ? found.obj.id : null;
     const edge = hit.getAttribute('data-resize-edge') || null;
     FP.dragId = found.obj.id;
     FP.drag = {obj:found.obj, kind:found.kind, ppf:ppf, moved:false, edge:edge,
