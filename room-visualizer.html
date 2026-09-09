@@ -398,6 +398,11 @@
   .orient-btn:hover:not(.active){background:var(--ink);color:var(--paper)}
 
   .panel-sizes{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  /* DEV-47: furniture picker. Plan-view only; setView() owns the visibility. */
+  .furn-types{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
+  .furn-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--paper);border:1.5px solid var(--ink);cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink);min-height:44px;text-align:left;transition:background 0.18s,color 0.18s}
+  .furn-chip svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.5;flex:none}
+  .furn-chip:hover{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper)}
   .size-chip{padding:9px 8px;border:1.5px solid var(--ink);background:var(--paper);cursor:pointer;transition:all 0.2s;display:flex;flex-direction:column;gap:3px;text-align:left;font-family:inherit;min-height:48px}
   .size-chip:hover{background:var(--ink);color:var(--paper)}
   .size-chip:hover .size-price{color:var(--accent)}
@@ -775,6 +780,22 @@
       <div class="designs-grid-outer" id="designedPanels"></div>
     </div>
 
+    <div class="sidebar-section" id="furnitureSection" hidden>
+      <div class="sidebar-title">
+        <span>Furniture</span>
+        <span class="deselect-hint">click to add</span>
+      </div>
+      <div class="furn-types" id="furnTypes">
+        <button class="furn-chip" data-furn="window"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><path d="M12 4v16M4 12h16"/></svg>Window</button>
+        <button class="furn-chip" data-furn="door"><svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18"/><circle cx="15" cy="12" r="1"/></svg>Door</button>
+        <button class="furn-chip" data-furn="desk"><svg viewBox="0 0 24 24"><path d="M3 9h18M5 9v11M19 9v11"/></svg>Desk</button>
+        <button class="furn-chip" data-furn="chair"><svg viewBox="0 0 24 24"><path d="M7 4v9m10-9v9M6 13h12M8 13v7m8-7v7"/></svg>Chair</button>
+        <button class="furn-chip" data-furn="speaker"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="7" r="1"/></svg>Speakers</button>
+        <button class="furn-chip" data-furn="bed"><svg viewBox="0 0 24 24"><path d="M3 18v-7h18v7M3 18v2m18-2v2M3 11V7h7v4"/></svg>Bed</button>
+        <button class="furn-chip" data-furn="couch"><svg viewBox="0 0 24 24"><path d="M4 11V8h16v3M2 11h20v6H2zM5 17v2m14-2v2"/></svg>Couch</button>
+      </div>
+    </div>
+
     <div class="sidebar-section">
       <div class="sidebar-title">Your plan</div>
       <div class="stats">
@@ -1136,6 +1157,37 @@ function furnClamp(f){
     f.y = Math.max(0, Math.min(R.D - f.h, f.y));
   }
   return f;
+}
+
+/* A sidebar click ARMS nothing -- unlike a panel size chip, furniture has no surface to be
+   placed on, so it is created immediately at the room centre and dragged from there. That is
+   what "the Plan positions, it does not originate" means in practice (DEV-47 decision 1). */
+function addFurniture(type){
+  const def = FURN_TYPES[type];
+  if(!def) return;
+  const R = r3dRoom();
+  const made = [];
+  const base = function(extra){
+    return Object.assign({id:furnNewId(), type:type, wall:null, x:0, y:0,
+                          w:def.w, h:def.h, base:def.base, tall:def.tall}, extra);
+  };
+  if(def.mount === 'wall'){
+    /* The front wall: where the 2D view starts and where the 3D camera looks at yaw 0, so a
+       new window is visible in every view without hunting for it. */
+    made.push(furnClamp(base({wall:'front', x:(furnWallSpan('front') - def.w)/2})));
+  } else if(type === 'speaker'){
+    /* A pair, but two independent pieces from the moment they land -- nothing links them
+       afterwards, so each drags, resizes and deletes on its own. */
+    const cy = (R.D - def.h)/2;
+    [['L', -FURN_SPEAKER_GAP/2], ['R', FURN_SPEAKER_GAP/2]].forEach(function(s){
+      made.push(furnClamp(base({side:s[0], x:R.W/2 + s[1] - def.w/2, y:cy})));
+    });
+  } else {
+    made.push(furnClamp(base({x:(R.W - def.w)/2, y:(R.D - def.h)/2})));
+  }
+  state.furniture.push.apply(state.furniture, made);
+  state.selectedFurnitureId = made[made.length-1].id;
+  renderFloorplan(); invalidate3D(); renderActivePanels(); saveRoomPlan();
 }
 
 const $ = id => document.getElementById(id);
@@ -2071,6 +2123,11 @@ function setView(view){
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
+  /* The picker is the one sidebar section that belongs to a single view: furniture is
+     created here and positioned in the Plan, so offering it from 2D would arm something
+     with nowhere to land. */
+  const furnSec = $('furnitureSection');
+  if(furnSec) furnSec.hidden = (view !== 'floorplan');
   /* A pane has a zero-size box while display:none, so neither view can be measured until
      it is visible -- the same reflow trap as DEV-13. Draw after the class flip above. */
   if(view === '3D'){ R3D.eye = 0; render3D(); }
@@ -2079,6 +2136,10 @@ function setView(view){
 
 document.querySelectorAll('.view-rail-btn').forEach(btn => {
   btn.addEventListener('click', () => setView(btn.dataset.view));
+});
+
+document.querySelectorAll('.furn-chip').forEach(function(btn){
+  btn.addEventListener('click', function(){ addFurniture(btn.dataset.furn); });
 });
 
 initRoom3D();
