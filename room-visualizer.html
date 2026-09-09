@@ -218,7 +218,7 @@
   .fp-stage{
     position:relative;flex:1;min-height:380px;max-height:min(70vh,640px);
     border:1.5px solid var(--ink);background:var(--paper);
-    overflow:hidden;
+    overflow:hidden;touch-action:none;
   }
   .fp-svg{display:block;width:100%;height:100%}
   /* The viewBox is in FEET, so every stroke needs non-scaling-stroke -- a bare
@@ -226,9 +226,17 @@
   .fp-room{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke}
   .fp-grid{fill:none;stroke:var(--ink);stroke-width:1;opacity:0.10;vector-effect:non-scaling-stroke}
   .fp-panel{fill:var(--accent);stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;cursor:pointer}
+  /* A ceiling panel is on a different plane from the wall panels ringing the room, so it
+     must not read as the same object: hollow with a dashed rule, not a solid accent fill. */
+  .fp-ceiling{fill:var(--accent);fill-opacity:0.14;stroke:var(--ink);stroke-width:1.5;
+    stroke-dasharray:5 3;stroke-linejoin:round;vector-effect:non-scaling-stroke;cursor:grab}
+  .fp-ceiling:hover{fill-opacity:0.3}
+  .fp-stage.dragging .fp-ceiling{cursor:grabbing}
+  .fp-stage.dragging .fp-ceiling.moving{fill-opacity:0.34}
   .fp-txt{font-family:'Archivo',sans-serif;font-weight:700;text-transform:uppercase;
     letter-spacing:0.12em;text-anchor:middle;dominant-baseline:middle;fill:var(--ink)}
-  .fp-txt.mute{fill:var(--mute)}
+  .fp-txt.mute{fill:var(--mute);paint-order:stroke fill;stroke:var(--paper);stroke-width:3;
+    stroke-linejoin:round;vector-effect:non-scaling-stroke}
   .fp-empty{
     position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
     font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;
@@ -276,11 +284,25 @@
   .wall-surface-big.armed{cursor:crosshair;outline:2px solid var(--accent);outline-offset:-2px;background:#FAF4EA}
   .wall-surface-big::before{content:attr(data-empty);position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em;color:var(--mute);pointer-events:none;white-space:nowrap;text-align:center}
   .wall-surface-big.has-panels::before{display:none}
+  /* DEV-46: looking at a ceiling top-down, nothing tells you which way the room faces.
+     The four edges are labelled so the read is never left to assumption. Plan-view
+     convention, identical to the Floor Plan: top edge = front of room. */
+  .ceiling-edge{position:absolute;font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;color:var(--mute);pointer-events:none;white-space:nowrap;z-index:4;display:none}
+  .wall-surface-big[data-wall="ceiling"] .ceiling-edge{display:block}
+  .ceiling-edge.top{top:3px;left:50%;transform:translateX(-50%)}
+  .ceiling-edge.bottom{bottom:3px;left:50%;transform:translateX(-50%)}
+  .ceiling-edge.left{left:3px;top:50%;transform-origin:left center;transform:translateY(-50%) rotate(-90deg) translateX(-50%)}
+  .ceiling-edge.right{right:3px;top:50%;transform-origin:right center;transform:translateY(-50%) rotate(90deg) translateX(50%)}
+  /* No floor strip and no adjacent-wall labels when the surface is the ceiling:
+     'the wall to your left' has no meaning in a plan view. */
+  .big-wall-scene.ceiling-mode .wall-ground,
+  .big-wall-scene.ceiling-mode .side-wall,
+  .big-wall-scene.ceiling-mode .side-wall-label{display:none}
 
   .big-wall-inner{position:absolute;top:26px;bottom:26px;left:26px;right:26px;display:flex;align-items:center;justify-content:center}
 
   /* Compact thumbnails — small enough to keep wall-in-focus dominant */
-  .wall-thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .wall-thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
   .wall-thumb{background:var(--paper);border:1.5px solid var(--ink);padding:6px 8px;display:flex;flex-direction:column;gap:3px;cursor:pointer;transition:background 0.2s, border-color 0.2s, color 0.2s;position:relative;min-width:0}
   .wall-thumb:hover{background:rgba(9,61,83,0.05);border-color:var(--primary-light);color:var(--primary-light)}
   .wall-thumb:hover .thumb-meta{color:var(--primary-light);opacity:1}
@@ -485,7 +507,7 @@
     .designed-card-tag{font-size:8px}
   }
   @media (max-width:560px){
-    .wall-thumbs{gap:4px}
+    .wall-thumbs{grid-template-columns:repeat(2,1fr);gap:4px}
     .wall-thumb{padding:4px 5px}
     .thumb-label{font-size:9px}
     .thumb-meta{font-size:7px}
@@ -673,7 +695,7 @@
         <div class="wall-ground"></div>
         <div class="selection-hint" id="selectionHint">Drag to select multiple · Esc to clear</div>
         <div class="big-wall-inner">
-          <div class="wall-surface-big" id="activeWallSurface" data-wall="front" data-empty="Select a panel size to start"></div>
+          <div class="wall-surface-big" id="activeWallSurface" data-wall="front" data-empty="Select a panel size to start"><span class="ceiling-edge top">Front Wall</span><span class="ceiling-edge bottom">Back Wall</span><span class="ceiling-edge left">Left Wall</span><span class="ceiling-edge right">Right Wall</span></div>
         </div>
       </div>
     </div>
@@ -1038,8 +1060,12 @@ document.getElementById('consultForm').addEventListener('submit',e=>{
 
 const state = {roomLength:14, roomWidth:12, roomHeight:10, activeWall:'front', selectedSize:null, selectedDesignedId:null, orientation:'horizontal', panels:[], designedCart:[], selectedPanelIds:new Set(), activeView:'2D'};
 const PANEL_PRICES = { '1x1':2500, '2x1':3500, '2x2':4500, '4x2':6500, '1x4':5500 };
+/* WALL_ORDER is the four VERTICAL walls and stays that way: the 3D view's opacity,
+   focus and yaw machinery is defined only for them. The ceiling is a placeable
+   surface (DEV-46), not a wall -- SURFACE_ORDER is the list that includes it. */
 const WALL_ORDER = ['front','right','back','left'];
-const WALL_LABELS = {front:'Front Wall', back:'Back Wall', left:'Left Wall', right:'Right Wall'};
+const SURFACE_ORDER = ['front','right','back','left','ceiling'];
+const WALL_LABELS = {front:'Front Wall', back:'Back Wall', left:'Left Wall', right:'Right Wall', ceiling:'Ceiling'};
 const WALL_ADJACENTS = {
   front:{left:'left', right:'right'},
   right:{left:'front', right:'back'},
@@ -1268,6 +1294,12 @@ function r3dPanelQuad(panel){
   const yTop = H - panel.y, yBot = H - panel.y - panel.h;
   const a = panel.x, b = panel.x + panel.w;
   switch(panel.wall){
+    /* DEV-46: the ceiling is a horizontal surface at y=H, so it never touches yTop/yBot.
+       A ceiling panel's second coordinate is a DEPTH along z, not a height up a wall:
+       editor (x,y) is (x,z) in plan orientation, the same mapping the 2D ceiling surface
+       and the Floor Plan use, so the three views agree by construction. */
+    case 'ceiling': return [{x:a,y:H,z:panel.y},{x:b,y:H,z:panel.y},
+                            {x:b,y:H,z:panel.y+panel.h},{x:a,y:H,z:panel.y+panel.h}];
     case 'front': return [{x:a,y:yBot,z:0},{x:b,y:yBot,z:0},{x:b,y:yTop,z:0},{x:a,y:yTop,z:0}];
     /* Facing the back wall from inside the room, editor-left maps to world +x mirrored. */
     case 'back':  return [{x:W-b,y:yBot,z:D},{x:W-a,y:yBot,z:D},{x:W-a,y:yTop,z:D},{x:W-b,y:yTop,z:D}];
@@ -1276,13 +1308,6 @@ function r3dPanelQuad(panel){
     /* Facing the right wall, the front of the room (z=0) is on the left. */
     default:      return [{x:W,y:yBot,z:a},{x:W,y:yBot,z:b},{x:W,y:yTop,z:b},{x:W,y:yTop,z:a}];
   }
-}
-
-/* Ceiling panels belong to DEV-44; read them if present so the ceiling populates for free. */
-function r3dCeilingQuad(panel){
-  const H = r3dRoom().H;
-  const a = panel.x, b = panel.x + panel.w, c = panel.y, d = panel.y + panel.h;
-  return [{x:a,y:H,z:c},{x:b,y:H,z:c},{x:b,y:H,z:d},{x:a,y:H,z:d}];
 }
 
 /* --- Panel extrusion (DEV-45) -------------------------------------------------------
@@ -1536,26 +1561,18 @@ function render3D(){
      fills, so unlike the old flat quads two panels can genuinely overlap and order matters. */
   const drawn = [];
   for(const panel of state.panels){
-    if(!R3D_WALL_YAW.hasOwnProperty(panel.wall)) continue;
+    const ceil = panel.wall === 'ceiling';
+    if(!ceil && !R3D_WALL_YAW.hasOwnProperty(panel.wall)) continue;
     drawn.push({
       panel: panel,
       back:  r3dPanelQuad(panel),
-      nrm:   R3D_WALL_NORMAL[panel.wall],
-      op:    r3dOpacity(panel.wall),
+      /* A ceiling panel hangs DOWN into the room, and holds the steady 0.5 the ceiling
+         plane itself holds -- fading it by yaw would read as flicker, not as depth. */
+      nrm:   ceil ? {x:0, y:-1, z:0} : R3D_WALL_NORMAL[panel.wall],
+      op:    ceil ? 0.5 : r3dOpacity(panel.wall),
       wall:  panel.wall,
       pid:   r3dEsc(panel.id),
       label: r3dEsc((panel.size || (panel.w+'×'+panel.h)) + ' · ' + WALL_LABELS[panel.wall])
-    });
-  }
-  for(const panel of (state.ceilingPanels||[])){
-    drawn.push({
-      panel: panel,
-      back:  r3dCeilingQuad(panel),
-      nrm:   {x:0, y:-1, z:0},                 // ceiling panels hang down into the room
-      op:    0.5,
-      wall:  'ceiling',
-      pid:   'c'+r3dEsc(panel.id),
-      label: r3dEsc((panel.size || (panel.w+'×'+panel.h)) + ' · Ceiling')
     });
   }
   for(const item of drawn) item.depth = r3dToCam(r3dCentroid(item.back), cam).d;
@@ -1699,16 +1716,25 @@ function invalidate3D(){ R3D.eye = 0; if(state.activeView==='3D') render3D(); }
        14ft room and 24px in a 30ft one. So fpFontFt() converts a target pixel size back
        through the actual fitted scale, and a ResizeObserver re-renders when the stage
        changes shape. */
-const FP = {stage:null, svg:null, empty:null, tip:null};
+const FP = {stage:null, svg:null, empty:null, tip:null, dragId:null, drag:null};
 
 /* Feet per pixel, from the scale preserveAspectRatio="meet" will actually use: it fits by
    whichever axis runs out first. Returns the viewBox-unit font size that lands on targetPx
    on screen. Falls back to a proportional guess if the stage has no box yet (hidden pane). */
-function fpFontFt(targetPx, vbW, vbH){
+function fpFitScale(vbW, vbH){
   const r = FP.stage ? FP.stage.getBoundingClientRect() : null;
-  if(!r || r.width < 2 || r.height < 2) return vbW * 0.024;
-  const scale = Math.min(r.width / vbW, r.height / vbH);
+  if(!r || r.width < 2 || r.height < 2) return 0;
+  return Math.min(r.width / vbW, r.height / vbH);
+}
+function fpFontFt(targetPx, vbW, vbH){
+  const scale = fpFitScale(vbW, vbH);
   return scale > 0 ? targetPx / scale : vbW * 0.024;
+}
+/* Screen pixels per foot -- the same fitted scale, which is what turns a pointer delta
+   into a distance in the room. */
+function fpPxPerFt(){
+  const R = r3dRoom(), pad = Math.max(R.W, R.D) * 0.15;
+  return fpFitScale(R.W + pad*2, R.D + pad*2);
 }
 
 function fpRect(cls, x, y, w, h, extra){
@@ -1722,7 +1748,9 @@ function fpRect(cls, x, y, w, h, extra){
    merely resembling each other. */
 function fpPanelBox(panel){
   const q = r3dPanelQuad(panel);
-  const n = R3D_WALL_NORMAL[panel.wall];
+  /* A ceiling panel's depth hangs straight down, so its normal has no x or z component
+     and the extrusion below adds nothing -- which is exactly right from above. */
+  const n = R3D_WALL_NORMAL[panel.wall] || {x:0, y:-1, z:0};
   const d = R3D_PANEL_DEPTH;
   const xs = q.map(function(pt){ return pt.x; }), zs = q.map(function(pt){ return pt.z; });
   const x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
@@ -1753,24 +1781,36 @@ function renderFloorplan(){
   parts.push(fpRect('fp-room', 0, 0, W, D));
 
   /* Wall names sit just INSIDE their edge; room dimensions sit outside, so the two
-     never collide however narrow the room gets. */
+     never collide however narrow the room gets. Ceiling panels CAN sit under a wall
+     name, so the names are collected here and painted last, over everything. */
   const inset = Math.min(W, D) * 0.075 + fs*0.6;
-  parts.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" x="'+(W/2).toFixed(3)+'" y="'+inset.toFixed(3)+'">Front Wall</text>');
-  parts.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" x="'+(W/2).toFixed(3)+'" y="'+(D-inset).toFixed(3)+'">Back Wall</text>');
-  parts.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" transform="translate('+inset.toFixed(3)+','+(D/2).toFixed(3)+') rotate(-90)">Left Wall</text>');
-  parts.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" transform="translate('+(W-inset).toFixed(3)+','+(D/2).toFixed(3)+') rotate(90)">Right Wall</text>');
+  const wallNames = [];
+  wallNames.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" x="'+(W/2).toFixed(3)+'" y="'+inset.toFixed(3)+'">Front Wall</text>');
+  wallNames.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" x="'+(W/2).toFixed(3)+'" y="'+(D-inset).toFixed(3)+'">Back Wall</text>');
+  wallNames.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" transform="translate('+inset.toFixed(3)+','+(D/2).toFixed(3)+') rotate(-90)">Left Wall</text>');
+  wallNames.push('<text class="fp-txt mute" font-size="'+fs.toFixed(4)+'" transform="translate('+(W-inset).toFixed(3)+','+(D/2).toFixed(3)+') rotate(90)">Right Wall</text>');
 
   parts.push('<text class="fp-txt" font-size="'+dimFs.toFixed(4)+'" x="'+(W/2).toFixed(3)+'" y="'+(-pad*0.45).toFixed(3)+'">'+W.toFixed(1)+' ft</text>');
   parts.push('<text class="fp-txt" font-size="'+dimFs.toFixed(4)+'" transform="translate('+(-pad*0.45).toFixed(3)+','+(D/2).toFixed(3)+') rotate(-90)">'+D.toFixed(1)+' ft</text>');
 
   let shown = 0;
+  /* Ceiling panels are drawn after the wall panels so a cloud near a wall sits on top of
+     it rather than under -- it is physically the nearer plane to a viewer looking down. */
+  const ceilings = [];
   for(const panel of state.panels){
-    if(!R3D_WALL_YAW.hasOwnProperty(panel.wall)) continue;
+    const ceil = panel.wall === 'ceiling';
+    if(!ceil && !R3D_WALL_YAW.hasOwnProperty(panel.wall)) continue;
     const b = fpPanelBox(panel);
     const label = r3dEsc((panel.size || (panel.w+'x'+panel.h)) + ' · ' + WALL_LABELS[panel.wall]);
-    parts.push(fpRect('fp-panel', b.x, b.y, b.w, b.h, ' data-label="'+label+'"'));
+    const rect = ceil
+      ? fpRect('fp-ceiling'+(FP.dragId !== null && String(FP.dragId) === String(panel.id) ? ' moving' : ''),
+               b.x, b.y, b.w, b.h, ' data-label="'+label+'" data-drag-id="'+r3dEsc(panel.id)+'"')
+      : fpRect('fp-panel', b.x, b.y, b.w, b.h, ' data-label="'+label+'"');
+    (ceil ? ceilings : parts).push(rect);
     shown++;
   }
+  parts.push.apply(parts, ceilings);
+  parts.push.apply(parts, wallNames);
 
   FP.svg.setAttribute('viewBox', (-pad).toFixed(3)+' '+(-pad).toFixed(3)+' '+vbW.toFixed(3)+' '+vbH.toFixed(3));
   FP.svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
@@ -1780,11 +1820,90 @@ function renderFloorplan(){
 
 function invalidateFloorplan(){ if(state.activeView === 'floorplan') renderFloorplan(); }
 
+/* ---- DEV-46: the plan's drag mechanism ---------------------------------------------
+   Written against "an object with x/y/w/h in floor-plane feet", not against ceiling
+   panels. A kind registers a lookup and a commit; the pointer handling, the clamp to the
+   room and the readout are shared. DEV-47's furniture is another entry in this table,
+   not another set of handlers.
+
+   Wall panels are deliberately NOT registered. A top view can slide one along its wall
+   but has no way to show its height up that wall, so dragging one here would be half an
+   edit performed in the view that cannot show the other half -- and the 2D view already
+   does that job in both axes (DEV-44). */
+const FP_DRAGGABLE = {
+  ceiling: {
+    find: function(id){
+      return state.panels.find(function(p){ return p.wall === 'ceiling' && String(p.id) === String(id); });
+    },
+    /* A ceiling panel moving changes the thumbnail, the 2D surface and the 3D view too. */
+    commit: function(){ renderActivePanels(); renderThumbnails(); updateStats(); invalidate3D(); saveRoomPlan(); }
+  }
+};
+
+function fpFindDraggable(id){
+  for(const kind in FP_DRAGGABLE){
+    const obj = FP_DRAGGABLE[kind].find(id);
+    if(obj) return {obj:obj, kind:kind};
+  }
+  return null;
+}
+
+/* The wall-resize readout idiom: what you are changing, live, in feet. Distance from the
+   left and front walls is how a cloud's position is actually described. */
+function fpDragReadout(clientX, clientY){
+  if(!FP.tip || !FP.drag) return;
+  const o = FP.drag.obj, r = FP.stage.getBoundingClientRect();
+  FP.tip.textContent = o.x.toFixed(1)+' ft from Left · '+o.y.toFixed(1)+' ft from Front';
+  FP.tip.style.left = (clientX - r.left)+'px';
+  FP.tip.style.top  = (clientY - r.top)+'px';
+  FP.tip.classList.add('on');
+}
+
 function initFloorplan(){
   FP.stage = $('fpStage'); FP.svg = $('fpSvg'); FP.empty = $('fpEmpty'); FP.tip = $('fpTip');
   if(!FP.stage) return;
+  /* Capture is taken on the STAGE, not on the rect: every move re-renders the SVG and
+     destroys the element under the pointer, so a capture on the rect would die instantly. */
+  FP.stage.addEventListener('pointerdown', function(e){
+    const hit = e.target && e.target.closest ? e.target.closest('[data-drag-id]') : null;
+    if(!hit) return;
+    const found = fpFindDraggable(hit.getAttribute('data-drag-id'));
+    const ppf = fpPxPerFt();
+    if(!found || !(ppf > 0)) return;
+    e.preventDefault();
+    FP.dragId = found.obj.id;
+    FP.drag = {obj:found.obj, kind:found.kind, ppf:ppf, moved:false,
+               startX:e.clientX, startY:e.clientY, ox:found.obj.x, oy:found.obj.y};
+    FP.stage.classList.add('dragging');
+    try{ FP.stage.setPointerCapture(e.pointerId); }catch(err){}
+    renderFloorplan();
+    fpDragReadout(e.clientX, e.clientY);
+  });
+
+  function fpEndDrag(e){
+    if(!FP.drag) return;
+    try{ FP.stage.releasePointerCapture(e.pointerId); }catch(err){}
+    const d = FP.drag;
+    FP.drag = null; FP.dragId = null;
+    FP.stage.classList.remove('dragging');
+    if(FP.tip) FP.tip.classList.remove('on');
+    renderFloorplan();
+    if(d.moved) FP_DRAGGABLE[d.kind].commit();
+  }
+  FP.stage.addEventListener('pointerup', fpEndDrag);
+  FP.stage.addEventListener('pointercancel', fpEndDrag);
+
   FP.stage.addEventListener('pointermove', function(e){
-    const hit = e.target && e.target.closest ? e.target.closest('.fp-panel') : null;
+    if(FP.drag){
+      const R = r3dRoom(), d = FP.drag, o = d.obj;
+      o.x = Math.max(0, Math.min(R.W - o.w, d.ox + (e.clientX - d.startX) / d.ppf));
+      o.y = Math.max(0, Math.min(R.D - o.h, d.oy + (e.clientY - d.startY) / d.ppf));
+      d.moved = true;
+      renderFloorplan();
+      fpDragReadout(e.clientX, e.clientY);
+      return;
+    }
+    const hit = e.target && e.target.closest ? e.target.closest('.fp-panel, .fp-ceiling') : null;
     if(hit && FP.tip){
       const r = FP.stage.getBoundingClientRect();
       FP.tip.textContent = hit.getAttribute('data-label');
@@ -1793,7 +1912,7 @@ function initFloorplan(){
       FP.tip.classList.add('on');
     } else if(FP.tip){ FP.tip.classList.remove('on'); }
   });
-  FP.stage.addEventListener('pointerleave', function(){ if(FP.tip) FP.tip.classList.remove('on'); });
+  FP.stage.addEventListener('pointerleave', function(){ if(FP.tip && !FP.drag) FP.tip.classList.remove('on'); });
   /* Label sizing depends on the stage's fitted scale, so a reshape needs a redraw. */
   if(window.ResizeObserver){
     new ResizeObserver(function(){ if(state.activeView === 'floorplan') renderFloorplan(); }).observe(FP.stage);
@@ -1857,7 +1976,11 @@ document.querySelectorAll('.preset-card').forEach(card=>{
 
 [lengthInput,widthInput,heightInput].forEach(input=>{input.addEventListener('input',updateDimensions)});
 
+/* The ceiling is seen in PLAN: its width is the room's length and its height on screen
+   is the room's width (depth). Its top edge is the front of the room, exactly as in the
+   Floor Plan -- so editor (x,y) maps to world (x, z=y) and nothing mirrors. */
 function getWallDimensionsFt(wall){
+  if(wall === 'ceiling') return {w: state.roomLength, h: state.roomWidth};
   const w = (wall === 'front' || wall === 'back') ? state.roomLength : state.roomWidth;
   return {w, h: state.roomHeight};
 }
@@ -1875,8 +1998,8 @@ function updateDimensions(){
   invalidateFloorplan();
 }
 
-$('sideLabelLeft').addEventListener('click',()=>setActiveWall(WALL_ADJACENTS[state.activeWall].left));
-$('sideLabelRight').addEventListener('click',()=>setActiveWall(WALL_ADJACENTS[state.activeWall].right));
+$('sideLabelLeft').addEventListener('click',()=>{const a=WALL_ADJACENTS[state.activeWall]; if(a) setActiveWall(a.left);});
+$('sideLabelRight').addEventListener('click',()=>{const a=WALL_ADJACENTS[state.activeWall]; if(a) setActiveWall(a.right);});
 
 function setActiveWall(wall){
   state.activeWall = wall;
@@ -1895,8 +2018,11 @@ function refreshActiveWall(){
   activeWallSurface.dataset.wallWidth = wallWft;
   sizeWallSurface();
   const adj = WALL_ADJACENTS[wall];
-  $('sideLabelLeft').textContent = `← ${WALL_LABELS[adj.left]}`;
-  $('sideLabelRight').textContent = `${WALL_LABELS[adj.right]} →`;
+  bigWallScene.classList.toggle('ceiling-mode', wall === 'ceiling');
+  if(adj){
+    $('sideLabelLeft').textContent = `← ${WALL_LABELS[adj.left]}`;
+    $('sideLabelRight').textContent = `${WALL_LABELS[adj.right]} →`;
+  }
   renderActivePanels();
   updateArmedState();
 }
@@ -2816,8 +2942,15 @@ function renderThumbnails(){
   // Order thumbnails to match the viewer's orientation when facing the active wall:
   // [wall to your left] | [wall behind you] | [wall to your right]
   const adj = WALL_ADJACENTS[state.activeWall];
-  const opposite = WALL_ORDER.find(w => w !== state.activeWall && w !== adj.left && w !== adj.right);
-  const otherWalls = [adj.left, opposite, adj.right];
+  /* Facing the ceiling there is no left/right/behind, so the strip is simply the four
+     walls in their canonical order. Facing a wall it is the other three plus Ceiling. */
+  let otherWalls;
+  if(adj){
+    const opposite = WALL_ORDER.find(w => w !== state.activeWall && w !== adj.left && w !== adj.right);
+    otherWalls = [adj.left, opposite, adj.right, 'ceiling'];
+  } else {
+    otherWalls = WALL_ORDER.slice();
+  }
   otherWalls.forEach(wall => {
     const {w:wWft, h:wHft} = getWallDimensionsFt(wall);
     const panelsOnWall = state.panels.filter(p=>p.wall===wall);
@@ -2896,8 +3029,11 @@ function paintThumbSurface(thumb, wall, wWft, wHft, panelsOnWall, attempt = 0){
 function updateStats(){
   statCount.textContent = state.panels.length;
   const totalPanelArea = state.panels.reduce((s,p)=>s + p.w*p.h, 0);
-  const totalWallArea = 2*(state.roomLength + state.roomWidth)*state.roomHeight;
-  const coverage = totalWallArea > 0 ? (totalPanelArea / totalWallArea * 100).toFixed(1) : 0;
+  /* DEV-46: the ceiling is placeable now, so it belongs in the divisor -- otherwise a
+     ceiling panel inflates coverage against an area it does not sit on. */
+  const totalSurfaceArea = 2*(state.roomLength + state.roomWidth)*state.roomHeight
+                         + state.roomLength*state.roomWidth;
+  const coverage = totalSurfaceArea > 0 ? (totalPanelArea / totalSurfaceArea * 100).toFixed(1) : 0;
   statCoverage.textContent = coverage + '%';
   const total = state.panels.reduce((s,p)=>s + p.price, 0);
   statTotal.textContent = '₹' + total.toLocaleString();
@@ -2956,6 +3092,22 @@ window.addEventListener('resize',()=>{setTimeout(()=>{sizeWallSurface();renderAc
 // ====================================================
 let _resizeHandles = null;
 
+/* Which room dimension an edge drag changes on the surface currently on screen.
+   On a wall the horizontal edges are the room's HEIGHT. On the ceiling, seen in plan,
+   there is no height on screen at all: top/bottom is the room's width and left/right
+   its length. This was inlined in three places before DEV-46; keep it in one. */
+function surfaceResizeAxis(edge){
+  const horizEdge = (edge === 'top' || edge === 'bottom');
+  if(state.activeWall === 'ceiling'){
+    return horizEdge ? {dim:state.roomWidth,  input:widthInput,  min:6, max:40}
+                     : {dim:state.roomLength, input:lengthInput, min:6, max:40};
+  }
+  if(horizEdge) return {dim:state.roomHeight, input:heightInput, min:7, max:14};
+  const isLengthWall = (state.activeWall === 'front' || state.activeWall === 'back');
+  return isLengthWall ? {dim:state.roomLength, input:lengthInput, min:6, max:40}
+                      : {dim:state.roomWidth,  input:widthInput,  min:6, max:40};
+}
+
 function createResizeHandles(){
   if(_resizeHandles) return;
   _resizeHandles = {};
@@ -2983,14 +3135,11 @@ function createResizeHandles(){
       e.stopPropagation();
       const wallRect = activeWallSurface.getBoundingClientRect();
       const {w:wallW, h:wallH} = getWallDimensionsFt(state.activeWall);
-      const isHeightAxis = (edge==='top' || edge==='bottom');
-      const isLengthWall = (state.activeWall==='front' || state.activeWall==='back');
-      const startDim = isHeightAxis ? state.roomHeight : (isLengthWall ? state.roomLength : state.roomWidth);
-      const inputEl  = isHeightAxis ? heightInput      : (isLengthWall ? lengthInput  : widthInput);
+      const ax = surfaceResizeAxis(edge);
       interaction = {
         kind: 'wall-resize', edge,
         startX: e.clientX, startY: e.clientY,
-        startDim, inputEl, isHeightAxis,
+        startDim: ax.dim, inputEl: ax.input, minDim: ax.min, maxDim: ax.max,
         startPxPerFtX: wallRect.width  / wallW,
         startPxPerFtY: wallRect.height / wallH
       };
@@ -3019,10 +3168,7 @@ function updateResizeHandles(){
 }
 
 function _showResizeReadout(clientX, clientY, edge){
-  const isHeightAxis = (edge==='top' || edge==='bottom');
-  const isLengthWall = (state.activeWall==='front' || state.activeWall==='back');
-  const dim = isHeightAxis ? state.roomHeight : (isLengthWall ? state.roomLength : state.roomWidth);
-  wallResizeReadout.textContent = dim.toFixed(1)+' ft';
+  wallResizeReadout.textContent = surfaceResizeAxis(edge).dim.toFixed(1)+' ft';
   wallResizeReadout.style.left = (clientX+14)+'px';
   wallResizeReadout.style.top  = (clientY-28)+'px';
   wallResizeReadout.style.display = 'block';
@@ -3034,7 +3180,7 @@ function _hideResizeReadout(){
 
 bigWallScene.addEventListener('pointermove', e=>{
   if(!interaction || interaction.kind!=='wall-resize') return;
-  const {edge, startX, startY, startDim, startPxPerFtX, startPxPerFtY, inputEl, isHeightAxis} = interaction;
+  const {edge, startX, startY, startDim, startPxPerFtX, startPxPerFtY, inputEl, minDim, maxDim} = interaction;
   const dx = e.clientX - startX;
   const dy = e.clientY - startY;
   let rawDelta;
@@ -3044,8 +3190,6 @@ bigWallScene.addEventListener('pointermove', e=>{
   else                     rawDelta =  dx / startPxPerFtX;
   const snap   = e.shiftKey ? 0.5 : 0.1;
   const newDim = Math.round((startDim + rawDelta) / snap) * snap;
-  const minDim = isHeightAxis ? 7 : 6;
-  const maxDim = isHeightAxis ? 14 : 40;
   const clampedDim = Math.max(minDim, Math.min(maxDim, newDim));
   inputEl.value = clampedDim.toFixed(1);
   updateDimensions();

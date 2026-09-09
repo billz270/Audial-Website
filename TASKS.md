@@ -2950,7 +2950,8 @@ Measured at 35 deg of yaw: the focused wall fills 82.8% of frame width at 55 deg
 ---
 
 ## Task #DEV-46: Ceiling Panel Placement
-- **Status:** TODO -- specced, awaiting founder review
+- **Status:** IN REVIEW -- built, 55 checks green in Chromium, handedness verified by screenshot.
+  Awaiting founder sign-off on localhost. Not yet deployed.
 - **Priority:** MEDIUM
 - **File:** room-visualizer.html
 - **Depends on:** DEV-44 (the Floor Plan must exist to show and rearrange them)
@@ -3041,19 +3042,92 @@ Wall panels stay display-only in the plan. That does not change.
   they are seen from behind up there, so the default is that they do not.
 
 ### Acceptance Criteria
-- [ ] Ceiling appears as a fifth surface in the 2D wall thumbnails
-- [ ] Selecting it shows a `roomLength x roomWidth` surface with its four edges labelled
-- [ ] Panels can be placed on it using both a size chip and a designed panel
-- [ ] Designed-panel quantity cap counts ceiling placements against the quantity bought
-- [ ] Marquee select, drag, delete and Clear All Panels all work on ceiling panels
-- [ ] Ceiling panels appear in the Floor Plan inside the room, visually distinct from wall panels
-- [ ] Ceiling panels drag in the plan, clamped to the room, with a live readout
-- [ ] Wall panels remain non-draggable in the plan
-- [ ] Ceiling panels appear in the 3D view with depth and finish
-- [ ] **Ceiling artwork handedness verified by screenshot with an asymmetric image**
-- [ ] Ceiling panels survive save/reload and a 2D -> 3D -> Plan round trip
-- [ ] Stats and checkout subtotal include ceiling panels
-- [ ] Works at 1440x900 and 390x844; no console errors beyond the known favicon 404
+- [x] Ceiling appears as a fifth surface in the 2D wall thumbnails
+- [x] Selecting it shows a `roomLength x roomWidth` surface with its four edges labelled
+- [x] Panels can be placed on it using both a size chip and a designed panel
+- [x] Designed-panel quantity cap counts ceiling placements against the quantity bought
+- [x] Marquee select, drag, delete and Clear All Panels all work on ceiling panels
+- [x] Ceiling panels appear in the Floor Plan inside the room, visually distinct from wall panels
+- [x] Ceiling panels drag in the plan, clamped to the room, with a live readout
+- [x] Wall panels remain non-draggable in the plan
+- [x] Ceiling panels appear in the 3D view with depth and finish
+- [x] **Ceiling artwork handedness verified by screenshot with an asymmetric image**
+- [x] Ceiling panels survive save/reload and a 2D -> 3D -> Plan round trip
+- [x] Stats and checkout subtotal include ceiling panels
+- [x] Works at 1440x900 and 390x844; no console errors beyond the known favicon 404
+
+
+### Implementation notes (2026-09-09)
+
+**The 2D view needed almost nothing, and that was the whole bet.** Placement, drag, marquee
+select, snapping, the alignment arrows, delete, the remove button, the "+ Add Design" popup,
+the quantity cap, Clear All, the stats and save/load are all written against `state.panels`
+plus `getWallDimensionsFt(state.activeWall)`. Two lines make the ceiling a legal surface:
+`WALL_LABELS.ceiling` and a `getWallDimensionsFt` branch returning `roomLength x roomWidth`.
+Everything else came along for free, which is exactly the payoff decision 1 was buying.
+
+**`WALL_ORDER` is still the four vertical walls; `SURFACE_ORDER` is the list with the ceiling
+in it.** The 3D view's opacity, focus and yaw tables are defined only for walls -- putting the
+ceiling in `WALL_ORDER` would have had `r3dFocusedWall()` try to face it.
+
+**Orientation: the 2D ceiling surface is a PLAN view, not a looking-up view.** Top edge = front
+of the room, so editor `(x, y)` maps to world `(x, z = y)` -- identical to the Floor Plan and to
+what `r3dCeilingQuad` already did, so nothing mirrors and the three views agree by construction.
+The four edges are labelled inside the surface. The looking-up alternative is the physically
+honest one but it mirrors against the Plan, which is the view you rearrange ceiling panels in.
+
+**Four things did need writing:**
+1. The thumbnail strip went 3 -> 4 (three walls + Ceiling, or all four walls when the ceiling
+   is active), `repeat(4,1fr)` desktop and 2x2 below 560px.
+2. The `<- Left Wall / Right Wall ->` side labels read `WALL_ADJACENTS[activeWall]`, which is
+   **undefined for the ceiling** -- they are hidden there, along with the floor strip, via
+   `.big-wall-scene.ceiling-mode`.
+3. Edge-drag resize: on a wall the horizontal edges are the room's HEIGHT; on the ceiling they
+   are its WIDTH and the vertical edges its LENGTH. That decision was inlined in three places
+   (pointerdown, the readout, the min/max clamp) and is now `surfaceResizeAxis(edge)`.
+4. `r3dCeilingQuad` and the `state.ceilingPanels` loop are deleted; `r3dPanelQuad` gained a
+   `ceiling` case. The extrusion, depth sort, finish and artwork pipeline then ran on ceiling
+   panels with no further change -- code that had never once executed.
+
+**`R3D_ART_CORNERS.ceiling` was right.** The unverified copy of `front` turned out correct, but
+it was verified the way the spec demanded -- a screenshot with the four-quadrant test artwork,
+compared against the same panel on the 2D surface -- **not** by assertion. DEV-45's mirrored
+back and left walls passed every assertion written about them.
+
+**The plan's drag is generic (`FP_DRAGGABLE`).** A kind registers a `find` and a `commit`; the
+pointer handling, the clamp to the room and the readout are shared, so DEV-47's furniture is a
+registration. **Pointer capture is taken on the STAGE, not on the rect**: every move re-renders
+the SVG and destroys the element under the pointer, so a capture on the rect dies instantly.
+
+**Coverage now divides by wall area + ceiling area.** Otherwise a ceiling panel inflates the
+percentage against an area it does not sit on. This changes an existing on-screen number: in a
+14x12x10 room the divisor goes 520 -> 688 sqft, so a plan reading 10.0% redraws as 7.6%.
+
+**Wall names in the plan are painted LAST, with a `--paper` halo** (`paint-order:stroke fill`).
+A ceiling panel can sit anywhere, including under "Front Wall", and before this the label was
+drawn under the panel and half-swallowed by it.
+
+### Open finding for review: ceiling panels are barely visible in 3D
+DEV-43's camera is **yaw-only with zero pitch**, so the ceiling sits at the very top of the
+frame. Measured with 4x2 panels down the room's depth in a 14x12x10 room, 905x628 stage:
+`y=0` -> 204x45px near the top edge; `y=2` -> partly cut by the top; **`y=4` and beyond project
+entirely above the frame.** So the 3D view shows only ceiling panels near the wall you are
+facing. This is not a DEV-46 defect -- it is what a zero-pitch camera does -- but ceiling panels
+are the first content that lives above the eyeline, so it is now worth a decision:
+- **(a) leave it** -- the Floor Plan is where ceiling layout is judged, 3D shows what is near
+  the wall you face;
+- **(b) pitch on vertical drag** -- costs the page-scroll gesture DEV-43 deliberately preserved
+  with `touch-action:pan-y`, which matters on mobile;
+- **(c) a "look up" toggle** -- one button tilts the camera to the ceiling and back, keeping the
+  scroll gesture. Recommended if (a) is not enough; it is its own small task.
+
+### Verification
+55 checks across three suites in real Chromium at 1440x900 and 390x844: the strip, the surface
+and its labels, placement from both a size chip and a designed panel, the quantity cap, 2D drag,
+edge-resize axis, delete, save/reload, the 3D render with depth and artwork, the plan render,
+plan drag with both corner clamps and the committed write, wall panels staying put, and the
+2D -> 3D -> Plan round trip. Only console error is the pre-existing `favicon.ico` 404 (confirmed
+by URL, not by message text -- the message alone does not name the resource).
 
 ### Out of Scope
 - Furniture of any kind (DEV-47)
