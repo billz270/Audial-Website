@@ -2122,7 +2122,11 @@ function invalidateFloorplan(){ if(state.activeView === 'floorplan') renderFloor
    Written against "an object with x/y/w/h in floor-plane feet", not against ceiling
    panels. A kind registers a lookup and a commit; the pointer handling, the clamp to the
    room and the readout are shared. DEV-47's furniture is another entry in this table,
-   not another set of handlers.
+   not another set of handlers. DEV-47 took that up, and the table grew three OPTIONAL hooks
+   to carry it: `move(obj, dx, dy, start)` replaces the default free clamp, `resize(obj, edge,
+   dx, dy, start)` handles an edge handle, and `readout(obj, edge)` names what is changing.
+   A kind that defines none of the three behaves exactly as it did before they existed --
+   which is what keeps the `ceiling` entry below bit-identical to DEV-46.
 
    Wall panels are deliberately NOT registered. A top view can slide one along its wall
    but has no way to show its height up that wall, so dragging one here would be half an
@@ -2135,6 +2139,65 @@ const FP_DRAGGABLE = {
     },
     /* A ceiling panel moving changes the thumbnail, the 2D surface and the 3D view too. */
     commit: function(){ renderActivePanels(); renderThumbnails(); updateStats(); invalidate3D(); saveRoomPlan(); }
+  },
+
+  /* DEV-47: floor furniture. No `move` hook -- the default free clamp is exactly right,
+     which is what DEV-46 predicted when it wrote this table against "an object with x/y/w/h
+     in floor-plane feet" rather than against ceiling panels specifically. */
+  furniture: {
+    find: function(id){
+      return state.furniture.find(function(f){ return !f.wall && String(f.id) === String(id); });
+    },
+    resize: function(o, edge, dx, dy, s){
+      const R = r3dRoom();
+      if(edge === 'w'){ o.x = Math.max(0, Math.min(s.x + dx, s.x + s.w - FURN_MIN)); o.w = s.x + s.w - o.x; }
+      if(edge === 'e'){ o.w = Math.max(FURN_MIN, Math.min(s.w + dx, R.W - s.x)); }
+      if(edge === 'n'){ o.y = Math.max(0, Math.min(s.y + dy, s.y + s.h - FURN_MIN)); o.h = s.y + s.h - o.y; }
+      if(edge === 's'){ o.h = Math.max(FURN_MIN, Math.min(s.h + dy, R.D - s.y)); }
+    },
+    readout: function(o, edge){
+      return edge ? o.w.toFixed(1)+' × '+o.h.toFixed(1)+' ft'
+                  : o.x.toFixed(1)+' ft from Left · '+o.y.toFixed(1)+' ft from Front';
+    },
+    /* Furniture changes the plan and the 3D view. It touches NO statistic: not the panel
+       count, not wall coverage, not the estimated total, and never the checkout. */
+    commit: function(){ renderFloorplan(); invalidate3D(); saveRoomPlan(); }
+  },
+
+  /* DEV-47: windows and doors -- the one kind with a genuinely different constraint. It
+     follows the pointer to the NEAREST wall and then slides only along that wall, so the
+     shared free clamp cannot serve it. */
+  furnitureWall: {
+    find: function(id){
+      return state.furniture.find(function(f){ return !!f.wall && String(f.id) === String(id); });
+    },
+    move: function(o, dx, dy, s){
+      const b0 = fpFurnBox({wall:s.wall, x:s.x, w:s.w, h:FURN_WALL_DEPTH});
+      const cx = b0.x + b0.w/2 + dx, cy = b0.y + b0.h/2 + dy;
+      o.wall = furnNearestWall(cx, cy);
+      const ax = fpWallAxes(o.wall), span = furnWallSpan(o.wall);
+      /* How far the pointer sits along the new wall, projected onto its along-axis, then
+         backed off half the piece so it centres under the pointer. */
+      const t = (cx - ax.o.x)*ax.a.x + (cy - ax.o.y)*ax.a.y;
+      o.x = Math.max(0, Math.min(span - o.w, t - o.w/2));
+      o.y = 0;
+      o.h = FURN_WALL_DEPTH;
+    },
+    /* Only the two ends along the wall. Height and sill are NOT editable here: a top view
+       cannot show height up a wall, the same reason DEV-46 refused to make wall panels
+       draggable in this view. See the spec's Deliberate Limitations. */
+    resize: function(o, edge, dx, dy, s){
+      const ax = fpWallAxes(o.wall), span = furnWallSpan(o.wall);
+      const along = dx*ax.a.x + dy*ax.a.y;
+      if(edge === 'start'){ o.x = Math.max(0, Math.min(s.x + along, s.x + s.w - FURN_MIN)); o.w = s.x + s.w - o.x; }
+      else { o.w = Math.max(FURN_MIN, Math.min(s.w + along, span - s.x)); }
+    },
+    readout: function(o, edge){
+      return edge ? o.w.toFixed(1)+' ft wide'
+                  : o.x.toFixed(1)+' ft along '+WALL_LABELS[o.wall];
+    },
+    /* A wall item may be on the wall currently open in 2D, so that view redraws too. */
+    commit: function(){ renderFloorplan(); invalidate3D(); renderActivePanels(); saveRoomPlan(); }
   }
 };
 
@@ -2150,8 +2213,11 @@ function fpFindDraggable(id){
    left and front walls is how a cloud's position is actually described. */
 function fpDragReadout(clientX, clientY){
   if(!FP.tip || !FP.drag) return;
-  const o = FP.drag.obj, r = FP.stage.getBoundingClientRect();
-  FP.tip.textContent = o.x.toFixed(1)+' ft from Left · '+o.y.toFixed(1)+' ft from Front';
+  const d = FP.drag, o = d.obj, r = FP.stage.getBoundingClientRect();
+  const reg = FP_DRAGGABLE[d.kind];
+  FP.tip.textContent = reg.readout
+    ? reg.readout(o, d.edge)
+    : o.x.toFixed(1)+' ft from Left · '+o.y.toFixed(1)+' ft from Front';
   FP.tip.style.left = (clientX - r.left)+'px';
   FP.tip.style.top  = (clientY - r.top)+'px';
   FP.tip.classList.add('on');
@@ -2169,9 +2235,12 @@ function initFloorplan(){
     const ppf = fpPxPerFt();
     if(!found || !(ppf > 0)) return;
     e.preventDefault();
+    const edge = hit.getAttribute('data-resize-edge') || null;
     FP.dragId = found.obj.id;
-    FP.drag = {obj:found.obj, kind:found.kind, ppf:ppf, moved:false,
-               startX:e.clientX, startY:e.clientY, ox:found.obj.x, oy:found.obj.y};
+    FP.drag = {obj:found.obj, kind:found.kind, ppf:ppf, moved:false, edge:edge,
+               startX:e.clientX, startY:e.clientY,
+               start:{x:found.obj.x, y:found.obj.y, w:found.obj.w, h:found.obj.h,
+                      wall:found.obj.wall || null}};
     FP.stage.classList.add('dragging');
     try{ FP.stage.setPointerCapture(e.pointerId); }catch(err){}
     renderFloorplan();
@@ -2193,9 +2262,17 @@ function initFloorplan(){
 
   FP.stage.addEventListener('pointermove', function(e){
     if(FP.drag){
-      const R = r3dRoom(), d = FP.drag, o = d.obj;
-      o.x = Math.max(0, Math.min(R.W - o.w, d.ox + (e.clientX - d.startX) / d.ppf));
-      o.y = Math.max(0, Math.min(R.D - o.h, d.oy + (e.clientY - d.startY) / d.ppf));
+      const d = FP.drag, o = d.obj, reg = FP_DRAGGABLE[d.kind];
+      const dx = (e.clientX - d.startX) / d.ppf, dy = (e.clientY - d.startY) / d.ppf;
+      if(d.edge && reg.resize)   reg.resize(o, d.edge, dx, dy, d.start);
+      else if(reg.move)          reg.move(o, dx, dy, d.start);
+      else {
+        /* The default: free, clamped inside the room. DEV-46's ceiling entry defines no
+           hooks, so this is the path it still takes and its behaviour is unchanged. */
+        const R = r3dRoom();
+        o.x = Math.max(0, Math.min(R.W - o.w, d.start.x + dx));
+        o.y = Math.max(0, Math.min(R.D - o.h, d.start.y + dy));
+      }
       d.moved = true;
       renderFloorplan();
       fpDragReadout(e.clientX, e.clientY);
