@@ -1075,7 +1075,7 @@ document.getElementById('consultForm').addEventListener('submit',e=>{
   window.location.href = `mailto:support@audial.in?subject=Consultation Request&body=${encodeURIComponent(body)}`;
 });
 
-const state = {roomLength:14, roomWidth:12, roomHeight:10, activeWall:'front', selectedSize:null, selectedDesignedId:null, orientation:'horizontal', panels:[], designedCart:[], selectedPanelIds:new Set(), activeView:'2D'};
+const state = {roomLength:14, roomWidth:12, roomHeight:10, activeWall:'front', selectedSize:null, selectedDesignedId:null, orientation:'horizontal', panels:[], designedCart:[], selectedPanelIds:new Set(), furniture:[], selectedFurnitureId:null, activeView:'2D'};
 const PANEL_PRICES = { '1x1':2500, '2x1':3500, '2x2':4500, '4x2':6500, '1x4':5500 };
 /* WALL_ORDER is the four VERTICAL walls and stays that way: the 3D view's opacity,
    focus and yaw machinery is defined only for them. The ceiling is a placeable
@@ -1089,6 +1089,54 @@ const WALL_ADJACENTS = {
   back: {left:'right', right:'left'},
   left: {left:'back', right:'front'}
 };
+
+/* ---- DEV-47: furniture -------------------------------------------------------------
+   Basic renditions, not models of anyone's actual furniture: close enough on dimensions
+   and position to plan a room around. Deliberately separate from state.panels -- furniture
+   has no price, no quantity cap, no artwork, and never reaches a statistic or the checkout.
+
+   w/h are ALWAYS the floor-plane footprint, for every type, so the Plan's shared clamp keeps
+   one meaning. The third dimension lives in base/tall. For a wall item w is its width along
+   the wall and h is a nominal depth, because a window has no floor area but the Plan still
+   needs a box to draw and hit-test. */
+const FURN_WALL_DEPTH = 0.35;   // ft
+const FURN_TYPES = {
+  window:  {label:'Window',   mount:'wall',  w:4, h:FURN_WALL_DEPTH, base:3, tall:3},
+  door:    {label:'Door',     mount:'wall',  w:3, h:FURN_WALL_DEPTH, base:0, tall:7},
+  desk:    {label:'Desk',     mount:'floor', w:4, h:2, base:0, tall:2.5},
+  chair:   {label:'Chair',    mount:'floor', w:2, h:2, base:0, tall:2.8},
+  speaker: {label:'Speakers', mount:'floor', w:1, h:1, base:0, tall:3.0},
+  bed:     {label:'Bed',      mount:'floor', w:6, h:5, base:0, tall:2.0},
+  couch:   {label:'Couch',    mount:'floor', w:6, h:3, base:0, tall:2.7}
+};
+const FURN_ORDER = ['window','door','desk','chair','speaker','bed','couch'];
+const FURN_MIN = 0.5;             // ft, smallest a piece can be resized to
+const FURN_SPEAKER_GAP = 4;       // ft centre-to-centre for a newly added pair
+const FURN_OPACITY = 0.55;        // 3D: just above the 0.5 the floor and ceiling planes hold
+
+/* Ids must be unique within a millisecond -- a speaker pair is created in one tick. */
+let furnSeq = 0;
+function furnNewId(){ return Date.now() * 1000 + (furnSeq++ % 1000); }
+
+/* The length of the wall a piece slides along. */
+function furnWallSpan(wall){ const R = r3dRoom(); return (wall==='front'||wall==='back') ? R.W : R.D; }
+
+function furnClamp(f){
+  const R = r3dRoom();
+  if(f.wall){
+    const span = furnWallSpan(f.wall);
+    f.h = FURN_WALL_DEPTH;
+    f.w = Math.max(FURN_MIN, Math.min(f.w, span));
+    f.x = Math.max(0, Math.min(span - f.w, f.x));
+    f.y = 0;
+  } else {
+    f.w = Math.max(FURN_MIN, Math.min(f.w, R.W));
+    f.h = Math.max(FURN_MIN, Math.min(f.h, R.D));
+    f.x = Math.max(0, Math.min(R.W - f.w, f.x));
+    f.y = Math.max(0, Math.min(R.D - f.h, f.y));
+  }
+  return f;
+}
 
 const $ = id => document.getElementById(id);
 const lengthInput = $('lengthInput'), widthInput = $('widthInput'), heightInput = $('heightInput');
@@ -1132,6 +1180,9 @@ function loadRoomPlan(){
       if(r.height){ state.roomHeight = r.height; heightInput.value = r.height; }
     }
     if(Array.isArray(saved.panels)) state.panels = saved.panels;
+    /* A plan saved before DEV-47 has no furniture key and simply loads with none -- the
+       same back-compat shape DEV-45 used for woodVarnish/fabricWrap. */
+    if(Array.isArray(saved.furniture)) state.furniture = saved.furniture;
   }catch(e){}
 }
 
@@ -3137,7 +3188,7 @@ $('clearBtn').addEventListener('click',()=>{
 });
 
 function saveRoomPlan(){
-  try{localStorage.setItem('acousticRoomPlan', JSON.stringify({room:{length:state.roomLength, width:state.roomWidth, height:state.roomHeight}, panels: state.panels}))}catch(err){}
+  try{localStorage.setItem('acousticRoomPlan', JSON.stringify({room:{length:state.roomLength, width:state.roomWidth, height:state.roomHeight}, panels: state.panels, furniture: state.furniture}))}catch(err){}
 }
 
 window.addEventListener('message', e => {
