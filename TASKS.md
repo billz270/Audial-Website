@@ -3329,6 +3329,41 @@ height, so editing belongs there, which would mean making 2D furniture interacti
 **Overlap is allowed and there is no collision detection**, deliberately: an app that refuses to
 let you nudge the couch under the window is worse than one that draws what you actually have.
 
+### RESUME POINT -- next session starts here (2026-09-09)
+
+DEV-47 is **built, 100 checks green, committed** (9 commits, `f7b1b3f`..`7170574`, master, local
+only -- not pushed, not deployed). The founder reviewed it on localhost and **it works**. What
+follows is UI feedback, not defects.
+
+**1. MOVE THE FURNITURE PICKER OFF THE SIDEBAR AND INTO THE PLAN VIEWER.** Founder's call,
+2026-09-09: *"I'd rather have these furniture button options within the viewer of the planning
+space, i.e. the space where the room is visible, and not on the side. That'll create too much
+clutter."* He is right, and it sharpens DEV-47 decision 1 rather than reversing it: the rule was
+already *"the Plan positions, it does not originate"*, and a control that only exists in one view
+has no business occupying permanent sidebar height in the other two.
+
+What this touches -- small, and deliberately isolated when it was built:
+- `#furnitureSection` (a `.sidebar-section` sitting between "Your Designs" and "Your plan") moves
+  into the Plan pane, over `#fpStage`. The `.furn-chip` buttons and their `addFurniture(type)`
+  click handler are unchanged; only the container and its CSS move.
+- The `setView()` line `furnSec.hidden = (view !== 'floorplan')` becomes unnecessary once the
+  picker lives inside the Plan pane -- the pane's own `.active` class already gates it. **Delete
+  it rather than leaving it dead.**
+- Watch: `#fpStage` takes pointer capture for every drag, so an overlay picker must not sit inside
+  the capture path or a chip click will read as a drag on the stage. Park it as a sibling of the
+  SVG inside the pane, not as a child of the stage -- the same trap DEV-33's Components drawer hit
+  with `#panelContainer`'s `overflow:hidden`.
+- Form is open: a horizontal toolbar strip along the top or bottom of the plan canvas, or a
+  collapsible drawer like DEV-33's. **Ask before building -- the founder said "we need to make
+  certain improvements to the UI for sure", so there is likely more than this one change.**
+
+**2. Not yet done, deliberately:** nothing is deployed. `npx vercel --prod` is founder-triggered,
+and `git status` must be checked against `.vercelignore` first (the Vercel CLI uploads the whole
+working directory).
+
+**3. Still open and unanswered:** the pitch finding immediately below. It needs a yes/no, not
+work -- the measurement is already done.
+
 ### The pitch finding -- OPEN, for founder review
 
 DEV-48 set `R3D_PITCH_MIN = 0` (the view never tilts down) on the founder's call, and wrote down
