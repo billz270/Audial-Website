@@ -3309,10 +3309,19 @@ limit visible because it is the first content placed above the eyeline.
   easing freezes half-way whenever the yaw happens to arrive first.
 - The wall snap (DEV-45) still touches yaw only.
 
-### The pitch limit is exactly half the FOV
-`R3D_PITCH_LIMIT = R3D_FOV/2` (35 deg). At that tilt the horizon sits precisely on the frame
-edge, so it never leaves the view and the room can never be lost -- a limit with a reason rather
-than a round number. Verified in both directions to within 2px.
+### The range: level to half the FOV, and never below
+`R3D_PITCH_LIMIT = R3D_FOV/2` (35 deg) upward. At that tilt the horizon sits precisely on the
+frame edge, so it never leaves the view and the room can never be lost -- a limit with a reason
+rather than a round number.
+
+**`R3D_PITCH_MIN = 0`: the view does not tilt DOWN** (founder's call on review). Nothing is ever
+placed below the eyeline -- there is no floor surface to design on -- so a downward tilt only
+ever shows bare floor. Level is the bottom of the range, which is exactly where the view was
+locked before this task, and the down button walks back to level and stops.
+
+**Raised once and overridden, deliberately:** DEV-47's furniture sits on the floor, so looking
+down is the natural way to judge a desk or speakers against the panels. The founder's call
+stands; reopening it is this one constant.
 
 ### Gesture: vertical drag on desktop, buttons on touch (founder's call)
 A vertical drag tilts **only when `e.pointerType !== 'touch'`**. On touch the stage keeps
@@ -3332,7 +3341,8 @@ Ceiling visibility by depth into a 12ft room, facing the front wall:
 - [x] The camera tilts up and down
 - [x] At pitch 0 the view is unchanged (up vector exactly (0,1,0); ceiling panel bbox identical)
 - [x] The basis stays orthonormal at every yaw/pitch tested
-- [x] Pitch clamps to +-FOV/2, with the horizon on the frame edge at the limit
+- [x] Pitch clamps to FOV/2 upward, with the horizon on the frame edge at the limit
+- [x] The view never tilts below level -- by drag, by button, or by a direct call
 - [x] Artwork stays correct under tilt (homography reads screen-up from `cam.u`)
 - [x] Mouse vertical drag tilts; a purely vertical drag does not change yaw
 - [x] Touch vertical drag does NOT tilt, and still turns the view
@@ -3342,6 +3352,7 @@ Ceiling visibility by depth into a 12ft room, facing the front wall:
 
 ### Out of Scope
 - Pitch snapping (the wall snap stays yaw-only)
+- Looking down at the floor (locked at level; see the range section)
 - Remembering pitch across view switches or reloads
 - Any change to `r3dEyeOffset`'s framing, which is still computed at the horizon
 

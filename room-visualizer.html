@@ -725,7 +725,7 @@
        <div class="room3d-hint">Drag to look around</div>
        <div class="room3d-tilt">
          <button type="button" id="room3dTiltUp" aria-label="Tilt view up">▲</button>
-         <button type="button" id="room3dTiltDown" aria-label="Tilt view down">▼</button>
+         <button type="button" id="room3dTiltDown" aria-label="Tilt view back to level">▼</button>
        </div>
        <div class="room3d-tip" id="room3dTip"></div>
      </div>
@@ -1173,10 +1173,18 @@ const R3D_SENS = 0.0055;              // radians per px of drag
    the eye off LESS, partly cancelling itself. Raising the eye can, but at the cost of the
    floor, which is where DEV-47's furniture lives.
 
-   The limit is exactly half the FOV, which is what makes it a limit worth having rather
-   than a round number: at that tilt the horizon sits precisely on the frame edge, so it
-   never leaves the view and the room can never be lost. */
-const R3D_PITCH_LIMIT = R3D_FOV / 2;
+   The upward limit is exactly half the FOV, which is what makes it a limit worth having
+   rather than a round number: at that tilt the horizon sits precisely on the frame edge,
+   so it never leaves the view and the room can never be lost.
+
+   THE VIEW DOES NOT TILT DOWN (founder's call, after reviewing DEV-48). Nothing is ever
+   placed below the eyeline -- there is no floor surface to design on -- so a downward tilt
+   only ever shows bare floor. Level is therefore the bottom of the range, which is exactly
+   where the view was locked before this task. The down button walks back to level and
+   stops. If floor content ever arrives (DEV-47's furniture is the candidate), reopening it
+   is this one constant. */
+const R3D_PITCH_LIMIT = R3D_FOV / 2;   // up
+const R3D_PITCH_MIN   = 0;             // down: level, never below
 const R3D_PITCH_STEP  = 12 * Math.PI/180;   // per tap of the touch tilt buttons
 const R3D_EASE = 0.16;                // per-frame approach to targetYaw (smooth, not linear tracking)
 /* Release-time wall snap. 13 deg is wide enough that landing square on a wall takes no
@@ -1673,7 +1681,7 @@ function r3dTick(){
 }
 
 function r3dSetPitch(v){
-  R3D.targetPitch = Math.max(-R3D_PITCH_LIMIT, Math.min(R3D_PITCH_LIMIT, v));
+  R3D.targetPitch = Math.max(R3D_PITCH_MIN, Math.min(R3D_PITCH_LIMIT, v));
   r3dAnimate();
 }
 function r3dAnimate(){ if(R3D.raf === null) R3D.raf = requestAnimationFrame(r3dTick); }
@@ -1726,7 +1734,7 @@ function initRoom3D(){
          scroll (the stage carries touch-action:pan-y so a visitor can get past a viewer
          embedded in a long page), so touch devices tilt with the buttons instead. */
       if(R3D.dragTilts){
-        R3D.targetPitch = Math.max(-R3D_PITCH_LIMIT, Math.min(R3D_PITCH_LIMIT,
+        R3D.targetPitch = Math.max(R3D_PITCH_MIN, Math.min(R3D_PITCH_LIMIT,
           R3D.dragPitch - (e.clientY - R3D.dragY) * R3D_SENS));
       }
       r3dAnimate();
