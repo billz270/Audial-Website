@@ -2691,6 +2691,17 @@ All elements use pure line-art following the blueprint aesthetic. Furniture uses
 
 Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
 
+### Starting notes (inherited from DEV-43 and DEV-45)
+- **3D ceiling display comes for free.** `state.ceilingPanels` is already read by the 3D view
+  and drawn through the same extrusion path as wall panels, with a downward normal, so ceiling
+  panels get depth and finish the moment this task can place one. It has never run with real
+  data, because nothing can place a ceiling panel yet.
+- **Check the ceiling's artwork handedness the first time a ceiling panel exists.**
+  `R3D_ART_CORNERS.ceiling` is an unverified copy of the front wall's corner order. Artwork on
+  the back and left walls turned out to be mirrored for exactly this reason (see DEV-45).
+- **A floor-plan renderer that draws artwork must use `artTransformParts`**, not start a fourth
+  copy of the image-transform maths (see DEV-45).
+
 ### Behavior Spec
 
 **Part 1 — Floor Plan View:**
@@ -3010,59 +3021,12 @@ room -- a narrower lens cannot see the side walls, ceiling and floor at once fro
 Measured at 35 deg of yaw: the focused wall fills 82.8% of frame width at 55 deg of FOV, 71.7% at
 62, 64.2% at 70. Narrowing it trades peripheral awareness for less edge stretch.
 
----
+**Also known, deliberately not done:**
+- **Mobile at 6x CPU throttle** drags at roughly 56fps. Fine at 4x (128fps). A low-end phone
+  during a drag only; the render loop still stops the moment the view settles.
+- **The cover-fit fallback** for carts saved before DEV-37 (designs with no natural image
+  dimensions) is asserted in the harness but has never been looked at on screen.
+- **`R3D_ART_CORNERS.ceiling` is an unverified copy of the front wall's order.** Nothing can
+  place a ceiling panel until DEV-44, so it has never been rendered. Check its handedness the
+  first time one exists -- this is precisely how the back and left walls came to be mirrored.
 
-# SESSION CHECKPOINT -- 2026-09-09 (end of session)
-
-## NEXT SESSION: start DEV-44 (floor plan view, edit mode, furniture)
-The room-visualizer arc is DEV-42 -> DEV-43 -> DEV-44. The first two are finished and signed
-off; DEV-44 is untouched and is the whole of the next session.
-
-## Where things stand
-- **DEV-42 DONE** (`549c299`) -- view-mode rail (2D / 3D / Plan) in the room visualizer.
-- **DEV-43 DONE** -- 3D line-art room view, through four rounds of founder feedback. Signed off
-  after local review. Read its notes **bottom-up**: Follow-up 3 is current, Follow-up 2
-  supersedes the orbit camera entirely, Follow-up 1 is history.
-- **DEV-45 DONE** -- correct artwork, 2.7in panel depth with the real finish, 13 deg wall snap.
-  Closes DEV-43's artwork glitch. Verified in Chromium and Firefox.
-- **DEV-44 NOT STARTED.**
-
-## NOT COMMITTED, NOT DEPLOYED
-`room-visualizer.html` and `TASKS.md` are dirty in the working tree, and `master` is 13 commits
-ahead of `origin`. The founder's plan is to commit, push and deploy to Vercel only once DEV-44
-lands, so **do not commit, push or deploy without asking** -- but equally, be aware that
-everything from this session exists only in the working tree.
-
-## What DEV-44 inherits for free (and what to check)
-- **`state.ceilingPanels` is already read and drawn** by the 3D view: `r3dCeilingQuad` feeds the
-  same extrusion path as wall panels, with a downward normal, so ceiling panels get depth and
-  finish the moment DEV-44 can place one.
-- **It has never been rendered with real data.** Nothing can place a ceiling panel yet, so this
-  path is asserted but unseen. Two specific things to verify the first time one exists:
-  1. `R3D_ART_CORNERS.ceiling` is `[3,2,0]`, copied from the front wall and **unverified**.
-     Artwork on the back and left walls turned out to be mirrored for exactly this reason
-     (see DEV-45 notes) -- check the ceiling's handedness before trusting it.
-  2. Ceiling panels currently hold a fixed 0.5 opacity, matching the ceiling surface.
-- The 2D wall's `computeArtTransform` and the 3D view's renderer now share one numeric core,
-  `artTransformParts`. **A floor-plan renderer that draws artwork should use it too** rather
-  than starting a fourth copy of the maths.
-
-## Open, deliberately not done
-- **Wide-angle stretch at the frame edges.** `R3D_FOV` is 70. Measured at 35 deg of yaw the
-  focused wall fills 82.8% of frame width at FOV 55, 71.7% at 62, 64.2% at 70. Comparison
-  renders were shown to the founder; no decision taken. One constant, `room-visualizer.html`.
-- **Mobile at 6x CPU throttle** drags at roughly 56fps. Fine at 4x (128fps). Not acted on.
-- **The cover-fit fallback** for carts saved before DEV-37 is asserted but never looked at.
-
-## Things the founder overrode -- do not "fix" them back
-- **No +-90 yaw clamp.** Rotation is unlimited so any wall, back wall included, can be faced.
-- **Active rail button is `--accent`**, which contradicts CLAUDE.md's "selection states -> --ink".
-- **Panels are no longer pure x-ray.** Side faces are opaque fills at full opacity, so panels on
-  the focused wall genuinely occlude. Accepted as an improvement over DEV-43's see-through look.
-
-## The habit that keeps paying
-**Every real defect across DEV-43 and DEV-45 was caught by looking at a rendered image, never by
-a passing assertion.** Affine strip seams passed 32 green checks and were obvious the instant a
-grid was rendered instead of a solid colour; before that, panels rendered as empty outlines while
-the suite happily confirmed the nodes existed. Green tests plus a featureless fixture prove almost
-nothing about geometry -- **render something with structure in it and look at the pixels.**
