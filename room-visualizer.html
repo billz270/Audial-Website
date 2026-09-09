@@ -352,6 +352,11 @@
   .thumb-count{position:absolute;top:3px;right:3px;font-size:9px;font-weight:700;color:var(--mute);background:var(--paper);padding:1px 4px;border:1px solid var(--ink);z-index:2}
   .wall-thumb:hover .thumb-count{background:var(--paper);color:var(--primary-light);border-color:var(--primary-light)}
 
+  /* DEV-47: windows and doors on the 2D wall diagram, so you can see what you are placing
+     panels around. Display-only -- all furniture editing lives in the Plan. */
+  .wall-furniture{position:absolute;border:1.5px solid var(--ink);background:transparent;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;font-family:'Archivo',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink);opacity:0.55;overflow:hidden;padding-bottom:2px}
+  .wall-furniture.window{border-style:dashed}
+  .wall-furniture.door{border-left-width:3px}
   .placed-panel{position:absolute;background:var(--accent);border:1.5px solid var(--ink);cursor:grab;transition:transform 0.1s, z-index 0s, box-shadow 0.15s, outline 0.15s;display:flex;align-items:center;justify-content:center;color:var(--ink);font-family:'Archivo Black',sans-serif;font-size:10px;text-align:center;user-select:none;overflow:hidden;touch-action:none}
   .placed-panel.dragging{cursor:grabbing;z-index:20;box-shadow:0 6px 20px rgba(0,23,31,0.3)}
   .placed-panel.selected{outline:2.5px solid var(--ink);outline-offset:2px;box-shadow:0 4px 14px rgba(9,61,83,0.45);z-index:15}
@@ -3445,7 +3450,7 @@ function attemptClosePopup(){
 }
 
 function renderActivePanels(){
-  activeWallSurface.querySelectorAll('.placed-panel').forEach(p=>p.remove());
+  activeWallSurface.querySelectorAll('.placed-panel, .wall-furniture').forEach(p=>p.remove());
   const rect = activeWallSurface.getBoundingClientRect();
   if(rect.width === 0) return;
   const {w:wallWidthFt, h:wallHeightFt} = getWallDimensionsFt(state.activeWall);
@@ -3481,6 +3486,22 @@ function renderActivePanels(){
     }
     activeWallSurface.appendChild(el);
   });
+
+  /* DEV-47: windows and doors belonging to THIS wall. Floor furniture is deliberately
+     absent -- a desk 8ft into the room is not on any wall, and drawing it here would crowd
+     the view with objects whose distance this flat view has no way to show. */
+  if(state.activeWall !== 'ceiling'){
+    state.furniture.filter(f => f.wall === state.activeWall).forEach(f => {
+      const el = document.createElement('div');
+      el.className = 'wall-furniture ' + f.type;
+      el.style.left   = (f.x * pxPerFtX) + 'px';
+      el.style.top    = ((wallHeightFt - f.base - f.tall) * pxPerFtY) + 'px';
+      el.style.width  = (f.w * pxPerFtX) + 'px';
+      el.style.height = (f.tall * pxPerFtY) + 'px';
+      el.textContent  = FURN_TYPES[f.type].label;
+      activeWallSurface.appendChild(el);
+    });
+  }
   syncSelectionDOM();
 }
 
