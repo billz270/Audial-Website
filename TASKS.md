@@ -3139,7 +3139,10 @@ by URL, not by message text -- the message alone does not name the resource).
 ---
 
 ## Task #DEV-47: Furniture + Edit Mode
-- **Status:** TODO -- specced, awaiting founder review
+- **Status:** IN REVIEW -- built, 100 checks green in Chromium at 1440x900 and 390x844,
+  screenshots reviewed. Awaiting founder sign-off on localhost. Not yet deployed.
+  **One open question for review: the 3D camera cannot tilt DOWN, so floor furniture in the
+  middle of the room is largely below the frame. See "The pitch finding" below.**
 - **Priority:** MEDIUM
 - **File:** room-visualizer.html
 - **Depends on:** DEV-44, and DEV-46 for the plan's drag mechanism
@@ -3254,6 +3257,120 @@ quad machinery -- a window as a double-stroked rectangle, a door as a rectangle 
 - Advanced 3D furniture models
 - Room templates
 - Saved room projects beyond localStorage
+
+### Implementation notes (2026-09-09)
+
+Full spec: `docs/superpowers/specs/2026-09-09-dev47-furniture-design.md`.
+Eleven decisions were confirmed with the founder before any code was written; the four the
+spec above flagged all stand as written, and **the "floor furniture cannot be dropped onto a
+wall edge" criterion was DROPPED** -- a desk pushed flat against a wall is normal and simply
+stands on the floor there, so there was nothing to forbid. (Founder's note, recorded because
+it shapes later work: home-studio desks are often held slightly *off* the wall for the
+speakers' sake. Not addressed here, and it does not need to be -- the Plan can drag it off.)
+
+**w/h are ALWAYS the floor footprint, for every type; the vertical lives in `base`/`tall`.**
+A window's `4x3` is width x height *up the wall* while a desk's `4x2` is a floor footprint, and
+`FP_DRAGGABLE`'s clamp reads `o.w`/`o.h` as floor-plane feet -- so those two could not share a
+meaning. The rejected alternative was storing plan-axis w/h and swapping them when a window
+moves to a side wall: the same field would then silently change meaning depending on which wall
+you are near, which is the exact bug class DEV-45 spent a whole task on.
+
+**`FP_DRAGGABLE` grew three OPTIONAL hooks** -- `move`, `resize`, `readout` -- rather than
+furniture growing its own handlers. A kind defining none of them behaves exactly as before, so
+**DEV-46's ceiling drag had to come out bit-identical, and that is a regression check in the
+suite, not an assumption.** Resize reuses the same stage-level pointer capture: DEV-46's warning
+that every move re-renders the SVG and destroys the element under the pointer applies just as
+much to a handle as to the rect.
+
+**Two registrations, because the constraints genuinely differ.** Floor furniture uses the
+default free clamp. **Windows and doors follow the pointer to the NEAREST wall and then slide
+only along it** -- so dragging one across a corner RE-HOMES it rather than pulling it off the
+wall, which is right: a window always belongs to some wall, there is no off-wall state to land
+in. Verified at all four walls and across two corners.
+
+**Wall furniture is built through `r3dPanelQuad`** by handing it a synthesized
+`{wall, x, w, y: H - base - tall, h: tall}`, so a window lands exactly where a panel with the
+same along-wall x would -- including DEV-45's back/left mirroring, for free, rather than by a
+second implementation that could drift.
+
+**3D furniture is UNFILLED and therefore NOT depth-sorted.** DEV-45's sort exists because filled
+panels can paint over each other; with no fill there is nothing to order, so sorting would run
+every frame to change nothing. The spec text said "depth-sort for edge ordering" and that was
+wrong. Unfilled also preserves DEV-43's deliberate x-ray read.
+
+**Recognizable outlines, not wireframe crates (founder's call).** Each type adds one or two
+edges through the same projection and clipping the room walls use. **Desk and chair first drew
+the identical symbol** -- the same drawing at two sizes, which is exactly the failure this
+decision exists to prevent; the chair gained an inset seat inside its back band, and the bed a
+pillow rectangle rather than another full-width rule. **No assertion caught this: it came from
+looking at the screenshot.** Same for two empty-state overlays -- both the Plan and the 3D view
+told a furnished room it was empty, because both counted `state.panels` only.
+
+**Wall furniture carries NO label in the Plan.** Its footprint is `FURN_WALL_DEPTH` (0.35ft)
+deep -- far shallower than the text -- and sits exactly where the wall's own name is painted, so
+the two collided, worst at 390px. It needs none: dashed reads as a window, a swing arc as a
+door, the hover tooltip names it, and the 2D wall diagram labels it in full.
+
+**The door's swing arc is Plan-only.** A swing describes floor sweep; on a wall plane it would
+read as a decorative curve on the door itself. In 3D a door is a rectangle with a hinge line.
+`cross(a, n)` is +1 for all four walls in the plan's y-down space, so the arc's sweep flag is a
+constant rather than a per-wall case.
+
+**Furniture needed no work to stay out of the statistics or the checkout** -- that isolation is
+structural, since `updateStats` reads `state.panels` only. It is now covered by checks rather
+than left as a happy accident.
+
+**Deliberate limitation: window and door height and sill are not editable.** The Plan resizes a
+wall item's width along its wall, but a top view cannot show height up a wall -- the same reason
+DEV-46 refused to make wall panels draggable there. Defaults are a 4x3 window at a 3ft sill and
+a 3x7 door. The reopening path, if it matters: the 2D wall view is the one view that shows
+height, so editing belongs there, which would mean making 2D furniture interactive.
+
+**Overlap is allowed and there is no collision detection**, deliberately: an app that refuses to
+let you nudge the couch under the window is worse than one that draws what you actually have.
+
+### The pitch finding -- OPEN, for founder review
+
+DEV-48 set `R3D_PITCH_MIN = 0` (the view never tilts down) on the founder's call, and wrote down
+the reason it might be reopened: *"nothing is ever placed below the eyeline... Raised once that
+DEV-47's furniture sits on the floor and overridden; reopening it is that one constant."*
+
+**That moment has arrived, and here is the measurement.** Percentage of each piece's bounding box
+inside the frame, facing the front wall of a 14x12x10 room, desk and chair at 1ft depth, couch at
+4ft, bed at 6ft:
+
+```
+pitch   desk chair  bed couch  spkr    floor px (frame 630)
+   0     100   100    1    37    41         107
+  -5     100   100    1    54    61         153
+ -10     100   100    4    71    82         196
+ -15     100   100    9    90   100         237
+ -20     100   100   16   100   100         277
+ -25     100   100   24   100   100         317
+```
+
+**It is the same shape DEV-48 measured for the ceiling, inverted:** furniture near the wall you
+face is fully visible, and furniture in the middle of the room falls out of frame. A downward
+tilt of about -20 deg brings the couch and speakers fully in and roughly quadruples the bed; the
+bed stays partial because it is both the lowest piece (2ft) and the deepest.
+
+**No code was changed for this** -- the founder's override was explicit and made with this task
+in view. Reopening it is the one constant, `R3D_PITCH_MIN`, plus removing the `pitch >= 0`
+assumption from the touch tilt buttons' lower bound. The counter-argument DEV-48 recorded still
+holds: a downward tilt shows bare floor, and the floor is mostly bare.
+
+### Verification
+100 checks in real Chromium at 1440x900 and 390x844: the seven type defaults, the picker's
+per-view visibility, every type adding at its default size, the speaker pair as two independent
+pieces, plan footprints and per-wall geometry at all four walls, the door arc, dashed windows,
+non-scaling-stroke and --ink 1.5px line work, **the DEV-46 ceiling-drag regression**, floor drag
+and clamping, wall snap and corner re-homing, all four floor resize handles and both wall ones,
+the FURN_MIN floor, selection, delete, 3D unfilled line art with per-mount opacity, NaN-free
+paths through a full turn AND at the pitch limit, the 2D wall diagram with its sill arithmetic,
+thumbnails staying unchanged, no duplicate layers on re-render, statistics and checkout
+isolation, mobile at 390px, and a 2D -> 3D -> Plan -> 2D round trip plus reload. Seven
+screenshots reviewed. Only console error is the pre-existing `favicon.ico` 404, confirmed by
+**URL** via a response listener -- the message text does not name the resource.
 
 ---
 
