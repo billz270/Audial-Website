@@ -3107,7 +3107,7 @@ percentage against an area it does not sit on. This changes an existing on-scree
 A ceiling panel can sit anywhere, including under "Front Wall", and before this the label was
 drawn under the panel and half-swallowed by it.
 
-### Open finding for review: ceiling panels are barely visible in 3D
+### Open finding for review: ceiling panels are barely visible in 3D -- RESOLVED by DEV-48
 DEV-43's camera is **yaw-only with zero pitch**, so the ceiling sits at the very top of the
 frame. Measured with 4x2 panels down the room's depth in a 14x12x10 room, 905x628 stage:
 `y=0` -> 204x45px near the top edge; `y=2` -> partly cut by the top; **`y=4` and beyond project
@@ -3254,3 +3254,94 @@ quad machinery -- a window as a double-stroked rectangle, a door as a rectangle 
 - Advanced 3D furniture models
 - Room templates
 - Saved room projects beyond localStorage
+
+---
+
+## Task #DEV-48: Camera Pitch in the 3D Room View
+- **Status:** IN REVIEW -- built, 23 checks green in Chromium, screenshots reviewed.
+  Awaiting founder sign-off on localhost. Not yet deployed.
+- **Priority:** HIGH
+- **File:** room-visualizer.html
+- **Depends on:** DEV-46, which is what made the ceiling worth looking at
+
+### Goal
+Let the 3D camera tilt, so ceiling panels read the way wall panels do -- founder's call after
+reviewing DEV-46: "if the left wall has panels across the wall, and we're facing the front wall,
+then we'll see some of the panels on the left. Similarly, let's try and get the ceiling panels
+to view that way as well."
+
+### The measurement that shaped it
+**The premise was half wrong, and worth recording: the side walls were never doing better.**
+Matched 2x2 panels on the left wall and on the ceiling at the same depths into a 14x12x10 room,
+905x628 stage, facing the front wall:
+
+| Depth into room | Left wall | Ceiling |
+|---|---|---|
+| 0-2 ft | 100% | 100% |
+| 2-4 ft | 100% | 100% |
+| 4-6 ft | **4%** | **0%** |
+| 6 ft+ | 0% | 0% |
+
+Both surfaces die about 4ft into a 12ft room. So the ask was not "make the ceiling behave like
+the walls" -- it was "let the view reach further into the room", and the ceiling merely made the
+limit visible because it is the first content placed above the eyeline.
+
+**Two cheaper fixes were computed and rejected:**
+- **Widening the FOV cannot buy it.** Seeing the ceiling at mid-room needs ~86-92 deg vertical
+  (from 70), which distorts badly -- and it partly cancels itself, because `r3dEyeOffset`
+  derives the backoff from the FOV, so a wider angle backs the eye off LESS.
+- **Raising the eye works but costs the floor.** Eye at 6.6ft instead of 5ft reaches mid-room
+  ceiling, but the visible floor collapses to the first 1.4ft -- and the floor is where DEV-47's
+  furniture goes.
+
+### What was built
+- `r3dCamera(yaw, eye, pitch)` builds a real orthonormal basis: `r` stays horizontal (roll is
+  always zero) and `u = r x f`. **At pitch 0 that evaluates to exactly (0,1,0)**, so the flat
+  view is bit-identical to before -- verified, not assumed.
+- **The back-off uses the HORIZONTAL forward, never the pitched one.** Tilting your head does
+  not move your eye; backing off along the view direction would slide the eye down the room as
+  you looked up and the room would appear to breathe.
+- `r3dToCam` takes `cy` from `cam.u` instead of hardcoding world `y`.
+- **`r3dPlaneHomography` had the same assumption buried in it** -- it used `U.y`/`V.y`/`O.y` for
+  the screen-up component, under a comment saying pitch is always zero. Left alone it twists
+  every panel's artwork the moment the camera tilts. It now takes all three from `cam.u`.
+- `r3dTick` eases both axes, and **both must settle before the loop stops** or a tilt still
+  easing freezes half-way whenever the yaw happens to arrive first.
+- The wall snap (DEV-45) still touches yaw only.
+
+### The pitch limit is exactly half the FOV
+`R3D_PITCH_LIMIT = R3D_FOV/2` (35 deg). At that tilt the horizon sits precisely on the frame
+edge, so it never leaves the view and the room can never be lost -- a limit with a reason rather
+than a round number. Verified in both directions to within 2px.
+
+### Gesture: vertical drag on desktop, buttons on touch (founder's call)
+A vertical drag tilts **only when `e.pointerType !== 'touch'`**. On touch the stage keeps
+`touch-action:pan-y` so a visitor can still scroll past a viewer embedded in a long page --
+DEV-40 and DEV-41 both landed on that same constraint. Touch devices get a two-button tilt
+control instead, shown under `@media (hover:none), (max-width:900px)`, 12 deg per tap, easing.
+The buttons `stopPropagation` on `pointerdown` or pressing one would also start a view drag and
+the tap would read as a 0px pan.
+
+### Result
+Ceiling visibility by depth into a 12ft room, facing the front wall:
+- flat: `0ft=100%  2ft=100%  4ft=0%  6ft=0%`
+- tilted 25 deg: `0ft=100%  2ft=100%  4ft=100%  6ft=100%  8ft=2%`
+- at the 35 deg limit: `... 8ft=44%`
+
+### Acceptance Criteria
+- [x] The camera tilts up and down
+- [x] At pitch 0 the view is unchanged (up vector exactly (0,1,0); ceiling panel bbox identical)
+- [x] The basis stays orthonormal at every yaw/pitch tested
+- [x] Pitch clamps to +-FOV/2, with the horizon on the frame edge at the limit
+- [x] Artwork stays correct under tilt (homography reads screen-up from `cam.u`)
+- [x] Mouse vertical drag tilts; a purely vertical drag does not change yaw
+- [x] Touch vertical drag does NOT tilt, and still turns the view
+- [x] Tilt buttons appear on touch viewports only, and step the pitch
+- [x] DEV-46's suites still pass unchanged
+- [x] Works at 1440x900 and 390x844; no page errors
+
+### Out of Scope
+- Pitch snapping (the wall snap stays yaw-only)
+- Remembering pitch across view switches or reloads
+- Any change to `r3dEyeOffset`'s framing, which is still computed at the horizon
+

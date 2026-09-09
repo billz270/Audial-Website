@@ -193,6 +193,19 @@
     font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:0.12em;
     color:var(--ink);background:var(--paper);padding:2px 6px;
   }
+  /* DEV-48: tilt buttons. A vertical drag tilts the view with a mouse, but on touch that
+     gesture belongs to the page (touch-action:pan-y, so a visitor can scroll past a viewer
+     embedded in a long page) -- so where the pointer is coarse, tilting gets buttons. */
+  .room3d-tilt{display:none;position:absolute;right:8px;bottom:8px;z-index:3;
+    flex-direction:column;gap:4px}
+  .room3d-tilt button{
+    width:34px;height:34px;padding:0;line-height:1;cursor:pointer;
+    background:var(--paper);border:1.5px solid var(--ink);color:var(--ink);
+    font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;
+    touch-action:manipulation;
+  }
+  .room3d-tilt button:active{background:var(--ink);color:var(--paper)}
+  @media (hover:none), (max-width:900px){ .room3d-tilt{display:flex} }
   .room3d-wallname{
     position:absolute;left:10px;top:8px;z-index:2;pointer-events:none;
     font-family:'Archivo Black',sans-serif;font-size:13px;letter-spacing:-0.02em;color:var(--ink);
@@ -710,6 +723,10 @@
        <svg class="room3d-svg" id="room3dSvg" aria-label="3D room view"></svg>
        <div class="room3d-empty" id="room3dEmpty">No panels placed yet &middot; add them in 2D view</div>
        <div class="room3d-hint">Drag to look around</div>
+       <div class="room3d-tilt">
+         <button type="button" id="room3dTiltUp" aria-label="Tilt view up">▲</button>
+         <button type="button" id="room3dTiltDown" aria-label="Tilt view down">▼</button>
+       </div>
        <div class="room3d-tip" id="room3dTip"></div>
      </div>
    </div>
@@ -1137,7 +1154,8 @@ function loadRoomPlan(){
 const R3D = {
   svg:null, stage:null, tip:null,
   yaw:0, targetYaw:0,          // radians; 0 = facing front wall, + = turning right
-  eye:0, raf:null, dragging:false, dragX:0, dragYaw:0,
+  pitch:0, targetPitch:0,      // radians; + = looking up. See R3D_PITCH_LIMIT (DEV-48)
+  eye:0, raf:null, dragging:false, dragX:0, dragYaw:0, dragY:0, dragPitch:0,
   snapping:false               // a release-time wall snap is easing; see r3dSnapToWall
 };
 const R3D_FOV = 70 * Math.PI/180;     // wide-ish, as an interior view needs
@@ -1146,6 +1164,20 @@ const R3D_NEAR = 0.35;                // ft; geometry closer than this is clippe
    (The task spec asked for a +-90 soft limit; the founder overrode that so that turning
    onto a wall makes the wall opposite it the new "back wall" and fade out of view.) */
 const R3D_SENS = 0.0055;              // radians per px of drag
+/* DEV-48: the camera can tilt. Without it the ceiling is unreachable -- with the eye at
+   mid-height and no pitch, a ceiling point only enters a 70 deg frame beyond
+   (H/2)/tan(35 deg) = 7.1ft of forward distance, which in a 12ft room means the far ~4ft
+   of ceiling and NOTHING else. (Measured: matched 2x2 panels on the left wall and on the
+   ceiling both vanish about 4ft into the room -- the side walls were never doing better.)
+   Widening the FOV cannot buy it: ~86-92 deg would be needed, and a wider FOV also backs
+   the eye off LESS, partly cancelling itself. Raising the eye can, but at the cost of the
+   floor, which is where DEV-47's furniture lives.
+
+   The limit is exactly half the FOV, which is what makes it a limit worth having rather
+   than a round number: at that tilt the horizon sits precisely on the frame edge, so it
+   never leaves the view and the room can never be lost. */
+const R3D_PITCH_LIMIT = R3D_FOV / 2;
+const R3D_PITCH_STEP  = 12 * Math.PI/180;   // per tap of the touch tilt buttons
 const R3D_EASE = 0.16;                // per-frame approach to targetYaw (smooth, not linear tracking)
 /* Release-time wall snap. 13 deg is wide enough that landing square on a wall takes no
    care, and narrow enough that an angled view you chose on purpose is left alone. The
@@ -1210,13 +1242,25 @@ function r3dEyeOffset(vw, vh){
   return Math.max(0, Math.min(need, maxInside));
 }
 
-/* Camera turns in place about the room centre, backed off by `eye` along its own forward. */
-function r3dCamera(yaw, eye){
+/* Camera turns in place about the room centre, backed off by `eye` along its own forward.
+
+   The BACK-OFF uses the horizontal forward, never the pitched one: tilting your head does
+   not move your eye. Pitching along the view direction would slide the eye down the room
+   as you looked up, and the room would appear to breathe.
+
+   `r` stays horizontal (roll is always zero), and `u = r x f` is the true up. At pitch 0
+   that evaluates to exactly (0,1,0), so the un-pitched view is bit-identical to before. */
+function r3dCamera(yaw, eye, pitch){
   const R = r3dRoom();
-  const f = {x:Math.sin(yaw), y:0, z:-Math.cos(yaw)};
+  const p = pitch || 0;
+  const cp = Math.cos(p), sp = Math.sin(p);
+  const fh = {x:Math.sin(yaw), y:0, z:-Math.cos(yaw)};                 // horizontal forward
+  const f  = {x:fh.x*cp, y:sp, z:fh.z*cp};                             // view forward
+  const r  = {x:Math.cos(yaw), y:0, z:Math.sin(yaw)};
+  const u  = {x:r.y*f.z - r.z*f.y, y:r.z*f.x - r.x*f.z, z:r.x*f.y - r.y*f.x};
   return {
-    pos:{x:R.W/2 - f.x*eye, y:R.H/2, z:R.D/2 - f.z*eye},
-    f:f, r:{x:Math.cos(yaw), y:0, z:Math.sin(yaw)}
+    pos:{x:R.W/2 - fh.x*eye, y:R.H/2, z:R.D/2 - fh.z*eye},
+    f:f, r:r, u:u
   };
 }
 
@@ -1225,7 +1269,7 @@ function r3dToCam(pt, cam){
   const rx = pt.x-cam.pos.x, ry = pt.y-cam.pos.y, rz = pt.z-cam.pos.z;
   return {
     cx: rx*cam.r.x + ry*cam.r.y + rz*cam.r.z,
-    cy: ry,                                        // up is world +y (pitch is always 0)
+    cy: rx*cam.u.x + ry*cam.u.y + rz*cam.u.z,      // true up; at pitch 0 this is just ry
     d:  rx*cam.f.x + ry*cam.f.y + rz*cam.f.z
   };
 }
@@ -1509,14 +1553,16 @@ function r3dPlaneHomography(TL, TR, BL, cam, vw, vh, focal, ox, oy){
   const V = {x:BL.x-TL.x, y:BL.y-TL.y, z:BL.z-TL.z};      // local +y edge
   const O = {x:TL.x-cam.pos.x, y:TL.y-cam.pos.y, z:TL.z-cam.pos.z};
   const dot = function(a, b){ return a.x*b.x + a.y*b.y + a.z*b.z; };
-  /* Depth (along forward) and screen-right, each affine in u and v. Up is world +y: pitch is
-     always zero, so camera-space cy is just the world y difference. */
+  /* Depth (along forward), screen-right and screen-up, each affine in u and v. Screen-up
+     MUST come from cam.u, not from world +y: it was world y while pitch was always zero,
+     and leaving it that way twists the artwork the moment the camera tilts (DEV-48). */
   const Wu = dot(U, cam.f), Wv = dot(V, cam.f), W1 = dot(O, cam.f);
   const Ru = dot(U, cam.r), Rv = dot(V, cam.r), R1 = dot(O, cam.r);
+  const Uu = dot(U, cam.u), Uv = dot(V, cam.u), U1 = dot(O, cam.u);
   const cx = vw/2, cy = vh/2;
   const H = {
     Xu: (cx - ox)*Wu + focal*Ru,  Xv: (cx - ox)*Wv + focal*Rv,  X1: (cx - ox)*W1 + focal*R1,
-    Yu: (cy - oy)*Wu - focal*U.y, Yv: (cy - oy)*Wv - focal*V.y, Y1: (cy - oy)*W1 - focal*O.y,
+    Yu: (cy - oy)*Wu - focal*Uu,  Yv: (cy - oy)*Wv - focal*Uv,  Y1: (cy - oy)*W1 - focal*U1,
     Wu: Wu, Wv: Wv, W1: W1
   };
   for(const k in H) if(!isFinite(H[k])) return null;
@@ -1534,7 +1580,7 @@ function render3D(){
   if(vw < 2 || vh < 2) return;          // pane is hidden; setView re-renders once it is visible
   R3D.svg.setAttribute('viewBox', '0 0 '+vw+' '+vh);
   if(!R3D.eye) R3D.eye = r3dEyeOffset(vw, vh);
-  const cam = r3dCamera(R3D.yaw, R3D.eye);
+  const cam = r3dCamera(R3D.yaw, R3D.eye, R3D.pitch);
   const focal = r3dFocal(vh);
   const R = r3dRoom(), W = R.W, H = R.H, D = R.D;
   const parts = [];
@@ -1608,17 +1654,27 @@ function render3D(){
 }
 
 function r3dTick(){
-  const diff = R3D.targetYaw - R3D.yaw;
-  if(Math.abs(diff) < 0.0004){
+  const diff  = R3D.targetYaw - R3D.yaw;
+  const diffP = R3D.targetPitch - R3D.pitch;
+  /* Both axes must settle before the loop stops, or a tilt still easing freezes
+     mid-way the moment the yaw happens to arrive first. */
+  if(Math.abs(diff) < 0.0004 && Math.abs(diffP) < 0.0004){
     R3D.yaw = R3D.targetYaw;
+    R3D.pitch = R3D.targetPitch;
     R3D.snapping = false;
     render3D();
     R3D.raf = null;
     return;
   }
-  R3D.yaw += diff * (R3D.snapping ? R3D_SNAP_EASE : R3D_EASE);
+  R3D.yaw   += diff  * (R3D.snapping ? R3D_SNAP_EASE : R3D_EASE);
+  R3D.pitch += diffP * R3D_EASE;
   render3D();
   R3D.raf = requestAnimationFrame(r3dTick);
+}
+
+function r3dSetPitch(v){
+  R3D.targetPitch = Math.max(-R3D_PITCH_LIMIT, Math.min(R3D_PITCH_LIMIT, v));
+  r3dAnimate();
 }
 function r3dAnimate(){ if(R3D.raf === null) R3D.raf = requestAnimationFrame(r3dTick); }
 
@@ -1653,7 +1709,10 @@ function initRoom3D(){
        so grabbing the view mid-snap never jumps. */
     R3D.snapping = false;
     R3D.targetYaw = R3D.yaw;
+    R3D.targetPitch = R3D.pitch;
     R3D.dragging = true; R3D.dragX = e.clientX; R3D.dragYaw = R3D.yaw;
+    R3D.dragY = e.clientY; R3D.dragPitch = R3D.pitch;
+    R3D.dragTilts = (e.pointerType !== 'touch');
     R3D.stage.classList.add('dragging');
     if(R3D.tip) R3D.tip.classList.remove('on');
     try{ R3D.stage.setPointerCapture(e.pointerId); }catch(err){}
@@ -1663,6 +1722,13 @@ function initRoom3D(){
       /* Drag left -> viewer turns right, revealing the right wall. Unclamped: a full
          turn is allowed so every wall, back wall included, can be faced head-on. */
       R3D.targetYaw = R3D.dragYaw - (e.clientX - R3D.dragX) * R3D_SENS;
+      /* Vertical drag tilts -- but ONLY for a mouse or pen. A touch drag must stay a page
+         scroll (the stage carries touch-action:pan-y so a visitor can get past a viewer
+         embedded in a long page), so touch devices tilt with the buttons instead. */
+      if(R3D.dragTilts){
+        R3D.targetPitch = Math.max(-R3D_PITCH_LIMIT, Math.min(R3D_PITCH_LIMIT,
+          R3D.dragPitch - (e.clientY - R3D.dragY) * R3D_SENS));
+      }
       r3dAnimate();
       return;
     }
@@ -1685,6 +1751,16 @@ function initRoom3D(){
   R3D.stage.addEventListener('pointerup', endDrag);
   R3D.stage.addEventListener('pointercancel', endDrag);
   R3D.stage.addEventListener('pointerleave', function(){ if(R3D.tip) R3D.tip.classList.remove('on'); });
+
+  /* Touch tilt. Shown only where a vertical drag cannot be spent on the camera. */
+  const tiltUp = $('room3dTiltUp'), tiltDown = $('room3dTiltDown');
+  if(tiltUp)   tiltUp.addEventListener('click',   function(e){ e.stopPropagation(); r3dSetPitch(R3D.targetPitch + R3D_PITCH_STEP); });
+  if(tiltDown) tiltDown.addEventListener('click', function(e){ e.stopPropagation(); r3dSetPitch(R3D.targetPitch - R3D_PITCH_STEP); });
+  /* The buttons sit inside the stage, so a press on one would otherwise also start a
+     view drag and the tap would read as a 0px pan. */
+  [tiltUp, tiltDown].forEach(function(el){
+    if(el) el.addEventListener('pointerdown', function(e){ e.stopPropagation(); });
+  });
 
   if(window.ResizeObserver){
     new ResizeObserver(function(){
