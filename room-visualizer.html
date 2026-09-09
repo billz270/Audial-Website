@@ -179,6 +179,10 @@
   .room3d-stage.dragging{cursor:grabbing}
   .room3d-svg{display:block;width:100%;height:100%}
   .room3d-edge{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+  /* DEV-47: furniture in 3D. UNFILLED, deliberately: DEV-43 chose an x-ray read with no
+     occlusion culling, and solid objects mid-room would destroy it. */
+  .room3d-furn{fill:none;stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke}
+  .room3d-furn[data-furn-type="window"]{stroke-dasharray:6 4}
   .room3d-panel{fill:var(--accent);stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round;vector-effect:non-scaling-stroke;cursor:pointer}
   /* a panel carrying uploaded artwork keeps only its outline; the art sits underneath.
      pointer-events:all so the unfilled outline still hit-tests for the hover label. */
@@ -1703,6 +1707,102 @@ function r3dEsc(v){
   return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
+/* ---- DEV-47: furniture in 3D --------------------------------------------------------
+   Line art with no fill, so unlike DEV-45's panels these need NO depth sort: nothing can be
+   painted over, and sorting would run every frame to change nothing on screen. Each piece is
+   one <path> of near-clipped segments, built exactly the way r3dSurfacePath builds a wall. */
+function r3dSegPath(segs, cam, vw, vh, focal){
+  let d = '';
+  for(const s of segs){
+    const seg = r3dClipSeg(r3dToCam(s[0], cam), r3dToCam(s[1], cam));
+    if(!seg) continue;
+    const p0 = r3dProjCam(seg[0], vw, vh, focal), p1 = r3dProjCam(seg[1], vw, vh, focal);
+    d += 'M'+p0.x.toFixed(1)+' '+p0.y.toFixed(1)+'L'+p1.x.toFixed(1)+' '+p1.y.toFixed(1);
+  }
+  return d;
+}
+
+/* World-space edges of one piece. Floor pieces are a box plus the one or two lines that make
+   the type readable; wall pieces are the panel quad at zero depth, flat on the wall. */
+function r3dFurnSegs(f){
+  const R = r3dRoom();
+  const P = function(x,y,z){ return {x:x, y:y, z:z}; };
+  const S = [];
+  if(f.wall){
+    /* Built through r3dPanelQuad so a window lands exactly where a panel with the same
+       along-wall x would -- including the back/left mirroring, for free. */
+    const q = r3dPanelQuad({wall:f.wall, x:f.x, w:f.w, y:R.H - f.base - f.tall, h:f.tall});
+    for(let i=0;i<4;i++) S.push([q[i], q[(i+1)%4]]);
+    if(f.type === 'door'){
+      /* A hinge line, not a swing arc: a swing describes floor sweep and belongs in the
+         Plan. Inset from the leading edge so it reads as a stile, not a duplicate edge. */
+      const t = 0.12;
+      const lerp = function(a,b){ return P(a.x+(b.x-a.x)*t, a.y+(b.y-a.y)*t, a.z+(b.z-a.z)*t); };
+      S.push([lerp(q[0],q[1]), lerp(q[3],q[2])]);
+    }
+    return S;
+  }
+  const x0=f.x, x1=f.x+f.w, z0=f.y, z1=f.y+f.h, y0=f.base, y1=f.base+f.tall;
+  const ring = function(y){
+    S.push([P(x0,y,z0),P(x1,y,z0)], [P(x1,y,z0),P(x1,y,z1)],
+           [P(x1,y,z1),P(x0,y,z1)], [P(x0,y,z1),P(x0,y,z0)]);
+  };
+  ring(y0); ring(y1);
+  S.push([P(x0,y0,z0),P(x0,y1,z0)], [P(x1,y0,z0),P(x1,y1,z0)],
+         [P(x1,y0,z1),P(x1,y1,z1)], [P(x0,y0,z1),P(x0,y1,z1)]);
+  const band = Math.min(0.45, Math.min(f.w, f.h) * 0.28);
+  switch(f.type){
+    case 'desk':  ring(Math.max(y0, y1 - 0.15)); break;        // the desktop slab on legs
+    case 'chair': ring(Math.min(y1 - 0.1, y0 + 1.5)); break;   // the seat, back rising above it
+    case 'couch':                                              // seat plane plus two arms
+      ring(Math.min(y1 - 0.1, y0 + 1.4));
+      S.push([P(x0+band, y0+1.4, z0), P(x0+band, y1, z0)],
+             [P(x1-band, y0+1.4, z0), P(x1-band, y1, z0)]);
+      break;
+    case 'bed': {                                              // a pillow line on the top face
+      const zp = z0 + Math.min(1.4, f.h*0.3);
+      S.push([P(x0, y1, zp), P(x1, y1, zp)]);
+      break;
+    }
+    case 'speaker': {                                          // the driver, on the front face
+      const cx = (x0+x1)/2, cy = y0 + f.tall*0.45;
+      const r = Math.min(f.w, f.tall*0.5) * 0.32, N = 16;
+      for(let i=0;i<N;i++){
+        const a0 = i/N*Math.PI*2, a1 = (i+1)/N*Math.PI*2;
+        S.push([P(cx + Math.cos(a0)*r, cy + Math.sin(a0)*r, z0),
+                P(cx + Math.cos(a1)*r, cy + Math.sin(a1)*r, z0)]);
+      }
+      break;
+    }
+  }
+  return S;
+}
+
+function r3dFurnParts(cam, vw, vh, focal){
+  const out = [];
+  for(const f of state.furniture){
+    const d = r3dSegPath(r3dFurnSegs(f), cam, vw, vh, focal);
+    if(!d) continue;
+    /* A wall item fades with its wall exactly as a panel does. A floor item is on no wall,
+       so a per-wall fade has nothing to say about it: it holds a steady value just above
+       the 0.5 the floor and ceiling planes hold. */
+    const op = f.wall ? r3dOpacity(f.wall) : FURN_OPACITY;
+    out.push('<path class="room3d-furn" data-furn-type="'+f.type+
+             '" data-furn-mount="'+(f.wall ? 'wall' : 'floor')+'" d="'+d+
+             '" opacity="'+op.toFixed(3)+'"/>');
+    /* A speaker says which side it is; the pair is otherwise identical. */
+    if(f.side){
+      const c = r3dToCam({x:f.x+f.w/2, y:f.base+f.tall+0.3, z:f.y+f.h/2}, cam);
+      if(c.d > R3D_NEAR){
+        const p = r3dProjCam(c, vw, vh, focal);
+        out.push('<text class="room3d-dim" x="'+p.x.toFixed(1)+'" y="'+p.y.toFixed(1)+
+                 '" text-anchor="middle" opacity="'+FURN_OPACITY.toFixed(3)+'">'+f.side+'</text>');
+      }
+    }
+  }
+  return out;
+}
+
 function render3D(){
   if(!R3D.svg || !R3D.stage) return;
   const rect = R3D.stage.getBoundingClientRect();
@@ -1759,6 +1859,9 @@ function render3D(){
     if(built) parts.push.apply(parts, built);
   }
 
+  /* Furniture last among the geometry, and deliberately unsorted -- see r3dFurnParts. */
+  parts.push.apply(parts, r3dFurnParts(cam, vw, vh, focal));
+
   /* Dimension labels on the focused wall: width along its base, height up its near edge.
      Only drawn when the anchor is genuinely in front of the viewer. */
   const focus = r3dFocusedWall();
@@ -1780,7 +1883,9 @@ function render3D(){
   const nameEl = $('room3dWallName');
   if(nameEl) nameEl.textContent = WALL_LABELS[focus];
   const emptyEl = $('room3dEmpty');
-  if(emptyEl) emptyEl.style.display = state.panels.length ? 'none' : 'flex';
+  /* DEV-47: furniture counts as content here too -- otherwise a furnished room is told it
+     is empty, over the top of the furniture it is drawing. */
+  if(emptyEl) emptyEl.style.display = (state.panels.length + state.furniture.length) ? 'none' : 'flex';
 }
 
 function r3dTick(){
