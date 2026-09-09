@@ -2185,6 +2185,13 @@ function fpFurnGroup(f, fs, hs){
     handles = handle('n', b.x+b.w/2, b.y) + handle('s', b.x+b.w/2, b.y+b.h) +
               handle('w', b.x, b.y+b.h/2) + handle('e', b.x+b.w, b.y+b.h/2);
   }
+  /* A wall piece gets NO text label. Its footprint is FURN_WALL_DEPTH deep -- far shallower
+     than the text -- and it sits exactly where the wall's own name is painted, so the two
+     collide. It needs no label anyway: dashed reads as a window and a swing arc as a door,
+     the hover tooltip names it, and the 2D wall diagram labels it in full. */
+  const label = f.wall ? '' :
+    '<text class="fp-furn-label" font-size="'+(fs*0.8).toFixed(4)+'" x="'+(b.x+b.w/2).toFixed(3)+
+    '" y="'+(b.y+b.h/2).toFixed(3)+'">'+r3dEsc(name)+'</text>';
   const dr = hs*0.7, dx = b.x + b.w, dy = b.y, k = dr*0.4;
   const del = '<circle class="fp-furn-del" data-furn-del="'+id+
               '" cx="'+dx.toFixed(3)+'" cy="'+dy.toFixed(3)+'" r="'+dr.toFixed(3)+'"/>'+
@@ -2195,9 +2202,7 @@ function fpFurnGroup(f, fs, hs){
   return '<g class="fp-furn'+sel+'" data-furn-type="'+f.type+'" data-drag-id="'+id+
          '" data-label="'+r3dEsc(name+' · '+f.w.toFixed(1)+'×'+(f.wall?f.tall:f.h).toFixed(1)+' ft')+'">'+
          fpRect('fp-furn-box', b.x, b.y, b.w, b.h) +
-         fpFurnSymbol(f, b) +
-         '<text class="fp-furn-label" font-size="'+(fs*0.8).toFixed(4)+'" x="'+(b.x+b.w/2).toFixed(3)+
-         '" y="'+(b.y+b.h/2).toFixed(3)+'">'+r3dEsc(name)+'</text>'+
+         fpFurnSymbol(f, b) + label +
          '<g class="fp-furn-handles">'+handles+del+'</g></g>';
 }
 
