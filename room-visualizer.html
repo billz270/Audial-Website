@@ -359,8 +359,11 @@
   .wall-furniture{position:absolute;border:1.5px solid var(--ink);background:transparent;display:flex;align-items:flex-end;justify-content:center;font-family:'Archivo',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink);opacity:0.55;padding-bottom:2px;cursor:grab;touch-action:none;user-select:none;transition:opacity 0.15s}
   .wall-furniture:hover{opacity:0.85}
   /* A window's label sits mid-height: its bottom edge carries the sill handle, which would
-     otherwise land on the text. A door has no bottom handle, so its label stays low. */
-  .wall-furniture.window{border-style:dashed;align-items:center;padding-bottom:0}
+     otherwise land on the text. A door has no bottom handle, so its label stays low.
+     Solid and heavier than the door's frame, founder's call -- the dashed 1.5px line read as
+     faint. (The Plan keeps its dashed window: there it is the architectural convention.) */
+  .wall-furniture.window{border-width:2.5px;align-items:center;padding-bottom:0}
+  .wall-furniture.window.selected{border-width:3.5px}
   .wall-furniture.door{border-left-width:3px}
   /* Windows are see-through, so the empty-wall prompt would print straight across one. The
      "Select a panel size first" hint above the wall still does that job. */
