@@ -3139,10 +3139,11 @@ by URL, not by message text -- the message alone does not name the resource).
 ---
 
 ## Task #DEV-47: Furniture + Edit Mode
-- **Status:** IN REVIEW -- built, 100 checks green in Chromium at 1440x900 and 390x844,
-  screenshots reviewed. Awaiting founder sign-off on localhost. Not yet deployed.
-  **One open question for review: the 3D camera cannot tilt DOWN, so floor furniture in the
-  middle of the room is largely below the frame. See "The pitch finding" below.**
+- **Status:** DONE (closed 2026-09-11) -- base task reviewed by the founder on localhost; the
+  follow-up moved the picker onto the view rail (`f1ad35b`) and made windows and doors editable
+  in the 2D wall view (`eef74bf`, plus the solid window line). **3D furniture dragging is
+  PARKED.** Not yet deployed. Visual polish continues as a separate, founder-written task.
+  See "Follow-up, 2026-09-11" below -- it supersedes three of the base task's decisions.
 - **Priority:** MEDIUM
 - **File:** room-visualizer.html
 - **Depends on:** DEV-44, and DEV-46 for the plan's drag mechanism
@@ -3329,42 +3330,84 @@ height, so editing belongs there, which would mean making 2D furniture interacti
 **Overlap is allowed and there is no collision detection**, deliberately: an app that refuses to
 let you nudge the couch under the window is worse than one that draws what you actually have.
 
-### RESUME POINT -- next session starts here (2026-09-09)
+### Follow-up, 2026-09-11 -- the picker moves to the view rail; windows and doors editable in 2D
 
-DEV-47 is **built, 100 checks green, committed** (9 commits, `f7b1b3f`..`7170574`, master, local
-only -- not pushed, not deployed). The founder reviewed it on localhost and **it works**. What
-follows is UI feedback, not defects.
+After reviewing the base task on localhost the founder asked for the picker to leave the
+sidebar: *"That'll create too much clutter."* Their own proposal went further than the resume
+note had: a **Furniture button on the view rail** beside 2D / 3D / Plan, opening a dropdown of
+icons "similar to the Components element", usable in 2D (for walls) as well as the Plan. An
+interactive desktop + mobile mockup was published as an artifact and approved, then built in
+three phases, each reviewed on localhost before the next.
 
-**1. MOVE THE FURNITURE PICKER OFF THE SIDEBAR AND INTO THE PLAN VIEWER.** Founder's call,
-2026-09-09: *"I'd rather have these furniture button options within the viewer of the planning
-space, i.e. the space where the room is visible, and not on the side. That'll create too much
-clutter."* He is right, and it sharpens DEV-47 decision 1 rather than reversing it: the rule was
-already *"the Plan positions, it does not originate"*, and a control that only exists in one view
-has no business occupying permanent sidebar height in the other two.
+**Phase 1 -- the rail tray (`f1ad35b`).**
+- `#furnitureSection` and the `.furn-chip` CSS are **deleted**; so is the `furnSec.hidden` line
+  in `setView()`. `#furnBtn` sits last on the rail after a hatched `.view-rail-gap`.
+- **Furniture is an ACTION, not a view**, so its open state is navy (`.open`) and never the peach
+  `.active` that marks the current view. It stays out of `VIEW_PANES`.
+- `#furnTray` is rendered by `renderFurnTray()` from `FURN_ORDER` / `FURN_ICONS` and re-fills in
+  place on every view switch (the outside-press close excludes the rail for exactly that reason).
+  It is a **sibling of the panes inside `.walls-area`, never inside `#fpStage` / `#room3dStage`**,
+  which take pointer capture. `.walls-area` is `position:relative` to contain it.
+- **Per view:** Plan offers all seven at the room centre (unchanged). 2D offers Window and Door
+  only, onto the wall in view, and the button is disabled on the ceiling. 3D offers all seven:
+  wall items go on `r3dFocusedWall()`; floor items go through `furn3DLanding()`.
+- **`furn3DLanding()` exists because the room centre is out of frame in 3D.** With the camera
+  locked at level, the floor at the room centre sits below the bottom edge of the frame, so a
+  piece added there is invisible. It walks ahead along the horizontal view direction until the
+  piece's near floor edge clears the frame bottom (`eyeH / tan(FOV/2 - pitch)`), then
+  `furnClamp` keeps it in the room. A speaker pair spreads along the camera's right vector.
+  Verified against a control: the room-centre spot is out of frame, the landing spot is not.
+- **Desktop:** the tray comes out level with the Furniture button (`placeFurnTray`), one column,
+  each item showing its default size in feet. **Mobile (<=760px):** it drops from the rail row
+  as a tile grid whose column count always fills its rows (`--cols`), so the ink-gap divider
+  trick never shows an ink cell; Close is the last tile. Below 560px the rail buttons stack icon
+  over label so four fit at 390px.
+- Adding closes the tray, selects the piece, and shows a toast naming where it landed.
 
-What this touches -- small, and deliberately isolated when it was built:
-- `#furnitureSection` (a `.sidebar-section` sitting between "Your Designs" and "Your plan") moves
-  into the Plan pane, over `#fpStage`. The `.furn-chip` buttons and their `addFurniture(type)`
-  click handler are unchanged; only the container and its CSS move.
-- The `setView()` line `furnSec.hidden = (view !== 'floorplan')` becomes unnecessary once the
-  picker lives inside the Plan pane -- the pane's own `.active` class already gates it. **Delete
-  it rather than leaving it dead.**
-- Watch: `#fpStage` takes pointer capture for every drag, so an overlay picker must not sit inside
-  the capture path or a chip click will read as a drag on the stage. Park it as a sibling of the
-  SVG inside the pane, not as a child of the stage -- the same trap DEV-33's Components drawer hit
-  with `#panelContainer`'s `overflow:hidden`.
-- Form is open: a horizontal toolbar strip along the top or bottom of the plan canvas, or a
-  collapsible drawer like DEV-33's. **Ask before building -- the founder said "we need to make
-  certain improvements to the UI for sure", so there is likely more than this one change.**
+**Phase 2 -- windows and doors editable in the 2D wall view (`eef74bf`).**
+- Drag a window along the wall **and up/down (its sill)**; a door slides along and stays on the
+  floor. Handles: `w`/`e` = width, `n` = height, and windows also get `s` = sill with the top
+  fixed (`FURN_2D_EDGES`). A live readout names the change in feet. × or the Delete key removes
+  a piece -- Delete only for a piece on the wall in view, never an off-screen selection.
+- **This lifts the base task's "height and sill are not editable" limit -- in 2D only.** That
+  limit's stated reason was that a TOP view cannot show height; the 2D wall is the view that can.
+  The Plan still edits only position and width.
+- **Windows and doors draw BEHIND the panels** (rendered first): panels are the product, so where
+  the two overlap a press belongs to the panel. While a panel size is armed they are
+  `pointer-events:none`, so clicking a window still places a panel there.
+- `furnDelete()` is now shared by the Plan's delete control, the 2D ×, and the Delete key.
+  `furnClamp` also clamps `tall`/`base` so a window survives the room being made lower.
+- **Two defects caught by screenshot and by none of the assertions:** the empty-wall prompt
+  printed straight across a see-through window (hidden via `.has-furniture`), and a window's
+  label sat under its sill handle (centred). Always look at the picture.
 
-**2. Not yet done, deliberately:** nothing is deployed. `npx vercel --prod` is founder-triggered,
-and `git status` must be checked against `.vercelignore` first (the Vercel CLI uploads the whole
-working directory).
+**Window line (founder's call at close):** the 2D window is a **solid 2.5px** line (3.5px
+selected) instead of dashed 1.5px, which read as faint. **The Plan keeps its dashed window** --
+there it is the architectural convention -- and so does the 3D view.
 
-**3. Still open and unanswered:** the pitch finding immediately below. It needs a yes/no, not
-work -- the measurement is already done.
+**Phase 3 -- dragging furniture in 3D: PARKED.** The founder does not want furniture to take much
+more effort. Notes for whoever picks it up: hit-test by casting the pointer ray onto the floor
+plane (y=0), or onto the wall planes for wall items so that crossing a corner re-homes the piece
+as it does in the Plan; press-on-a-piece must set `touch-action:none` on that piece only, so
+touch still scrolls the page everywhere else; and with the tilt locked at level only the part of
+the room that is in frame can be reached.
 
-### The pitch finding -- OPEN, for founder review
+**Open, founder's choice:** `FURN_2D_FLOOR` -- `'hide'` (current) drops floor items from the 2D
+tray; `'grey'` keeps them visible but disabled, tagged "Plan · 3D". One constant.
+
+**Superseded from the base task above:** "created from the sidebar" (now the rail, every view);
+"height and sill are not editable" (editable in 2D); "2D furniture is display-only".
+
+**Verification:** `verify-tray.mjs` 40/40, `verify-2dfurn.mjs` 37/37 (real mouse input and CDP
+touch events), `verify-furn.mjs` 97/97 (its three sidebar-visibility checks moved to the tray
+suite; its display-only check inverted), `verify-fp.mjs` 27/27 -- all in real Chromium at
+1440x900 and 390x844, screenshots reviewed. Nothing deployed.
+
+### The pitch finding -- RESOLVED: the tilt stays locked at level (founder, 2026-09-11)
+
+*"With regard to the panning to bottom, let's keep that locked for now as we don't really want to
+focus too much on the furniture."* `R3D_PITCH_MIN` stays 0. The measurement is kept below in case
+it is reopened; `furn3DLanding()` is what makes adding furniture from 3D work despite it.
 
 DEV-48 set `R3D_PITCH_MIN = 0` (the view never tilts down) on the founder's call, and wrote down
 the reason it might be reopened: *"nothing is ever placed below the eyeline... Raised once that
