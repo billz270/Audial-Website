@@ -237,8 +237,8 @@ _(none)_
   button on the view rail** (after a hatched gap; navy when open, because it is an action, not a
   view) opening `#furnTray` over the viewer — a sibling of the panes, never inside the
   pointer-capturing stages. Plan: all seven, room centre. 2D: Window/Door only, onto the wall in
-  view; disabled on the ceiling (`FURN_2D_FLOOR` `'hide'` vs `'grey'` is the founder's open
-  call). 3D: wall items on the wall faced; floor items via **`furn3DLanding()`, because with the
+  view, with floor items **hidden** from the 2D tray (`FURN_2D_FLOOR = 'hide'`, founder's call
+  2026-09-11; `'grey'` would show them disabled instead); disabled on the ceiling. 3D: wall items on the wall faced; floor items via **`furn3DLanding()`, because with the
   tilt locked the floor at the room centre is below the frame** — it walks ahead until the
   piece's near floor edge is in view. Windows and doors are now **editable in 2D**: drag (windows
   also up/down for the sill; doors stay on the floor), `w`/`e`/`n` handles plus a window-only `s`

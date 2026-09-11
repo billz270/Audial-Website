@@ -3392,8 +3392,9 @@ as it does in the Plan; press-on-a-piece must set `touch-action:none` on that pi
 touch still scrolls the page everywhere else; and with the tilt locked at level only the part of
 the room that is in frame can be reached.
 
-**Open, founder's choice:** `FURN_2D_FLOOR` -- `'hide'` (current) drops floor items from the 2D
-tray; `'grey'` keeps them visible but disabled, tagged "Plan · 3D". One constant.
+**Decided -- floor items are HIDDEN in the 2D tray** (founder, 2026-09-11: "let's leave it as it
+is"). `FURN_2D_FLOOR = 'hide'`; the alternative `'grey'` keeps them visible but disabled, tagged
+"Plan · 3D", and remains a one-constant switch if it is ever revisited.
 
 **Superseded from the base task above:** "created from the sidebar" (now the rail, every view);
 "height and sill are not editable" (editable in 2D); "2D furniture is display-only".
