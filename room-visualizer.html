@@ -353,11 +353,44 @@
   .thumb-count{position:absolute;top:3px;right:3px;font-size:9px;font-weight:700;color:var(--mute);background:var(--paper);padding:1px 4px;border:1px solid var(--ink);z-index:2}
   .wall-thumb:hover .thumb-count{background:var(--paper);color:var(--primary-light);border-color:var(--primary-light)}
 
-  /* DEV-47: windows and doors on the 2D wall diagram, so you can see what you are placing
-     panels around. Display-only -- all furniture editing lives in the Plan. */
-  .wall-furniture{position:absolute;border:1.5px solid var(--ink);background:transparent;pointer-events:none;display:flex;align-items:flex-end;justify-content:center;font-family:'Archivo',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink);opacity:0.55;overflow:hidden;padding-bottom:2px}
-  .wall-furniture.window{border-style:dashed}
+  /* DEV-47: windows and doors on the 2D wall. Editable here (phase 2) -- this is the one view
+     that shows a wall item's height as well as where it sits along the wall. Drawn BEHIND the
+     panels: panels are the product, so where the two overlap, a press belongs to the panel. */
+  .wall-furniture{position:absolute;border:1.5px solid var(--ink);background:transparent;display:flex;align-items:flex-end;justify-content:center;font-family:'Archivo',sans-serif;font-size:9px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--ink);opacity:0.55;padding-bottom:2px;cursor:grab;touch-action:none;user-select:none;transition:opacity 0.15s}
+  .wall-furniture:hover{opacity:0.85}
+  /* A window's label sits mid-height: its bottom edge carries the sill handle, which would
+     otherwise land on the text. A door has no bottom handle, so its label stays low. */
+  .wall-furniture.window{border-style:dashed;align-items:center;padding-bottom:0}
   .wall-furniture.door{border-left-width:3px}
+  /* Windows are see-through, so the empty-wall prompt would print straight across one. The
+     "Select a panel size first" hint above the wall still does that job. */
+  .wall-surface-big.has-furniture::before{display:none}
+  .wall-furniture.selected{opacity:1;border-width:2.5px}
+  .wall-furniture.door.selected{border-left-width:4px}
+  .wall-furniture.dragging{cursor:grabbing}
+  /* While a panel size is armed, a press on a window must still place a panel there. */
+  .wall-surface-big.armed .wall-furniture{pointer-events:none}
+  .wf-label{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 3px;pointer-events:none}
+  .wf-h{position:absolute;width:10px;height:10px;background:var(--paper);border:1.5px solid var(--ink);display:none;z-index:2}
+  .wf-h[data-furn-edge="w"]{left:-6px;top:50%;margin-top:-5px;cursor:ew-resize}
+  .wf-h[data-furn-edge="e"]{right:-6px;top:50%;margin-top:-5px;cursor:ew-resize}
+  .wf-h[data-furn-edge="n"]{top:-6px;left:50%;margin-left:-5px;cursor:ns-resize}
+  .wf-h[data-furn-edge="s"]{bottom:-6px;left:50%;margin-left:-5px;cursor:ns-resize}
+  .wf-del{position:absolute;top:-10px;right:-10px;width:20px;height:20px;padding:0;border-radius:50%;background:var(--accent);border:1.5px solid var(--ink);color:var(--paper);font:700 12px/1 'Archivo',sans-serif;display:none;align-items:center;justify-content:center;cursor:pointer;z-index:3}
+  .wall-furniture:hover .wf-h,.wall-furniture.selected .wf-h{display:block}
+  .wall-furniture:hover .wf-del,.wall-furniture.selected .wf-del{display:flex}
+  .wall-furniture.dragging .wf-del{display:none}
+  .wf-tip{position:absolute;bottom:calc(100% + 8px);left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:4px 8px;font-size:9px;letter-spacing:0.1em;white-space:nowrap;pointer-events:none;display:none;z-index:4}
+  .wall-furniture.dragging .wf-tip{display:block}
+  /* A fingertip needs more than a 10px square to land on. */
+  @media (pointer:coarse){
+    .wf-h{width:18px;height:18px}
+    .wf-h[data-furn-edge="w"]{left:-10px;margin-top:-9px}
+    .wf-h[data-furn-edge="e"]{right:-10px;margin-top:-9px}
+    .wf-h[data-furn-edge="n"]{top:-10px;margin-left:-9px}
+    .wf-h[data-furn-edge="s"]{bottom:-10px;margin-left:-9px}
+    .wf-del{width:26px;height:26px;top:-13px;right:-13px}
+  }
   .placed-panel{position:absolute;background:var(--accent);border:1.5px solid var(--ink);cursor:grab;transition:transform 0.1s, z-index 0s, box-shadow 0.15s, outline 0.15s;display:flex;align-items:center;justify-content:center;color:var(--ink);font-family:'Archivo Black',sans-serif;font-size:10px;text-align:center;user-select:none;overflow:hidden;touch-action:none}
   .placed-panel.dragging{cursor:grabbing;z-index:20;box-shadow:0 6px 20px rgba(0,23,31,0.3)}
   .placed-panel.selected{outline:2.5px solid var(--ink);outline-offset:2px;box-shadow:0 4px 14px rgba(9,61,83,0.45);z-index:15}
@@ -1211,6 +1244,10 @@ function furnClamp(f){
     f.w = Math.max(FURN_MIN, Math.min(f.w, span));
     f.x = Math.max(0, Math.min(span - f.w, f.x));
     f.y = 0;
+    /* Height and sill are editable in 2D, so they must also survive the room getting lower.
+       A door always stands on the floor. */
+    f.tall = Math.max(FURN_MIN, Math.min(f.tall, R.H));
+    f.base = f.type === 'door' ? 0 : Math.max(0, Math.min(R.H - f.tall, f.base));
   } else {
     f.w = Math.max(FURN_MIN, Math.min(f.w, R.W));
     f.h = Math.max(FURN_MIN, Math.min(f.h, R.D));
@@ -1218,6 +1255,14 @@ function furnClamp(f){
     f.y = Math.max(0, Math.min(R.D - f.h, f.y));
   }
   return f;
+}
+
+/* Removing a piece redraws every view that can show it. Shared by the Plan's delete control,
+   the 2D wall's, and the Delete key. */
+function furnDelete(id){
+  state.furniture = state.furniture.filter(function(f){ return String(f.id) !== String(id); });
+  if(String(state.selectedFurnitureId) === String(id)) state.selectedFurnitureId = null;
+  renderFloorplan(); invalidate3D(); renderActivePanels(); saveRoomPlan();
 }
 
 /* Which wall a new window or door goes on, from the view it was added in: the wall open in
@@ -2456,10 +2501,7 @@ function initFloorplan(){
     const del = e.target && e.target.closest ? e.target.closest('[data-furn-del]') : null;
     if(del){
       e.preventDefault();
-      const did = del.getAttribute('data-furn-del');
-      state.furniture = state.furniture.filter(function(f){ return String(f.id) !== String(did); });
-      if(String(state.selectedFurnitureId) === String(did)) state.selectedFurnitureId = null;
-      renderFloorplan(); invalidate3D(); renderActivePanels(); saveRoomPlan();
+      furnDelete(del.getAttribute('data-furn-del'));
       return;
     }
     const hit = e.target && e.target.closest ? e.target.closest('[data-drag-id]') : null;
@@ -2669,7 +2711,8 @@ if(furnTray) furnTray.addEventListener('click', function(e){
   if(!made || !made.length) return;
   const label = FURN_TYPES[type].label, f = made[0];
   if(f.wall) furnToast(label + ' added to the ' + WALL_LABELS[f.wall]
-                       + (state.activeView === 'floorplan' ? ' · drag to place' : ' · move it in Plan'));
+                       + (state.activeView === '2D' ? ' · drag to move, edges to resize'
+                        : state.activeView === '3D' ? ' · edit it in 2D' : ' · drag to place'));
   else if(state.activeView === '3D') furnToast(label + ' added ahead of you · move it in Plan');
   else furnToast(label + ' added · drag to place');
 });
@@ -2997,6 +3040,31 @@ activeWallSurface.addEventListener('pointerdown', e => {
     return;
   }
 
+  /* DEV-47: a window or door. Its delete control sits inside the piece, so check it first
+     or the press would read as a grab. (Never reached while a panel size is armed: the CSS
+     makes furniture transparent to the pointer then, so the press places a panel.) */
+  const wfDel = e.target.closest('[data-wf-del]');
+  if(wfDel){ e.preventDefault(); furnDelete(wfDel.dataset.wfDel); return; }
+  const wfEl = e.target.closest('.wall-furniture');
+  const wf = wfEl ? state.furniture.find(f => String(f.id) === String(wfEl.dataset.furnId)) : null;
+  if(wf){
+    e.preventDefault();
+    if(state.selectedPanelIds.size) clearSelection();
+    state.selectedFurnitureId = wf.id;
+    syncFurnSelectionDOM();
+    const handle = e.target.closest('[data-furn-edge]');
+    const {wHft, pxPerFtX, pxPerFtY} = getWallPxPerFt();
+    interaction = {kind:'furn', f:wf, el:wfEl, edge: handle ? handle.dataset.furnEdge : null,
+                   startX:e.clientX, startY:e.clientY, wHft, pxPerFtX, pxPerFtY, moved:false,
+                   start:{x:wf.x, w:wf.w, base:wf.base, tall:wf.tall}};
+    wfEl.classList.add('dragging');
+    furn2DTip(interaction);
+    activeWallSurface.setPointerCapture(e.pointerId);
+    return;
+  }
+  /* A press anywhere else on the wall -- a panel or bare wall -- lets go of the piece. */
+  if(state.selectedFurnitureId !== null){ state.selectedFurnitureId = null; syncFurnSelectionDOM(); }
+
   const panelEl = e.target.closest('.placed-panel');
   const panelId = panelEl ? panelEl.dataset.panelId : null;
   const panel = panelId ? state.panels.find(p => String(p.id) === String(panelId)) : null;
@@ -3061,6 +3129,18 @@ activeWallSurface.addEventListener('pointermove', e => {
   const dx = e.clientX - interaction.startX;
   const dy = e.clientY - interaction.startY;
   if(Math.abs(dx) > 4 || Math.abs(dy) > 4) interaction.moved = true;
+
+  if(interaction.kind === 'furn'){
+    /* Held still until the pointer clears the 4px dead zone, so a click to select never
+       nudges the piece. Styles are set in place -- a full renderActivePanels per move would
+       rebuild every panel's artwork. */
+    const it = interaction;
+    if(!it.moved) return;
+    furn2DApply(it, dx / it.pxPerFtX, dy / it.pxPerFtY);
+    furn2DPlace(it.el, it.f, it.pxPerFtX, it.pxPerFtY, it.wHft);
+    furn2DTip(it);
+    return;
+  }
 
   if(interaction.kind === 'drag-panels'){
     const {movingPanels, initPositions, wWft, wHft, pxPerFtX, pxPerFtY} = interaction;
@@ -3365,6 +3445,11 @@ activeWallSurface.addEventListener('pointermove', e => {
 activeWallSurface.addEventListener('pointerup', e => {
   if(!interaction) return;
   try{ activeWallSurface.releasePointerCapture(e.pointerId); }catch(err){}
+  if(interaction.kind === 'furn'){
+    furn2DEnd(interaction);
+    interaction = null;
+    return;
+  }
   if(interaction.kind === 'drag-panels'){
     interaction.movingPanels.forEach(p => {
       const el = activeWallSurface.querySelector(`.placed-panel[data-panel-id="${p.id}"]`);
@@ -3383,6 +3468,7 @@ activeWallSurface.addEventListener('pointerup', e => {
 });
 
 activeWallSurface.addEventListener('pointercancel', () => {
+  if(interaction && interaction.kind === 'furn') furn2DEnd(interaction);
   if(interaction && interaction.kind === 'marquee') interaction.box.remove();
   if(interaction && interaction.kind === 'drag-panels'){
     interaction.movingPanels.forEach(p => {
@@ -3407,6 +3493,13 @@ document.addEventListener('keydown', e => {
     state.panels = state.panels.filter(p => !ids.has(String(p.id)));
     state.selectedPanelIds.clear();
     renderActivePanels(); renderThumbnails(); renderDesignedPanels(); updateStats();
+  } else if(state.activeView === '2D' && state.selectedFurnitureId !== null){
+    /* Only a piece you can see: the selection may be a desk picked in the Plan, which the
+       2D wall does not draw, and Delete must never remove something off screen. */
+    const sf = state.furniture.find(f => String(f.id) === String(state.selectedFurnitureId));
+    if(!sf || sf.wall !== state.activeWall) return;
+    if(e.key === 'Escape'){ state.selectedFurnitureId = null; syncFurnSelectionDOM(); }
+    else if(e.key === 'Delete' || e.key === 'Backspace'){ e.preventDefault(); furnDelete(sf.id); }
   }
 });
 
@@ -3653,6 +3746,27 @@ function renderActivePanels(){
   const liveIds = new Set(state.panels.map(p=>String(p.id)));
   [...state.selectedPanelIds].forEach(id => { if(!liveIds.has(String(id))) state.selectedPanelIds.delete(id); });
 
+  /* DEV-47: windows and doors belonging to THIS wall, drawn FIRST so the panels paint over
+     them -- where the two overlap, a press belongs to the panel. Floor furniture is
+     deliberately absent: a desk 8ft into the room is not on any wall, and this flat view has
+     no way to show its distance. */
+  const wallFurn = state.activeWall === 'ceiling' ? [] : state.furniture.filter(f => f.wall === state.activeWall);
+  activeWallSurface.classList.toggle('has-furniture', wallFurn.length > 0);
+  if(wallFurn.length){
+    wallFurn.forEach(f => {
+      const el = document.createElement('div');
+      const label = FURN_TYPES[f.type].label;
+      const sel = String(state.selectedFurnitureId) === String(f.id);
+      el.className = 'wall-furniture ' + f.type + (sel ? ' selected' : '');
+      el.dataset.furnId = f.id;
+      furn2DPlace(el, f, pxPerFtX, pxPerFtY, wallHeightFt);
+      el.innerHTML = '<span class="wf-label">' + label + '</span><span class="wf-tip"></span>'
+        + (FURN_2D_EDGES[f.type] || []).map(ed => '<span class="wf-h" data-furn-edge="' + ed + '"></span>').join('')
+        + '<button type="button" class="wf-del" data-wf-del="' + f.id + '" aria-label="Remove ' + label + '">×</button>';
+      activeWallSurface.appendChild(el);
+    });
+  }
+
   wallPanels.forEach(panel=>{
     const el = document.createElement('div');
     el.className = 'placed-panel';
@@ -3676,22 +3790,63 @@ function renderActivePanels(){
     activeWallSurface.appendChild(el);
   });
 
-  /* DEV-47: windows and doors belonging to THIS wall. Floor furniture is deliberately
-     absent -- a desk 8ft into the room is not on any wall, and drawing it here would crowd
-     the view with objects whose distance this flat view has no way to show. */
-  if(state.activeWall !== 'ceiling'){
-    state.furniture.filter(f => f.wall === state.activeWall).forEach(f => {
-      const el = document.createElement('div');
-      el.className = 'wall-furniture ' + f.type;
-      el.style.left   = (f.x * pxPerFtX) + 'px';
-      el.style.top    = ((wallHeightFt - f.base - f.tall) * pxPerFtY) + 'px';
-      el.style.width  = (f.w * pxPerFtX) + 'px';
-      el.style.height = (f.tall * pxPerFtY) + 'px';
-      el.textContent  = FURN_TYPES[f.type].label;
-      activeWallSurface.appendChild(el);
-    });
-  }
   syncSelectionDOM();
+}
+
+/* ---- DEV-47 phase 2: editing windows and doors on the 2D wall ----
+   Which edges each type can drag. A door stands on the floor, so it has no bottom edge. */
+const FURN_2D_EDGES = {window:['w','e','n','s'], door:['w','e','n']};
+
+/* The 2D wall is the one view that shows a wall item's height, so it is where height and
+   sill are edited. Screen y runs DOWN while base and tall are measured UP from the floor,
+   which is why every vertical term subtracts dy. */
+function furn2DApply(it, dxFt, dyFt){
+  const f = it.f, s = it.start, span = furnWallSpan(f.wall), H = state.roomHeight;
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  if(!it.edge){
+    f.x = clamp(s.x + dxFt, 0, span - s.w);
+    if(f.type !== 'door') f.base = clamp(s.base - dyFt, 0, H - s.tall);
+  } else if(it.edge === 'w'){
+    f.x = clamp(s.x + dxFt, 0, s.x + s.w - FURN_MIN); f.w = s.x + s.w - f.x;
+  } else if(it.edge === 'e'){
+    f.w = clamp(s.w + dxFt, FURN_MIN, span - s.x);
+  } else if(it.edge === 'n'){
+    f.tall = clamp(s.tall - dyFt, FURN_MIN, H - s.base);
+  } else if(it.edge === 's'){
+    const top = s.base + s.tall;
+    f.base = clamp(s.base - dyFt, 0, top - FURN_MIN); f.tall = top - f.base;
+  }
+}
+
+function furn2DPlace(el, f, pxPerFtX, pxPerFtY, wallHeightFt){
+  el.style.left   = (f.x * pxPerFtX) + 'px';
+  el.style.top    = ((wallHeightFt - f.base - f.tall) * pxPerFtY) + 'px';
+  el.style.width  = (f.w * pxPerFtX) + 'px';
+  el.style.height = (f.tall * pxPerFtY) + 'px';
+}
+
+/* The wall-resize readout idiom: what you are changing, live, in feet. "From left" is as
+   seen facing this wall, which is how editor x already runs. */
+function furn2DTip(it){
+  const tip = it.el.querySelector('.wf-tip'), f = it.f;
+  if(!tip) return;
+  if(it.edge === 'w' || it.edge === 'e') tip.textContent = f.w.toFixed(1) + ' ft wide';
+  else if(it.edge === 'n')               tip.textContent = f.tall.toFixed(1) + ' ft tall';
+  else if(it.edge === 's')               tip.textContent = 'Sill ' + f.base.toFixed(1) + ' ft · ' + f.tall.toFixed(1) + ' ft tall';
+  else tip.textContent = f.x.toFixed(1) + ' ft from left' + (f.type === 'door' ? '' : ' · sill ' + f.base.toFixed(1) + ' ft');
+}
+
+/* A piece moved in 2D moves in the Plan and the 3D view too. */
+function furn2DEnd(it){
+  it.el.classList.remove('dragging');
+  if(it.moved){ renderFloorplan(); invalidate3D(); saveRoomPlan(); }
+  renderActivePanels();
+}
+
+function syncFurnSelectionDOM(){
+  activeWallSurface.querySelectorAll('.wall-furniture').forEach(el => {
+    el.classList.toggle('selected', String(el.dataset.furnId) === String(state.selectedFurnitureId));
+  });
 }
 
 function renderThumbnails(){
