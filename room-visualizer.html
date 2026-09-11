@@ -288,6 +288,7 @@
   .fp-tip.on{opacity:1}
 
   .walls-area{
+    position:relative;              /* containing block for the furniture tray */
     padding:20px 28px;
     border-right:1.5px solid var(--ink);
     background:linear-gradient(to right,rgba(0,23,31,0.04) 1px,transparent 1px),linear-gradient(to bottom,rgba(0,23,31,0.04) 1px,transparent 1px);
@@ -427,10 +428,32 @@
 
   .panel-sizes{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
   /* DEV-47: furniture picker. Plan-view only; setView() owns the visibility. */
-  .furn-types{display:grid;grid-template-columns:repeat(2,1fr);gap:6px}
-  .furn-chip{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--paper);border:1.5px solid var(--ink);cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;letter-spacing:0.06em;text-transform:uppercase;color:var(--ink);min-height:44px;text-align:left;transition:background 0.18s,color 0.18s}
-  .furn-chip svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.5;flex:none}
-  .furn-chip:hover{background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper)}
+  /* DEV-47 follow-up: the furniture tray. Furniture is an ACTION on the rail, not a view, so
+     it is set apart by a hatched gap and its open state is navy (selection), never the
+     peach that marks the current view. The tray overlays the viewer it acts on. */
+  .view-rail-gap{height:14px;flex:none;border-bottom:1.5px solid var(--ink);background:repeating-linear-gradient(135deg,transparent 0 4px,var(--line) 4px 5px)}
+  .view-rail-btn.furn-btn.open{background:var(--ink);color:var(--paper)}
+  .view-rail-btn.furn-btn:disabled{opacity:0.35;cursor:not-allowed}
+  .view-rail-btn.furn-btn:disabled:hover{background:var(--paper);color:var(--ink)}
+  .furn-tray{position:absolute;z-index:30;left:0;top:0;width:236px;max-height:100%;overflow-y:auto;background:var(--paper);border:1.5px solid var(--ink);border-left:none;border-bottom:none;box-shadow:8px 8px 24px rgba(0,23,31,0.12);opacity:0;visibility:hidden;transform:translateX(-12px);transition:opacity 0.2s,transform 0.24s cubic-bezier(.2,.7,.2,1),visibility 0s linear 0.24s}
+  .furn-tray.open{opacity:1;visibility:visible;transform:none;transition:opacity 0.2s,transform 0.24s cubic-bezier(.2,.7,.2,1),visibility 0s}
+  .furn-tray-head{padding:12px 14px 10px;border-bottom:1.5px solid var(--ink);display:flex;flex-direction:column;gap:3px}
+  .furn-tray-title{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.15em}
+  .furn-tray-where{font-size:11px;color:var(--mute);line-height:1.35}
+  .furn-tray-list{display:flex;flex-direction:column}
+  .furn-item{display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:10px;min-height:46px;padding:6px 14px;background:var(--paper);color:var(--ink);border:none;border-bottom:1.5px solid var(--ink);font-family:inherit;text-align:left;cursor:pointer;transition:background 0.18s,color 0.18s}
+  .furn-item svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.5}
+  .furn-item-name{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em}
+  .furn-item-dims{font-size:10px;font-weight:500;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .furn-item:hover:not(:disabled){background:linear-gradient(135deg,var(--primary),var(--primary-light));color:var(--paper)}
+  .furn-item:hover:not(:disabled) .furn-item-dims{color:rgba(242,242,249,0.8)}
+  .furn-item:disabled{cursor:not-allowed}
+  .furn-item:disabled svg,.furn-item:disabled .furn-item-name{opacity:0.32}
+  .furn-item:disabled .furn-item-dims{font-size:8.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;border:1px solid var(--line);padding:1px 5px}
+  .furn-item.close{display:none}
+  .furn-toast{position:absolute;z-index:31;left:50%;top:12px;transform:translate(-50%,-6px);background:var(--ink);color:var(--paper);font-size:9.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;padding:7px 11px;white-space:nowrap;max-width:calc(100% - 24px);overflow:hidden;text-overflow:ellipsis;opacity:0;pointer-events:none;transition:opacity 0.2s,transform 0.2s}
+  .furn-toast.on{opacity:1;transform:translate(-50%,0)}
+  @media (prefers-reduced-motion:reduce){ .furn-tray,.furn-tray.open,.furn-toast{transition:none} }
   .size-chip{padding:9px 8px;border:1.5px solid var(--ink);background:var(--paper);cursor:pointer;transition:all 0.2s;display:flex;flex-direction:column;gap:3px;text-align:left;font-family:inherit;min-height:48px}
   .size-chip:hover{background:var(--ink);color:var(--paper)}
   .size-chip:hover .size-price{color:var(--accent)}
@@ -532,6 +555,23 @@
     }
     .view-rail-btn:last-child{border-right:none}
     .view-rail-btn svg{width:18px;height:18px}
+    .view-rail-gap{width:8px;height:auto;border-bottom:none;border-right:1.5px solid var(--ink)}
+    /* The rail is a row above the viewer here, so the tray drops down from it as a grid of
+       tiles. The ink gap between tiles draws the dividers; the column count is set so the
+       tiles always fill their rows, which is what keeps that trick from showing ink cells. */
+    .furn-tray{right:0;width:auto;border:none;border-bottom:1.5px solid var(--ink);box-shadow:0 10px 24px rgba(0,23,31,0.14);transform:translateY(-8px)}
+    .furn-tray-list{display:grid;grid-template-columns:repeat(var(--cols,4),1fr);gap:1.5px;background:var(--ink)}
+    .furn-item{grid-template-columns:1fr;justify-items:center;text-align:center;gap:3px;min-height:74px;padding:8px 2px;border-bottom:none}
+    .furn-item-name{font-size:9.5px;letter-spacing:0.06em}
+    .furn-item-dims{font-size:9px}
+    .furn-item:disabled .furn-item-dims{font-size:7.5px;padding:0 3px}
+    .furn-item.close{display:grid}
+    .furn-item.close .furn-item-name{color:var(--mute)}
+    .furn-item.close:hover .furn-item-name{color:var(--paper)}
+  }
+  /* Four rail buttons across 390px: stack each icon over its label so "Furniture" fits. */
+  @media (max-width:560px){
+    .view-rail-btn{flex-direction:column;gap:3px;padding:8px 2px;min-height:56px}
   }
   @media (max-width:900px){
     nav{padding:0 20px;flex-wrap:wrap}
@@ -716,9 +756,18 @@
       <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18"/><line x1="3" y1="14" x2="13" y2="14"/><line x1="13" y1="14" x2="13" y2="21"/><line x1="13" y1="3" x2="13" y2="9"/></svg>
       <span>Plan</span>
     </button>
+    <div class="view-rail-gap" aria-hidden="true"></div>
+    <button class="view-rail-btn furn-btn" id="furnBtn" type="button" aria-expanded="false" aria-controls="furnTray">
+      <svg viewBox="0 0 24 24"><path d="M2 15v-3h13v3M1 15h15v5H1zM3 20v2m11-2v2"/><path d="M19 2v7M15.5 5.5h7"/></svg>
+      <span>Furniture</span>
+    </button>
   </div>
 
   <div class="walls-area">
+   <!-- DEV-47 follow-up: a sibling of the panes, never inside a stage -- #fpStage and
+        #room3dStage take pointer capture, so a tray inside one would read taps as drags. -->
+   <div class="furn-tray" id="furnTray" role="menu" aria-label="Add furniture"></div>
+   <div class="furn-toast" id="furnToast" role="status" aria-live="polite"></div>
    <div class="view-pane active" id="view2D">
     <div class="walls-title">
       <div class="subsection-label" style="margin-bottom:0">Place panels on walls</div>
@@ -806,22 +855,6 @@
         <span class="deselect-hint">tap to arm · click wall to place</span>
       </div>
       <div class="designs-grid-outer" id="designedPanels"></div>
-    </div>
-
-    <div class="sidebar-section" id="furnitureSection" hidden>
-      <div class="sidebar-title">
-        <span>Furniture</span>
-        <span class="deselect-hint">click to add</span>
-      </div>
-      <div class="furn-types" id="furnTypes">
-        <button class="furn-chip" data-furn="window"><svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/><path d="M12 4v16M4 12h16"/></svg>Window</button>
-        <button class="furn-chip" data-furn="door"><svg viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18"/><circle cx="15" cy="12" r="1"/></svg>Door</button>
-        <button class="furn-chip" data-furn="desk"><svg viewBox="0 0 24 24"><path d="M3 9h18M5 9v11M19 9v11"/></svg>Desk</button>
-        <button class="furn-chip" data-furn="chair"><svg viewBox="0 0 24 24"><path d="M7 4v9m10-9v9M6 13h12M8 13v7m8-7v7"/></svg>Chair</button>
-        <button class="furn-chip" data-furn="speaker"><svg viewBox="0 0 24 24"><rect x="7" y="3" width="10" height="18"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="7" r="1"/></svg>Speakers</button>
-        <button class="furn-chip" data-furn="bed"><svg viewBox="0 0 24 24"><path d="M3 18v-7h18v7M3 18v2m18-2v2M3 11V7h7v4"/></svg>Bed</button>
-        <button class="furn-chip" data-furn="couch"><svg viewBox="0 0 24 24"><path d="M4 11V8h16v3M2 11h20v6H2zM5 17v2m14-2v2"/></svg>Couch</button>
-      </div>
     </div>
 
     <div class="sidebar-section">
@@ -1187,9 +1220,38 @@ function furnClamp(f){
   return f;
 }
 
-/* A sidebar click ARMS nothing -- unlike a panel size chip, furniture has no surface to be
-   placed on, so it is created immediately at the room centre and dragged from there. That is
-   what "the Plan positions, it does not originate" means in practice (DEV-47 decision 1). */
+/* Which wall a new window or door goes on, from the view it was added in: the wall open in
+   2D, the wall faced in 3D, and in the Plan the front wall -- where the 2D view starts and
+   where the 3D camera looks at yaw 0, so it is visible everywhere without hunting for it. */
+function furnLandingWall(){
+  if(state.activeView === '2D' && state.activeWall !== 'ceiling') return state.activeWall;
+  if(state.activeView === '3D') return r3dFocusedWall();
+  return 'front';
+}
+
+/* In 3D a new floor piece must land where it can be SEEN. The camera never tilts below level
+   (R3D_PITCH_MIN), and from the eye the floor at the room centre sits below the bottom of the
+   frame -- so the Plan's "room centre" would add a piece out of sight. Instead walk ahead
+   along the horizontal view direction until the piece's near edge, on the floor, clears the
+   frame bottom. furnClamp then keeps it inside the room; in a short room that pushes it
+   against the wall ahead, which is still as visible as the room allows. Returns the centre
+   of the footprint plus the camera's right vector, which a speaker pair spreads along. */
+function furn3DLanding(def){
+  const vw = R3D.stage ? R3D.stage.clientWidth : 0, vh = R3D.stage ? R3D.stage.clientHeight : 0;
+  const eye = R3D.eye || (vw > 1 && vh > 1 ? r3dEyeOffset(vw, vh) : 0);
+  const yaw = R3D.targetYaw, pitch = R3D.targetPitch || 0;
+  const cam = r3dCamera(yaw, eye, pitch);
+  const fh = {x:Math.sin(yaw), z:-Math.cos(yaw)};
+  const below = R3D_FOV/2 - pitch;               // horizon -> frame bottom
+  const near = below > 0.05 ? cam.pos.y / Math.tan(below) : 0;
+  const halfDepth = Math.abs(fh.x)*def.w/2 + Math.abs(fh.z)*def.h/2;
+  return {cx:cam.pos.x + fh.x*(near + halfDepth), cy:cam.pos.z + fh.z*(near + halfDepth),
+          right:{x:cam.r.x, y:cam.r.z}};
+}
+
+/* Nothing is armed -- unlike a panel size chip, furniture has no surface to be placed on,
+   so it is created immediately and dragged from there. WHERE depends on the view it was
+   added from (see furnLandingWall / furn3DLanding); the Plan uses the room centre. */
 function addFurniture(type){
   const def = FURN_TYPES[type];
   if(!def) return;
@@ -1200,22 +1262,27 @@ function addFurniture(type){
                           w:def.w, h:def.h, base:def.base, tall:def.tall}, extra);
   };
   if(def.mount === 'wall'){
-    /* The front wall: where the 2D view starts and where the 3D camera looks at yaw 0, so a
-       new window is visible in every view without hunting for it. */
-    made.push(furnClamp(base({wall:'front', x:(furnWallSpan('front') - def.w)/2})));
-  } else if(type === 'speaker'){
-    /* A pair, but two independent pieces from the moment they land -- nothing links them
-       afterwards, so each drags, resizes and deletes on its own. */
-    const cy = (R.D - def.h)/2;
-    [['L', -FURN_SPEAKER_GAP/2], ['R', FURN_SPEAKER_GAP/2]].forEach(function(s){
-      made.push(furnClamp(base({side:s[0], x:R.W/2 + s[1] - def.w/2, y:cy})));
-    });
+    const wall = furnLandingWall();
+    made.push(furnClamp(base({wall:wall, x:(furnWallSpan(wall) - def.w)/2})));
   } else {
-    made.push(furnClamp(base({x:(R.W - def.w)/2, y:(R.D - def.h)/2})));
+    const at = state.activeView === '3D' ? furn3DLanding(def)
+                                          : {cx:R.W/2, cy:R.D/2, right:{x:1, y:0}};
+    if(type === 'speaker'){
+      /* A pair, but two independent pieces from the moment they land -- nothing links them
+         afterwards, so each drags, resizes and deletes on its own. Spread across the view
+         (plan x in the Plan, the camera's right in 3D) so both are side by side as seen. */
+      [['L', -FURN_SPEAKER_GAP/2], ['R', FURN_SPEAKER_GAP/2]].forEach(function(s){
+        made.push(furnClamp(base({side:s[0],
+          x:at.cx + at.right.x*s[1] - def.w/2, y:at.cy + at.right.y*s[1] - def.h/2})));
+      });
+    } else {
+      made.push(furnClamp(base({x:at.cx - def.w/2, y:at.cy - def.h/2})));
+    }
   }
   state.furniture.push.apply(state.furniture, made);
   state.selectedFurnitureId = made[made.length-1].id;
   renderFloorplan(); invalidate3D(); renderActivePanels(); saveRoomPlan();
+  return made;
 }
 
 const $ = id => document.getElementById(id);
@@ -2484,11 +2551,9 @@ function setView(view){
     btn.classList.toggle('active', on);
     btn.setAttribute('aria-pressed', on ? 'true' : 'false');
   });
-  /* The picker is the one sidebar section that belongs to a single view: furniture is
-     created here and positioned in the Plan, so offering it from 2D would arm something
-     with nowhere to land. */
-  const furnSec = $('furnitureSection');
-  if(furnSec) furnSec.hidden = (view !== 'floorplan');
+  /* The tray stays open across a view switch and re-fills in place -- what it offers, and
+     where a piece lands, both depend on the view. */
+  renderFurnTray();
   /* A pane has a zero-size box while display:none, so neither view can be measured until
      it is visible -- the same reflow trap as DEV-13. Draw after the class flip above. */
   if(view === '3D'){ R3D.eye = 0; render3D(); }
@@ -2499,9 +2564,126 @@ document.querySelectorAll('.view-rail-btn').forEach(btn => {
   btn.addEventListener('click', () => setView(btn.dataset.view));
 });
 
-document.querySelectorAll('.furn-chip').forEach(function(btn){
-  btn.addEventListener('click', function(){ addFurniture(btn.dataset.furn); });
+/* ---- DEV-47 follow-up: the furniture tray on the view rail ----
+   2D shows only what can sit on a wall: a desk 8ft into the room has no place on a flat
+   elevation, and that view deliberately does not draw floor furniture. 'hide' drops the
+   floor items from the 2D tray; 'grey' keeps them visible but disabled, tagged with where
+   they can be added. The founder is choosing between the two on seeing them -- this one
+   constant is the switch. */
+const FURN_2D_FLOOR = 'hide';
+const FURN_ICONS = {
+  window: '<rect x="4" y="4" width="16" height="16"/><path d="M12 4v16M4 12h16"/>',
+  door:   '<rect x="6" y="3" width="12" height="18"/><circle cx="15" cy="12" r="1"/>',
+  desk:   '<path d="M3 9h18M5 9v11M19 9v11"/>',
+  chair:  '<path d="M7 4v9m10-9v9M6 13h12M8 13v7m8-7v7"/>',
+  speaker:'<rect x="7" y="3" width="10" height="18"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="7" r="1"/>',
+  bed:    '<path d="M3 18v-7h18v7M3 18v2m18-2v2M3 11V7h7v4"/>',
+  couch:  '<path d="M4 11V8h16v3M2 11h20v6H2zM5 17v2m14-2v2"/>',
+  close:  '<path d="M6 6l12 12M18 6L6 18"/>'
+};
+const furnTray = $('furnTray'), furnBtn = $('furnBtn'), furnToastEl = $('furnToast');
+let furnTrayOpen = false, furnToastTimer = 0;
+
+/* The size a piece arrives at, in the unit the customer measures a room in. A wall item's
+   second number is its height up the wall; a floor item's is its depth into the room. */
+function furnDims(type){
+  const d = FURN_TYPES[type];
+  if(type === 'speaker') return 'Pair · 1 × 1 ft';
+  return d.w + ' × ' + (d.mount === 'wall' ? d.tall : d.h) + ' ft';
+}
+
+/* Facing the ceiling in 2D there is nothing furniture can go on. */
+function furnTrayAvailable(){
+  return !(state.activeView === '2D' && state.activeWall === 'ceiling');
+}
+
+function renderFurnTray(){
+  if(!furnTray) return;
+  const avail = furnTrayAvailable();
+  if(!avail) furnTrayOpen = false;
+  furnBtn.disabled = !avail;
+  furnBtn.title = avail ? '' : 'Furniture goes on a wall or the floor, not the ceiling';
+  furnBtn.classList.toggle('open', furnTrayOpen);
+  furnBtn.setAttribute('aria-expanded', furnTrayOpen ? 'true' : 'false');
+  furnTray.classList.toggle('open', furnTrayOpen);
+
+  const view = state.activeView;
+  const where = view === '2D' ? 'Adds to the ' + WALL_LABELS[furnLandingWall()] + '.'
+              : view === '3D' ? 'Lands ahead of you. Windows and doors go on the wall you face.'
+              : 'Lands in the room centre, ready to drag.';
+  const types = FURN_ORDER.filter(function(t){
+    return !(view === '2D' && FURN_2D_FLOOR === 'hide' && FURN_TYPES[t].mount === 'floor');
+  });
+  let html = '<div class="furn-tray-head"><div class="furn-tray-title">Add furniture</div>'
+           + '<div class="furn-tray-where">' + where + '</div></div>'
+           + '<div class="furn-tray-list" style="--cols:' + Math.min(4, types.length + 1) + '">';
+  types.forEach(function(t){
+    const off = view === '2D' && FURN_TYPES[t].mount === 'floor';
+    html += '<button type="button" role="menuitem" class="furn-item" data-furn="' + t + '"'
+          + (off ? ' disabled aria-disabled="true"' : '') + '>'
+          + '<svg viewBox="0 0 24 24">' + FURN_ICONS[t] + '</svg>'
+          + '<span class="furn-item-name">' + FURN_TYPES[t].label + '</span>'
+          + '<span class="furn-item-dims">' + (off ? 'Plan · 3D' : furnDims(t)) + '</span></button>';
+  });
+  /* The last tile closes the tray -- shown only where the tray is a grid (mobile). */
+  html += '<button type="button" class="furn-item close" data-furn-close="1">'
+        + '<svg viewBox="0 0 24 24">' + FURN_ICONS.close + '</svg>'
+        + '<span class="furn-item-name">Close</span><span class="furn-item-dims">&nbsp;</span></button></div>';
+  furnTray.innerHTML = html;
+  placeFurnTray();
+}
+
+/* On desktop the tray comes out level with the button that opened it, so it reads as that
+   button's flyout; on mobile the rail is a row above the viewer and the tray drops from it. */
+function placeFurnTray(){
+  if(!furnTray || !furnTrayOpen) return;
+  if(window.matchMedia('(max-width:760px)').matches){ furnTray.style.top = '0px'; return; }
+  const area = furnTray.parentElement.getBoundingClientRect();
+  const btnTop = furnBtn.getBoundingClientRect().top - area.top;
+  const room = area.height - furnTray.offsetHeight;
+  furnTray.style.top = Math.max(0, Math.min(btnTop, room)) + 'px';
+}
+
+function setFurnTray(open){
+  furnTrayOpen = !!open && furnTrayAvailable();
+  renderFurnTray();
+}
+
+function furnToast(msg){
+  if(!furnToastEl) return;
+  furnToastEl.textContent = msg;
+  furnToastEl.classList.add('on');
+  clearTimeout(furnToastTimer);
+  furnToastTimer = setTimeout(function(){ furnToastEl.classList.remove('on'); }, 2800);
+}
+
+if(furnBtn) furnBtn.addEventListener('click', function(){ setFurnTray(!furnTrayOpen); });
+if(furnTray) furnTray.addEventListener('click', function(e){
+  if(e.target.closest('[data-furn-close]')){ setFurnTray(false); return; }
+  const b = e.target.closest('[data-furn]');
+  if(!b || b.disabled) return;
+  const type = b.getAttribute('data-furn');
+  const made = addFurniture(type);
+  /* Close, so the new piece is visible -- and selected, ready to drag. */
+  setFurnTray(false);
+  if(!made || !made.length) return;
+  const label = FURN_TYPES[type].label, f = made[0];
+  if(f.wall) furnToast(label + ' added to the ' + WALL_LABELS[f.wall]
+                       + (state.activeView === 'floorplan' ? ' · drag to place' : ' · move it in Plan'));
+  else if(state.activeView === '3D') furnToast(label + ' added ahead of you · move it in Plan');
+  else furnToast(label + ' added · drag to place');
 });
+/* Outside a press closes it. The rail is excluded, so switching view with the tray open
+   re-fills it in place instead of closing it. */
+document.addEventListener('pointerdown', function(e){
+  if(!furnTrayOpen) return;
+  if(furnTray.contains(e.target) || $('viewRail').contains(e.target)) return;
+  setFurnTray(false);
+});
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Escape' && furnTrayOpen){ setFurnTray(false); furnBtn.focus(); }
+});
+window.addEventListener('resize', placeFurnTray);
 
 initRoom3D();
 initFloorplan();
@@ -2564,6 +2746,8 @@ function setActiveWall(wall){
   if(typeof selectionHint !== 'undefined' && selectionHint) selectionHint.classList.remove('visible');
   refreshActiveWall();
   renderThumbnails();
+  /* The tray names the wall a window will go on, and is unavailable on the ceiling. */
+  if(typeof renderFurnTray === 'function') renderFurnTray();
 }
 
 function refreshActiveWall(){
