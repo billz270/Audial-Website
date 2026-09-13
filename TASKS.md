@@ -3552,3 +3552,314 @@ Ceiling visibility by depth into a 12ft room, facing the front wall:
 - Remembering pitch across view switches or reloads
 - Any change to `r3dEyeOffset`'s framing, which is still computed at the horizon
 
+---
+
+## Task #DEV-49: Language & UX Reconciliation — Review-First Order Flow
+- **Status:** TODO
+- **Priority:** HIGH
+- **File:** configurator.html, room-visualizer.html, index.html, how-it-works.html, about.html
+
+### Goal
+Remove all payment-suggesting language ("Checkout", "Add to Cart", "Buy Now") across the site and reconcile every order path to a single review-first submission flow. This is a copy/UX task with no backend changes. Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
+
+### Behavior Spec
+
+**Language changes across all pages:**
+
+Remove or replace the following wording anywhere it appears:
+- "Checkout" → "Place Order for Review" or "Submit Order Request"
+- "Add to Cart" → "Add Panel" or "Add to Design"
+- "Buy Now" → remove entirely, no equivalent needed
+- "Cart" (as a noun) → "Your Design" or "My Panels"
+- "Purchase" → "Order"
+- "Payment" (as an action button) → do not display anywhere; payment happens off-site after approval
+
+**The configurator specifically:**
+- Currently shows BOTH "Place Order →" and "Checkout →" — reconcile to ONE button labeled "Place Order for Review"
+- Any secondary buttons like "Continue Shopping" should read "Add Another Panel" or similar
+
+**Add explainer copy near the submit button:**
+
+Just above or beside the "Place Order for Review" button, add short copy explaining the flow:
+- "Your order will be reviewed within 1-2 business days. We'll email you a print proof and payment link once approved."
+- Keep it concise (2 lines max), aligned with Audial's sparse voice
+
+**Room visualizer:**
+- Any "Add to Order" or "Order Panels" CTA should route to configurator's submit flow, matching the same review-first language
+
+**Homepage and other pages:**
+- Any hero CTA or footer link mentioning "buy" or "shop" gets updated
+- Nothing should imply the customer can complete a transaction on-site
+
+### Constraints
+- Do NOT change any functional behavior yet — just copy and button labels
+- Do NOT add or remove form fields
+- Do NOT touch the actual submission handler (Formspree endpoint, whatever exists today)
+- Do NOT modify the visual design of buttons beyond the label text
+- Preserve all existing styling and layout
+- Do NOT deploy to Netlify until fully tested and functional on localhost
+
+### Acceptance Criteria
+✅ No instance of "Checkout" anywhere on the site
+✅ No instance of "Add to Cart" anywhere on the site
+✅ No instance of "Buy Now" anywhere on the site
+✅ Configurator has one consistent CTA: "Place Order for Review"
+✅ Explainer copy visible near submit button
+✅ Room visualizer CTAs match the review-first language
+✅ All page-to-page navigation still works
+✅ Fully tested locally before production deployment
+
+### Out of Scope
+- Backend submission handler changes (DEV-50)
+- Google Drive integration (DEV-50)
+- Adding new form fields for customer info (DEV-51)
+- Payment integration
+- Deployment to Netlify (separate action after acceptance)
+
+---
+
+## Task #DEV-50: Google Drive + Netlify Function Backend for Order Submissions
+- **Status:** BLOCKED (awaiting Rohan to create Gmail business account for Drive access)
+- **Priority:** HIGH
+- **File:** New files: /netlify/functions/submit-order.js, /netlify/functions/utils/drive.js, netlify.toml (update)
+- **Depends on:** Gmail business account created, Google Cloud service account configured
+
+### Goal
+Build the backend infrastructure to receive order submissions from the configurator, generate unguessable order reference codes, create a unique folder per order in Google Drive, upload artwork and order details, and send email notifications. This is the "server-side" work that makes the review-first flow real. Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
+
+### Behavior Spec
+
+**Prerequisites (Rohan completes before Claude Code work begins):**
+1. Create Gmail business account (e.g., `audial.orders@gmail.com`)
+2. Create a Google Cloud project at console.cloud.google.com under that account
+3. Enable Google Drive API for the project
+4. Create a Service Account, download JSON credentials
+5. Create a Google Drive folder called "Audial Orders" in the business Gmail account
+6. Share that folder with the service account's email (Editor permission)
+7. Also share the folder with Rohan's personal email (so he can view all orders)
+8. Provide credentials JSON to Claude Code securely (via Netlify environment variables, not committed to git)
+
+**Netlify Function endpoint:**
+- Endpoint: `/netlify/functions/submit-order` (or `/api/submit-order` via redirect)
+- Method: POST
+- Accepts multipart/form-data (for file uploads)
+
+**On successful submission, function performs the following steps:**
+
+1. **Generate unguessable order reference code:**
+   - Format: `ORD-` + 6 random alphanumeric characters (lowercase, e.g., `ORD-a7k9x3`)
+   - Use cryptographically secure random generation
+   - Do NOT use sequential numbers or timestamps
+
+2. **Validate submission payload:**
+   - Required fields: name, email, phone, delivery address, at least one panel with artwork
+   - Optional fields: delivery notes, installation notes
+   - Reject with clear error message if validation fails
+   - Reject if any artwork file is over reasonable size (e.g., 20MB) or wrong format (accept: PNG, JPG, JPEG, WEBP only)
+
+3. **Create order folder in Google Drive:**
+   - Folder name: the order reference code (e.g., `ORD-a7k9x3`)
+   - Parent folder: "Audial Orders" root
+   - Permissions inherit from parent (private to Rohan)
+
+4. **Generate and upload order-details.txt:**
+   - Plain text file with format:
+ ORDER: ORD-a7k9x3
+ DATE: [ISO timestamp]
+
+ CUSTOMER:
+ Name: [name]
+ Email: [email]
+ Phone: [phone]
+
+ DELIVERY ADDRESS:
+ [full address]
+
+ DELIVERY NOTES:
+ [notes or "None"]
+
+ INSTALLATION NOTES:
+ [notes or "None"]
+
+ PANELS:
+ 1. [size] ft, [orientation], [wood] varnish, [wrap] wrap
+ 2. [size] ft, [orientation], [wood] varnish, [wrap] wrap
+ ...
+
+ TOTAL PANELS: [count]
+   - Upload to the order folder as `order-details.txt`
+
+5. **Upload each panel's captured artwork image:**
+   - Filename format: `ORD-a7k9x3_panel-1_[size]-[wood]-[wrap].png`
+     - Example: `ORD-a7k9x3_panel-1_2x2-light-halfwrap.png`
+     - Example: `ORD-a7k9x3_panel-2_4x2h-dark-fullwrap.png`
+   - Each panel gets its own file at the top level of the order folder (flat structure, no subfolders)
+
+6. **Email notification to Rohan:**
+   - Send via ProtonMail-compatible SMTP OR use a transactional email service (Resend, SendGrid free tier, or similar — decide during implementation based on ProtonMail's outbound relay setup)
+   - To: Rohan's ProtonMail address (e.g., support@audial.in on Titan, or a dedicated orders@audial.in — Rohan to confirm)
+   - Subject: `New Order: ORD-a7k9x3 — [Customer Name]`
+   - Body includes:
+     - Order reference code
+     - Customer name, email, phone
+     - Panel count and summary
+     - Direct link to the order folder in Drive
+     - Timestamp
+
+7. **Return success response to browser:**
+   - JSON response: `{ "success": true, "orderRef": "ORD-a7k9x3" }`
+   - Browser can then show the "Order Received" confirmation
+
+**Failure handling (critical):**
+
+- If any step fails (Drive upload error, network timeout, quota exceeded, etc.):
+  - Return HTTP 500 with error message
+  - Send Rohan an alert email: `Subject: Order Submission Failed — [timestamp]` with details
+  - Browser must show a visible error: "Something went wrong. Please try again or email us at support@audial.in"
+  - Do NOT silently accept a broken submission
+
+**Security requirements:**
+
+- Google service account credentials MUST be in Netlify environment variables, never in committed code
+- Function must validate content-type and reject non-multipart requests
+- Rate limiting: allow max 5 submissions per IP per hour (prevent abuse)
+- No public URLs generated for uploaded files — Drive folder stays private to Rohan
+- Order reference codes must be unguessable (not sequential, not timestamp-based)
+- Never log full submission payloads (including artwork) to Netlify function logs — privacy
+
+**Update netlify.toml:**
+- Add the new function to the allowlist
+- Ensure /netlify/functions/ folder is included in deployment
+- Environment variable stubs documented
+
+### Constraints
+- Do NOT commit credentials to git under any circumstance
+- Do NOT create public/shareable Drive links — folder stays private
+- Do NOT implement customer confirmation email in this task (defer to DEV-51 if desired)
+- Do NOT deploy to production until fully tested with a test order
+
+### Acceptance Criteria
+✅ Netlify Function endpoint responds to POST requests
+✅ Function generates unguessable `ORD-` codes
+✅ Function creates unique folder per order in Google Drive
+✅ Function uploads order-details.txt with all customer info
+✅ Function uploads each panel artwork with descriptive filename
+✅ Function sends email notification with folder link
+✅ On success, returns JSON with orderRef to browser
+✅ On failure, returns error to browser AND emails Rohan
+✅ Rate limiting active (5 submissions/IP/hour)
+✅ Credentials stored in Netlify env vars, not committed
+✅ Drive folder remains private (viewable only by Rohan and service account)
+✅ Fully tested with real submissions on Netlify preview environment before production
+
+### Out of Scope
+- Customer confirmation email (handle in DEV-51 or later)
+- Order status page for customer (out of scope entirely — no public URLs)
+- Admin dashboard (out of scope)
+- Automatic file cleanup (manual for now)
+- Razorpay integration (manual for now)
+- Deployment (separate action after acceptance)
+
+---
+
+## Task #DEV-51: Order Submission Form + Front-of-Panel Capture
+- **Status:** TODO
+- **Priority:** HIGH
+- **File:** configurator.html
+- **Depends on:** DEV-49 (language), DEV-50 (backend endpoint)
+
+### Goal
+Extend the configurator's "Place Order for Review" button to open a proper submission form collecting customer contact and delivery details, capture each designed panel as a front-view image with all image transforms applied, and submit everything to the Netlify Function endpoint from DEV-50. On success, show the "Order Received" confirmation. Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
+
+### Behavior Spec
+
+**Trigger:**
+- User has at least one panel designed in the configurator
+- User clicks "Place Order for Review"
+- Modal or inline form appears
+
+**Order form fields:**
+
+Required:
+- Full name
+- Email
+- Phone (with country code, default +91)
+- Delivery address (multi-line text field)
+
+Optional:
+- Delivery notes (single-line text, e.g., "Ring the bell twice, apartment 4B")
+- Installation notes (single-line text, e.g., "Please coordinate with the resident manager")
+
+**Form validation (client-side):**
+- All required fields filled
+- Email format valid
+- Phone number reasonable (accept spaces, dashes, country code)
+- Address not empty and at least 20 characters (basic sanity check)
+
+**Front-of-panel capture:**
+
+For each panel in the user's design, generate a PNG image capture:
+- **Method:** Use canvas rendering or html2canvas library to capture the front face of the panel with all applied transforms:
+  - Uploaded artwork with correct positioning, scale, rotation, flip
+  - Wood varnish tone (light or dark)
+  - Fabric wrap style (half or full)
+- **Resolution:** Reasonable print reference quality (e.g., 1200×1200 or scaled to panel aspect ratio at ~150 DPI equivalent)
+- **Format:** PNG for transparency support
+- **Do NOT include the 3D perspective view** — capture just the front face as if looking straight at it
+
+**Submission:**
+
+- On form submit, disable the button and show a "Submitting..." state
+- Package all captured panel images + form data + panel specs into multipart/form-data
+- POST to `/netlify/functions/submit-order` (or the equivalent endpoint from DEV-50)
+- Show a spinner or progress indication (submission may take 5-15 seconds due to uploads)
+
+**On success (function returns 200 with orderRef):**
+- Replace the form with a confirmation screen:
+  - "Order Received"
+  - "Your order reference: **ORD-a7k9x3**"
+  - "We'll review your artwork and get back to you within 1-2 business days with a print proof and payment link."
+  - Offer to clear the cart and start a new design
+- Optionally clear localStorage cart
+
+**On failure (function returns error or times out):**
+- Show a visible error message:
+  - "Something went wrong. Please try again."
+  - "If the problem continues, email us at support@audial.in and reference your design."
+- Re-enable the submit button so user can retry
+- Do NOT clear cart on failure
+
+**Loading state during submission:**
+- Disable all form fields and the submit button
+- Show a subtle spinner
+- Prevent the user from navigating away accidentally (e.g., beforeunload prompt)
+
+### Constraints
+- Do NOT allow submission if no panels are designed
+- Do NOT allow submission if any panel is missing its artwork
+- Do NOT include payment fields anywhere
+- Do NOT show any "Add to Cart"/"Checkout"/"Buy Now" language
+- Do NOT create public order status pages or URLs
+- Do NOT deploy to production until fully tested with a test order
+- The captured panel image should faithfully represent what the customer will receive (this is the reference Rohan reviews)
+
+### Acceptance Criteria
+✅ Clicking "Place Order for Review" opens a proper form
+✅ All required fields validated client-side
+✅ Panel front captures include artwork + transforms + wood + wrap correctly
+✅ Captures are PNG at reasonable print reference resolution
+✅ Form submits to DEV-50 endpoint via multipart/form-data
+✅ Loading state shown during submission
+✅ On success, "Order Received" confirmation with ORD- code visible
+✅ On failure, clear error message with retry option
+✅ Cart optionally cleared after successful submission
+✅ No submission possible without at least one designed panel
+✅ No submission possible with missing artwork on any panel
+✅ Fully tested with real submissions on Netlify preview environment before production
+
+### Out of Scope
+- Automatic customer confirmation email (handle in DEV-50 or later task)
+- Address autocomplete (future enhancement)
+- Saved customer profiles (no accounts on the site)
+- Editing submitted orders (out of scope — customer emails Rohan for changes)
+- Deployment (separate action after acceptance)
