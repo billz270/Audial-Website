@@ -6,7 +6,7 @@ This file documents the Audial website project. It's read by Claude Code at the 
 
 ## What this is
 
-**Audial** is a custom acoustic-panel business based in Mumbai. The website lets customers design panels with their own artwork, plan panel layouts in their rooms, and place orders. Five static HTML pages, no backend (yet), no build step.
+**Audial** is a custom acoustic-panel business based in Mumbai. The website lets customers design panels with their own artwork, plan panel layouts in their rooms, and place orders. Five static HTML pages, no backend (yet), and **no compilation step** — there is a minimal Netlify build, but its only job is deciding which files go public (see **Deployment**).
 
 The brand name is Sanskrit — "human effort striking sound" — paired with the concept of *Nada* in Carnatic music. Five logo shapes = five fingers of a hand = five letters of the name.
 
@@ -21,6 +21,7 @@ Location: Mumbai
 ```
 audial-website/
 ├── CLAUDE.md                  ← this file
+├── netlify.toml               ← deploy allowlist — the ONLY thing deciding what is public (see Deployment)
 ├── index.html                 ← landing page, design-led hero
 ├── configurator.html          ← panel designer (3D viewer, image upload, transforms)
 ├── room-visualizer.html       ← wall layout planner with drag/marquee/snap
@@ -46,7 +47,21 @@ audial-website/
 
 **`how-it-works.html` is the only page that loads 3D** (DEV-40 — the build viewer in the process section). The **configurator does not** — see "Parked: the 3D configurator" below. `build-web-glb.mjs` and `panel-viewer.html` remain build-only/standalone and are not referenced by any page.
 
-The nav logo is composed of two `<img>` tags inside `.logo`: `Audial Logo.png` (mark, 50px height) + `Audial Logo_Black.png` (wordmark, 64px height), gap 8px. Nav auto-sizes to 64px. Adding a font or photo? Drop it in `assets/` and ask Claude to wire it up.
+The nav logo is composed of two `<img>` tags inside `.logo`: `Audial Logo.png` (mark, 50px height) + `Audial Logo_Black.png` (wordmark, 64px height), gap 8px. Nav auto-sizes to 64px. Adding a font or photo? Drop it in `assets/`, **add a `cp` line to `netlify.toml`** (see Deployment), and ask Claude to wire it up.
+
+---
+
+## Deployment
+
+**Deploying is `git push`. There is no deploy command.** Netlify builds from GitHub `master` automatically, so a push to `master` is a public release. Never run `netlify deploy`, `npx vercel --prod`, or any other CLI publish. (The site ran on Vercel until 2026-09; `.vercelignore` is dead config kept only for reference — **Netlify does not read it**.)
+
+**The project has a minimal build step, and its only purpose is file exclusion — never compilation.** `netlify.toml` runs a short `cp` script that assembles a `dist/` folder and publishes that. No bundler, no transpiler, no framework: the five HTML pages ship byte-identical to the repo. `dist/` is generated at build time and gitignored.
+
+**Why it must work this way — there is no exclude list to write.** `netlify.toml` has *no* mechanism for excluding files from a publish directory. `[build] ignore` is a command that decides whether to **skip the build**, not a file filter; and a redirect rule that 404s a path doesn't remove the file (it stays on the CDN, and a real file beats the rule unless forced). The only reliable control is what lands in the publish directory — hence an allowlist.
+
+**So the rule is inverted from `.gitignore`: if it isn't copied, it isn't public.** Anything sensitive stays private by being absent from the copy list; anything that must be public has to be added to it. Currently published: **11 files** — the 5 pages, the 2 logo PNGs, the 3 hero video assets, and `Panels-web.glb`. Deliberately withheld: `CLAUDE.md`, `TASKS.md`, `DESIGN.md`, `docs/superpowers/**` (14 files), 322 `design-references/` design-source files, the `3d-models/` build tooling, and `legal/*.docx` (founder's call 2026-09-13 — proper HTML policy pages are a future task).
+
+**The one failure mode this creates:** a new image, video, font or model works locally and 404s in production. Add its `cp` line in the same change. The deploy log prints the full published file list — if something unexpected appears there, it is about to go public.
 
 ---
 
@@ -426,3 +441,6 @@ Future features to consider (from past discussions):
 - Don't ask Claude to fix bugs in the first message of a session — give context first (read CLAUDE.md, walk through the affected page)
 - Commit to git after each meaningful change so rollback is easy
 - When adding new tokens (colors, fonts, sizes), update this file in the same session
+- **Never push `master` unasked** — a push deploys (see Deployment), and finished work is sometimes held back on purpose while it's being fine-tuned
+- **Adding any new asset? Add its `cp` line to `netlify.toml` in the same change**, or it 404s in production while working perfectly on localhost
+- Never put anything secret in a tracked file just because it isn't linked from a page — the allowlist is what keeps it off the site, not obscurity

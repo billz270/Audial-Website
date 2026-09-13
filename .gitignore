@@ -2,6 +2,9 @@
 .superpowers/
 docs/superpowers/
 
+# Netlify build output — assembled by netlify.toml's build command, never committed.
+dist/
+
 # 3D pipeline: the Blender master is huge and local-only; the web build is committed.
 design-references/assets/3d-models/Panels.glb
 design-references/assets/3d-models/node_modules/

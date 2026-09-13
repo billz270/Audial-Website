@@ -1,0 +1,69 @@
+# Audial — Netlify deploy configuration
+#
+# WHY THIS IS AN ALLOWLIST, NOT AN EXCLUDE LIST
+# ---------------------------------------------
+# netlify.toml has NO mechanism to exclude files from a publish directory.
+# (`[build] ignore` is a command that decides whether to SKIP the build; it is
+# not a file filter. And a redirect rule that 404s a path does not remove the
+# file — it stays on the CDN, and a real file beats the rule unless forced.)
+#
+# The ONLY reliable control is what lands in the publish directory. So the build
+# below starts from an empty `dist/` and copies in the 11 files the live site
+# actually needs. Everything else in the repo — internal notes, design source
+# material, build tooling — is never uploaded, because it is never in `dist/`.
+#
+# Netlify also does NOT read `.vercelignore`. That file stays for reference only.
+#
+# TO SHIP A NEW FILE: add a `cp` line below. If it isn't copied, it isn't public.
+
+[build]
+  publish = "dist"
+  command = """
+set -e
+
+rm -rf dist
+mkdir -p dist/design-references/assets/logos
+mkdir -p dist/design-references/assets/videos
+mkdir -p dist/design-references/assets/3d-models
+
+# --- The five pages ---
+cp index.html configurator.html room-visualizer.html how-it-works.html about.html dist/
+
+# --- Nav logo (index.html …, all pages) ---
+cp "design-references/assets/logos/Audial Logo.png"       dist/design-references/assets/logos/
+cp "design-references/assets/logos/Audial Logo_Black.png" dist/design-references/assets/logos/
+
+# --- Hero banner clips (index.html, DEV-39) ---
+cp design-references/assets/videos/banner-1.mp4      dist/design-references/assets/videos/
+cp design-references/assets/videos/banner-2.mp4      dist/design-references/assets/videos/
+cp design-references/assets/videos/banner-poster.jpg dist/design-references/assets/videos/
+
+# --- 3D build viewer model (how-it-works.html, DEV-40) ---
+cp design-references/assets/3d-models/Panels-web.glb dist/design-references/assets/3d-models/
+
+# Audit trail: this list appears in the Netlify deploy log. If anything
+# unexpected shows up here, it is about to go public.
+echo "--- files being published ---"
+find dist -type f | sort
+echo "--- total: $(find dist -type f | wc -l) files ---"
+"""
+
+# Deliberately NOT published (all currently git-tracked, so a root publish
+# would expose them):
+#   CLAUDE.md, TASKS.md, DESIGN.md      — internal project docs
+#   docs/superpowers/**  (14 files)     — internal plans and specs
+#   design-references/**  (322 files)   — design source: create-your-own (134),
+#                                         manufacturing-process (131), blueprint
+#                                         and anti-references, renditions,
+#                                         textures, colour palettes, old logos,
+#                                         unused website-icons and fonts
+#   design-references/assets/3d-models/ — build-web-glb.mjs, package.json,
+#     (build-only files)                  panel-viewer.html, Panels-web.glb.hash
+#   legal/*.docx  (4 files)             — policy SOURCE documents. Founder's call
+#                                         2026-09-13: keep them OFF the site. They
+#                                         were publicly fetchable on the old Vercel
+#                                         deploy; this withholds them. Proper HTML
+#                                         policy pages are planned as a separate
+#                                         task — when those exist, cp the PAGES
+#                                         here, never the .docx.
+#   .gitignore, .vercelignore           — repo config
