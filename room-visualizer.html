@@ -681,6 +681,9 @@
   .checkout-field.invalid input,.checkout-field.invalid textarea{border-color:#C03020}
   .checkout-row{display:flex;gap:12px}
   .checkout-row .checkout-field{flex:1;min-width:0}
+  #checkoutFooter2{display:grid;grid-template-columns:1fr auto auto}
+  #checkoutFooter2 .checkout-review-note + .checkout-btn{grid-column:2}
+  .checkout-review-note{grid-column:1/-1;font-size:11px;color:var(--mute);line-height:1.6}
   .checkout-submit-error{font-size:10px;color:#C03020;font-weight:600;margin-top:8px;display:none}
   .checkout-success{text-align:center;padding:48px 22px 40px}
   .checkout-success .success-mark{font-size:32px;color:var(--accent);display:block;margin-bottom:20px}
@@ -907,7 +910,7 @@
       <div class="action-btns">
         <a href="configurator.html" class="action-btn primary" id="designBtn">Design These Panels →</a>
         <button class="action-btn" data-open-consult>Book Consultation</button>
-        <button class="action-btn primary" data-open-checkout>Checkout →</button>
+        <button class="action-btn primary" data-open-checkout>Place Order for Review →</button>
       </div>
     </div>
   </aside>
@@ -1020,15 +1023,16 @@
       </form>
     </div>
     <div class="checkout-footer" id="checkoutFooter2" style="display:none">
+      <p class="checkout-review-note">Reviewed within 1–2 business days. We'll email a print proof and payment link once approved.</p>
       <button class="checkout-btn" id="checkoutBackBtn">← Back</button>
-      <button class="checkout-btn primary" id="checkoutSubmitBtn">Place Order →</button>
+      <button class="checkout-btn primary" id="checkoutSubmitBtn">Submit Order Request</button>
     </div>
 
     <!-- Success state -->
     <div class="checkout-success" id="checkoutSuccess" style="display:none">
       <span class="success-mark">◆</span>
       <h3>Order Received.</h3>
-      <p id="checkoutSuccessMsg">We'll be in touch at your email within 1–2 business days to confirm your order and arrange delivery.</p>
+      <p id="checkoutSuccessMsg">We'll be in touch at your email within 1–2 business days with a print proof and payment link.</p>
       <button class="checkout-btn primary" id="checkoutDoneBtn">Back to Visualizer</button>
     </div>
   </div>
@@ -1178,11 +1182,11 @@ document.getElementById('checkoutSubmitBtn').addEventListener('click', async ()=
     checkoutHeaderLabel.textContent   = '◆ Audial';
     checkoutStepIndicator.textContent = '';
     document.getElementById('checkoutSuccessMsg').textContent =
-      `We'll be in touch at ${email} within 1–2 business days to confirm your order and arrange delivery.`;
+      `We'll be in touch at ${email} within 1–2 business days with a print proof and payment link.`;
   }catch{
     submitError.style.display = 'block';
     submitBtn.disabled  = false;
-    submitBtn.textContent = 'Place Order →';
+    submitBtn.textContent = 'Submit Order Request';
   }
 });
 

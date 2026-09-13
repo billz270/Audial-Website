@@ -215,6 +215,13 @@ _(none)_
 **Blender master state (2026-07-20, current):** the fabric front is now its own flat 2-triangle quad per config (`<key> Acoustic Fabric`), fully separate from `<key> Half Fold` / `<key> Full Fold`. Verified: all 8 configs present, **zero fold triangles coplanar with the front plane** (no z-fighting, no art bleed onto the rim), every node name matches its mesh datablock name, no typos, all 8 Rockwool meshes carry the Rockwool material, both wood varnishes still in use so neither gets pruned. **`build-web-glb.mjs` has NOT been updated for this new node layout** — its `FABRIC_NODE_RE` still expects `<key> Acoustic Fabric (Half|Full) Fold`, so a rebuild against the current master will fail its guards (correctly, and loudly). Fix the regex before rebuilding.
 
 ### Recently resolved
+- **Review-first order language (DEV-49)** ✓ (2026-09-14, committed locally, not pushed) — No customer-visible
+  text suggests paying on the site. Openers read **"Place Order for Review →"**, the order modal's submit reads
+  **"Submit Order Request"**, a review note sits above it in `#checkoutFooter2`, and success copy promises a
+  print proof and payment link instead of delivery. Copy only; both Formspree modals untouched. **The two
+  labels differ on purpose** — the spec assumed two competing buttons, but they are the opener and the step-2
+  submit of one flow. **Internal names (`acousticCart`, `openCheckoutModal`, `.checkout-*`) intentionally
+  still say cart/checkout** — do not rename the storage key. Full notes in TASKS.md.
 - **Furniture in the room visualizer (DEV-47)** ✓ (closed 2026-09-11) — Seven line-art types: Window and
   Door mount on a wall, Desk/Chair/Speakers/Bed/Couch sit on the floor. **Added from a Furniture
   button on the view rail, in every view** (originally a sidebar section; see the follow-up at the

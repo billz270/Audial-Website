@@ -3555,7 +3555,7 @@ Ceiling visibility by depth into a 12ft room, facing the front wall:
 ---
 
 ## Task #DEV-49: Language & UX Reconciliation — Review-First Order Flow
-- **Status:** TODO
+- **Status:** DONE (2026-09-14, committed locally, not pushed)
 - **Priority:** HIGH
 - **File:** configurator.html, room-visualizer.html, index.html, how-it-works.html, about.html
 
@@ -3608,6 +3608,34 @@ Just above or beside the "Place Order for Review" button, add short copy explain
 ✅ Room visualizer CTAs match the review-first language
 ✅ All page-to-page navigation still works
 ✅ Fully tested locally before production deployment
+
+### Implementation notes (2026-09-14)
+- **The spec's premise was off: the configurator never showed two competing buttons.** "Checkout →"
+  opened the order modal and "Place Order →" was the modal's step-2 submit — one flow, two steps.
+  Giving both the same label would have put identical words on buttons doing different things, so
+  the opener reads **"Place Order for Review →"** and the submit reads **"Submit Order Request"**
+  (founder-approved).
+- Changed, identically in `configurator.html` and `room-visualizer.html`: both openers, the submit
+  label (including the string the failure path restores), the success message ("…with a print proof
+  and payment link", replacing "confirm your order and arrange delivery", which promised delivery
+  before review), and the new review note. Configurator only: `✓ Done — Review My Panels` and the
+  Clear All confirm ("Clear all panels and start fresh?") — **the confirm was found by the browser
+  scan, not by grep**, since grep for "cart" drowns in class names.
+- "Add to Cart", "Buy Now", "Continue Shopping" and "Purchase" **never existed** on the site.
+- **Explainer placement:** inside `#checkoutFooter2`, above Back/Submit, so it stays visible in the
+  sticky footer rather than scrolling away with the form. The footer became a grid
+  (`1fr auto auto`, note spanning, first button pinned to column 2) because the longer label no
+  longer fit beside Back at 390px and flex-wrap stacked Back alone on the right. On phone the submit
+  label wraps to two lines and Back stretches to equal height, matching step 1's footer.
+- **Deliberately unchanged:** prices/Subtotal/Total/Est. Shipping; the visualizer keeps its own
+  Formspree modal (rewiring it is behaviour, deferred to DEV-51); "What you're buying" and "don't buy
+  the wrong thing" (descriptive, not CTAs); internal names (`acousticCart`, `openCheckoutModal`,
+  `.checkout-*`) — renaming the storage key would orphan every saved design.
+- **Verified in Playwright Chromium at 1440×900 and 390×844**, Formspree mocked (no real order sent):
+  banned-word scan of text nodes + title/aria-label/placeholder/alt on all 5 pages, all page links
+  200, opener → step 1 → Back/Continue → empty-form validation → mocked 500 (error shown, label
+  restored, re-enabled) → mocked 200 (new success copy) → Done closes. Founder then hand-tested both
+  pages.
 
 ### Out of Scope
 - Backend submission handler changes (DEV-50)
