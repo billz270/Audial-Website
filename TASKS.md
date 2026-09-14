@@ -3652,6 +3652,34 @@ Just above or beside the "Place Order for Review" button, add short copy explain
 - **File:** New files: /netlify/functions/submit-order.js, /netlify/functions/utils/drive.js, netlify.toml (update)
 - **Depends on:** Gmail business account created, Google Cloud service account configured
 
+### Progress log (checkpoint 2026-09-16, ~5AM — paused overnight)
+
+**Decided / done**
+- Branch `dev-50-order-backend`. DEV-49, DEV-50 and DEV-51 merge and go live **together**, on purpose.
+- Email: Resend, sent from `support@audial.in` to `NOTIFICATION_EMAIL`. If Drive succeeds and the email fails, the customer still gets success and the failure is logged (spec below updated).
+- **Service account route is DEAD — proven, not assumed.** `scripts/dev-50/drive-spike.mjs` against the TEST folder: signing in OK, the account can see the folder, creating a folder OK, **file upload → 403 `storageQuotaExceeded`** ("Service Accounts do not have storage quota"); the account's `storageQuota.limit` is `"0"`. A consumer Gmail account can't use shared drives, so the fix is **OAuth** as `audial.orders@gmail.com`.
+- OAuth consent screen configured and saved. Test users: `audial.orders@gmail.com`, `rohan270@gmail.com`.
+- `scripts/dev-50/oauth-setup.mjs` is written and syntax-checked, **not yet run**. It uses scope `drive.file` (the app can only reach files it created), so it creates **new** app-owned "Audial Orders" + "Audial Orders (TEST)" folders. The two folders made by hand can't be reached and should be trashed first. The script stops if the wrong Google account signs in and never prints the refresh token.
+- Scripts live in `scripts/dev-50/`. They are not in `netlify.toml`'s copy list, so they are never published.
+
+**Next step:** step D — the founder creates a **Desktop app** OAuth client, downloads its JSON into `website/` (gitignored) and gives Claude the filename; Claude then runs `oauth-setup.mjs`.
+
+**⚠️ MERGE BLOCKERS — do not merge to `master` until all are resolved**
+1. **The refresh token expires after 7 days.** "Publish app" is greyed out, so the app is stuck in **Testing** mode, where refresh tokens last 7 days. Tokens issued in Testing **keep** that expiry even after publishing, so the token must be re-issued once the app is published. If an expired token reaches production, every order fails.
+2. **Why "Publish app" is greyed out is still unknown.** Suspects, none confirmed:
+   - listing `audial.in` as an authorized domain (it brings in home-page / privacy-policy / Search Console ownership requirements, and the site has no privacy policy page)
+   - a Branding field left empty
+   - a sensitive scope listed under Data Access
+
+   Try removing the authorized domain and the home-page / privacy-policy links first.
+3. **`oauth-setup.mjs` needs a "renew token only" mode** that reuses the existing folder IDs. Re-running it as written creates a duplicate pair of folders. Needed for the post-publish re-issue (blocker 1) and for any renewal during development.
+
+**Also pending (not blockers of the code, but required before go-live)**
+- Share the new app-owned folders with `rohan270@gmail.com` as Editor.
+- Netlify env vars: add `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`; point `AUDIAL_ORDERS_FOLDER_ID` at the new folder; enable the vars for the Deploy Preview context.
+- Remove the dead service-account credentials: delete `GOOGLE_SERVICE_ACCOUNT_JSON` from Netlify, delete the key in Cloud Console, delete `website/audial-orders-4cd27f0c08f1.json`.
+- Weekly scheduled keep-alive function (Google revokes refresh tokens unused for 6 months).
+
 ### Goal
 Build the backend infrastructure to receive order submissions from the configurator, generate unguessable order reference codes, create a unique folder per order in Google Drive, upload artwork and order details, and send email notifications. This is the "server-side" work that makes the review-first flow real. Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
 
