@@ -3647,7 +3647,7 @@ Just above or beside the "Place Order for Review" button, add short copy explain
 ---
 
 ## Task #DEV-50: Google Drive + Netlify Function Backend for Order Submissions
-- **Status:** BLOCKED (awaiting Rohan to create Gmail business account for Drive access)
+- **Status:** IN PROGRESS (prerequisites complete 2026-09-15; branch `dev-50-order-backend`)
 - **Priority:** HIGH
 - **File:** New files: /netlify/functions/submit-order.js, /netlify/functions/utils/drive.js, netlify.toml (update)
 - **Depends on:** Gmail business account created, Google Cloud service account configured
@@ -3724,8 +3724,9 @@ Build the backend infrastructure to receive order submissions from the configura
    - Each panel gets its own file at the top level of the order folder (flat structure, no subfolders)
 
 6. **Email notification to Rohan:**
-   - Send via ProtonMail-compatible SMTP OR use a transactional email service (Resend, SendGrid free tier, or similar — decide during implementation based on ProtonMail's outbound relay setup)
-   - To: Rohan's ProtonMail address (e.g., support@audial.in on Titan, or a dedicated orders@audial.in — Rohan to confirm)
+   - Send via Resend (decided 2026-09-15; audial.in domain verified in Resend)
+   - From: `support@audial.in`
+   - To: `NOTIFICATION_EMAIL` env var (currently `support@audial.in`)
    - Subject: `New Order: ORD-a7k9x3 — [Customer Name]`
    - Body includes:
      - Order reference code
@@ -3740,11 +3741,17 @@ Build the backend infrastructure to receive order submissions from the configura
 
 **Failure handling (critical):**
 
-- If any step fails (Drive upload error, network timeout, quota exceeded, etc.):
+_Revised 2026-09-15 (founder's call): Drive is the record of the order; email is only the notification._
+
+- If the **Drive** steps fail (folder create, details upload, artwork upload, network timeout, quota exceeded, etc.):
   - Return HTTP 500 with error message
   - Send Rohan an alert email: `Subject: Order Submission Failed — [timestamp]` with details
   - Browser must show a visible error: "Something went wrong. Please try again or email us at support@audial.in"
   - Do NOT silently accept a broken submission
+- If Drive **succeeded** but the notification email fails:
+  - Return success (`{ "success": true, "orderRef": ... }`) — the order is safely captured, and a 500 here would make the customer retry and create a duplicate order
+  - Log the failure prominently in the Netlify function logs (order ref + error, never customer data) so it can be caught
+- Validation failures (400) and rate-limit rejections (429) return a clear error but send NO alert email — otherwise anyone could flood the inbox with bad requests
 
 **Security requirements:**
 
