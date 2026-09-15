@@ -3662,7 +3662,13 @@ Just above or beside the "Place Order for Review" button, add short copy explain
 - `scripts/dev-50/oauth-setup.mjs` is written and syntax-checked, **not yet run**. It uses scope `drive.file` (the app can only reach files it created), so it creates **new** app-owned "Audial Orders" + "Audial Orders (TEST)" folders. The two folders made by hand can't be reached and should be trashed first. The script stops if the wrong Google account signs in and never prints the refresh token.
 - Scripts live in `scripts/dev-50/`. They are not in `netlify.toml`'s copy list, so they are never published.
 
-**Next step:** step D — the founder creates a **Desktop app** OAuth client, downloads its JSON into `website/` (gitignored) and gives Claude the filename; Claude then runs `oauth-setup.mjs`.
+- **Step D DONE (2026-09-15).** Hand-made folders trashed; Desktop client `audial-order-uploader-desktop` created (JSON in `website/`). `oauth-setup.mjs` ran green as `audial.orders@gmail.com` (scope `drive.file`, 15 GB quota): folders created, test upload + cleanup OK. Token saved to `website/google-oauth-token.json` (gitignored). New app-owned folder IDs:
+  - "Audial Orders": `1bT-aTv-1w5xudFRO69baIf192D29HZfx`
+  - "Audial Orders (TEST)": `1Urd-6DBpXff05DsWwXi7Wcy11Tc8dRk0`
+- The old TEST ID `1Rko81wTe6odEdq3TtW15q7W_ioUz6snn` pointed at a hand-made folder that is now trashed. Do not use it.
+- "Publish app" is still greyed out even with the Branding links and authorized domain removed, so blocker 2's first suspect is ruled out. Continuing in Testing mode: **this token expires around 2026-09-22.**
+
+**Next step:** add the renew-token-only mode (blocker 3), then write the function in `netlify/functions/submit-order` + `netlify/lib/`.
 
 **⚠️ MERGE BLOCKERS — do not merge to `master` until all are resolved**
 1. **The refresh token expires after 7 days.** "Publish app" is greyed out, so the app is stuck in **Testing** mode, where refresh tokens last 7 days. Tokens issued in Testing **keep** that expiry even after publishing, so the token must be re-issued once the app is published. If an expired token reaches production, every order fails.
