@@ -1,16 +1,26 @@
-// DEV-50 one-time OAuth setup. Not deployed (absent from netlify.toml copy list).
-// TODO (merge blocker): add a renew-token-only mode that reuses existing folder IDs.
+// DEV-50 OAuth setup. Not deployed (absent from netlify.toml copy list).
 //
-// Usage: node scripts/dev-50/oauth-setup.mjs "<path to OAuth client .json>" "<output token .json>"
+// First run:  node scripts/dev-50/oauth-setup.mjs "<OAuth client .json>" "<output token .json>"
+// Renew only: node scripts/dev-50/oauth-setup.mjs --renew "<OAuth client .json>" "<existing token .json>"
 //
-// 1. Runs Google's loopback sign-in (PKCE) for scope drive.file.
-// 2. Refuses to continue unless the signed-in account is audial.orders@gmail.com.
+// Both modes:
+// 1. Run Google's loopback sign-in (PKCE) for scope drive.file.
+// 2. Refuse to continue unless the signed-in account is audial.orders@gmail.com.
+//
+// First run then:
 // 3. Creates the app-owned root folders "Audial Orders" and "Audial Orders (TEST)".
 //    (drive.file can only touch files the app itself created, so the folders
 //    made by hand in the Drive UI are not reachable.)
 // 4. Proves an upload works: subfolder + file inside TEST, then deletes both.
 // 5. Writes client id/secret + refresh token + folder IDs to the output file.
-//    The refresh token is NEVER printed.
+//
+// Renew only (the app is in Testing mode, so refresh tokens die after 7 days):
+// 3. Reads the folder IDs from the existing token file and checks both folders
+//    are still reachable and not trashed. Creates NOTHING.
+// 4. Proves an upload works inside TEST, then deletes it.
+// 5. Replaces only the refresh token (and client/created) in that file.
+//
+// The refresh token is NEVER printed.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
@@ -21,12 +31,28 @@ const EXPECTED_ACCOUNT = 'audial.orders@gmail.com';
 const SCOPE = 'https://www.googleapis.com/auth/drive.file';
 const DRIVE = 'https://www.googleapis.com/drive/v3';
 
-const [clientPath, outPath] = process.argv.slice(2);
-if (!clientPath || !outPath) { console.error('Usage: node oauth-setup.mjs <client.json> <out-token.json>'); process.exit(2); }
+const args = process.argv.slice(2);
+const renew = args[0] === '--renew';
+const [clientPath, outPath] = renew ? args.slice(1) : args;
+if (!clientPath || !outPath) {
+  console.error('Usage: node oauth-setup.mjs [--renew] <client.json> <token.json>');
+  process.exit(2);
+}
 
 const raw = JSON.parse(readFileSync(clientPath, 'utf8'));
 const client = raw.installed;
 if (!client) { console.error('Not a Desktop-app OAuth client JSON (no "installed" key). Did you pick "Desktop app"?'); process.exit(2); }
+
+// Renew needs the existing file BEFORE sign-in, so a bad path fails without a browser round-trip.
+let existing = null;
+if (renew) {
+  try { existing = JSON.parse(readFileSync(outPath, 'utf8')); }
+  catch (e) { console.error(`--renew: cannot read existing token file ${outPath}: ${e.message}`); process.exit(2); }
+  if (!existing.folders?.orders || !existing.folders?.test) {
+    console.error('--renew: token file has no folders.orders / folders.test. Run without --renew first.');
+    process.exit(2);
+  }
+}
 
 const verifier = randomBytes(32).toString('base64url');
 const challenge = createHash('sha256').update(verifier).digest('base64url');
@@ -50,7 +76,6 @@ const code = await new Promise((resolve, reject) => {
 
   server.listen(0, '127.0.0.1', () => {
     const redirectUri = `http://127.0.0.1:${server.address().port}`;
-    server.redirectUri = redirectUri;
     const auth = new URL(client.auth_uri);
     auth.search = new URLSearchParams({
       client_id: client.client_id,
@@ -64,6 +89,7 @@ const code = await new Promise((resolve, reject) => {
       code_challenge_method: 'S256',
       state,
     });
+    console.log(`\nMode: ${renew ? 'RENEW token only (no folders created)' : 'FIRST RUN (creates folders)'}`);
     console.log('\nOpening the browser. If it does not open, visit:\n');
     console.log(auth.toString());
     console.log(`\nSign in as ${EXPECTED_ACCOUNT} (NOT your personal account).`);
@@ -108,17 +134,32 @@ if (about.user.emailAddress.toLowerCase() !== EXPECTED_ACCOUNT) {
   process.exit(1);
 }
 
-// --- 4. Create app-owned root folders -----------------------------------------
 const mkFolder = (name, parent) => api(`Create folder "${name}"`, `${DRIVE}/files?fields=id,name`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({ name, mimeType: 'application/vnd.google-apps.folder', ...(parent ? { parents: [parent] } : {}) }),
 });
-const orders = await mkFolder('Audial Orders');
-const test = await mkFolder('Audial Orders (TEST)');
+
+// --- 4. Root folders: create (first run) or verify (renew) --------------------
+let folders;
+if (renew) {
+  for (const [key, id] of Object.entries(existing.folders)) {
+    const f = await api(`Check existing "${key}" folder`, `${DRIVE}/files/${id}?fields=id,name,trashed`);
+    if (f.trashed) {
+      console.error(`\n"${f.name}" (${id}) is in the Drive trash. Restore it, then re-run --renew. Token file NOT changed.`);
+      process.exit(1);
+    }
+    console.log(`       ${f.name}`);
+  }
+  folders = existing.folders;
+} else {
+  const orders = await mkFolder('Audial Orders');
+  const test = await mkFolder('Audial Orders (TEST)');
+  folders = { orders: orders.id, test: test.id };
+}
 
 // --- 5. Prove an upload works, inside TEST, then clean up ---------------------
-const spike = await mkFolder(`SPIKE-${randomBytes(3).toString('hex')}`, test.id);
+const spike = await mkFolder(`SPIKE-${randomBytes(3).toString('hex')}`, folders.test);
 const boundary = `b${randomBytes(8).toString('hex')}`;
 const meta = JSON.stringify({ name: 'spike-test.txt', parents: [spike.id] });
 const file = await api('Upload a file', 'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,size', {
@@ -132,18 +173,20 @@ await api('Cleanup: delete spike folder', `${DRIVE}/files/${spike.id}`, { method
 
 // --- 6. Save ------------------------------------------------------------------
 writeFileSync(outPath, JSON.stringify({
+  ...(existing || {}),
   account: about.user.emailAddress,
   scope: tok.scope,
   created: new Date().toISOString(),
   client_id: client.client_id,
   client_secret: client.client_secret,
   refresh_token: tok.refresh_token,
-  folders: { orders: orders.id, test: test.id },
+  folders,
 }, null, 2));
 
 console.log('\n==================================================');
-console.log('VERDICT: OAuth upload WORKS. Credentials saved to:');
+console.log(`VERDICT: OAuth upload WORKS. ${renew ? 'Refresh token RENEWED' : 'Credentials saved'} in:`);
 console.log(`  ${outPath}`);
-console.log(`New "Audial Orders" folder ID:        ${orders.id}`);
-console.log(`New "Audial Orders (TEST)" folder ID: ${test.id}`);
+console.log(`"Audial Orders" folder ID:        ${folders.orders}`);
+console.log(`"Audial Orders (TEST)" folder ID: ${folders.test}`);
+if (renew) console.log('\nUpdate GOOGLE_OAUTH_REFRESH_TOKEN in Netlify (and your local .env) — the old token is now superseded.');
 console.log('==================================================');

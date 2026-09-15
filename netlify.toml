@@ -48,6 +48,16 @@ find dist -type f | sort
 echo "--- total: $(find dist -type f | wc -l) files ---"
 """
 
+# --- Order backend (DEV-50) ---
+# Functions are NOT files in `dist/`. Netlify bundles netlify/functions/*.mjs
+# (and the netlify/lib/ code they import) into server-side functions; their
+# source is never served. They answer only at the paths each file declares:
+#   POST /api/order/start   POST /api/order/panel   POST /api/order/finish
+# Secrets come from Netlify env vars (see TASKS.md DEV-50), never from the repo.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 # Deliberately NOT published (all currently git-tracked, so a root publish
 # would expose them):
 #   CLAUDE.md, TASKS.md, DESIGN.md      — internal project docs
