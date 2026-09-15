@@ -17,6 +17,7 @@ website/
 # Netlify Functions dependencies (package.json at repo root) and CLI state.
 node_modules/
 .netlify/
+deno.lock
 
 # Local-only working material
 website-content/
