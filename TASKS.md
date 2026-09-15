@@ -3685,7 +3685,9 @@ Just above or beside the "Place Order for Review" button, add short copy explain
 - **Timing, for DEV-51:** each Drive call is ~2.5–3.3 s locally (start 2.5 s, panel ~3 s, finish 2.7 s). Uploading panels one at a time, a 10-design order is ~35 s, so **DEV-51 should upload 3 panels in parallel** and show progress. Every request stays well inside the 60 s limit.
 - **Not verifiable locally:** Netlify's real 4.5 MB request cap and the built-in burst `rateLimit` rules (`netlify dev` enforces neither). Re-run `e2e-order.mjs` against the **Deploy Preview** with a ~3.9 MB image before merge.
 
-**Next step:** founder confirms the `[TEST] New Order: ORD-ol9hqf — E2E Test Customer` email arrived → DEV-51 (form + panel capture calling the three endpoints) → Deploy Preview test.
+- **Notification email confirmed** in the `support@audial.in` inbox (Titan, via GoDaddy), not junk. Resend DKIM (`resend._domainkey`) and the `send.audial.in` SPF/MX records are in place.
+
+**Next step:** DEV-51 (form + panel capture calling the three endpoints) → Deploy Preview test.
 
 **⚠️ MERGE BLOCKERS — do not merge to `master` until all are resolved**
 1. **The refresh token expires after 7 days.** "Publish app" is greyed out, so the app is stuck in **Testing** mode, where refresh tokens last 7 days. Tokens issued in Testing **keep** that expiry even after publishing, so the token must be re-issued once the app is published. If an expired token reaches production, every order fails.
