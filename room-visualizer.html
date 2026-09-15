@@ -682,13 +682,24 @@
   .checkout-row{display:flex;gap:12px}
   .checkout-row .checkout-field{flex:1;min-width:0}
   #checkoutFooter2{display:grid;grid-template-columns:1fr auto auto}
-  #checkoutFooter2 .checkout-review-note + .checkout-btn{grid-column:2}
+  #checkoutFooter2 #checkoutBackBtn{grid-column:2}
+  .checkout-progress[hidden],.checkout-review-note[hidden]{display:none}
   .checkout-review-note{grid-column:1/-1;font-size:11px;color:var(--mute);line-height:1.6}
-  .checkout-submit-error{font-size:10px;color:#C03020;font-weight:600;margin-top:8px;display:none}
+  .checkout-submit-error{grid-column:1/-1;font-size:11px;color:#C03020;font-weight:600;line-height:1.5;display:none}
+  .checkout-field textarea{resize:vertical}
+  .checkout-optional{font-weight:400;text-transform:none;letter-spacing:0}
+  .checkout-progress{grid-column:1/-1;display:flex;align-items:center;gap:10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:0.08em}
+  .checkout-spinner{width:14px;height:14px;border:1.5px solid rgba(9,61,83,0.2);border-top-color:var(--ink);border-radius:50%;animation:checkoutSpin 0.8s linear infinite;flex-shrink:0}
+  @keyframes checkoutSpin{to{transform:rotate(360deg)}}
+  .checkout-close:disabled{opacity:0.3;cursor:not-allowed}
   .checkout-success{text-align:center;padding:48px 22px 40px}
   .checkout-success .success-mark{font-size:32px;color:var(--accent);display:block;margin-bottom:20px}
   .checkout-success h3{font-family:'Archivo Black',sans-serif;font-size:20px;text-transform:uppercase;letter-spacing:-0.02em;margin-bottom:12px}
   .checkout-success p{font-size:12px;color:var(--mute);line-height:1.7;margin-bottom:28px}
+  .checkout-success p.checkout-ref{font-size:13px;color:var(--ink);margin-bottom:10px}
+  .checkout-ref strong{font-family:'Archivo Black',sans-serif;letter-spacing:0.02em}
+  .checkout-success-actions{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+  .checkout-cart-problem{margin-top:14px;font-size:11px;color:#C03020;font-weight:600;line-height:1.5}
 </style>
 </head>
 <body>
@@ -1000,30 +1011,37 @@
         </div>
         <div class="checkout-field" id="field-address">
           <label for="coAddress">Delivery address</label>
-          <input type="text" id="coAddress" name="address" autocomplete="street-address" placeholder="Flat 4B, Shanti Niwas, SV Road">
+          <textarea id="coAddress" name="address" rows="2" autocomplete="street-address" placeholder="Flat 4B, Shanti Niwas, SV Road, Bandra West"></textarea>
           <span class="field-error">Address is required</span>
         </div>
         <div class="checkout-row">
-          <div class="checkout-field" id="field-pincode">
-            <label for="coPincode">Pincode</label>
-            <input type="text" id="coPincode" name="pincode" autocomplete="postal-code" placeholder="400050">
-            <span class="field-error">Pincode is required</span>
-          </div>
           <div class="checkout-field" id="field-city">
             <label for="coCity">City</label>
             <input type="text" id="coCity" name="city" autocomplete="address-level2" placeholder="Mumbai">
             <span class="field-error">City is required</span>
           </div>
+          <div class="checkout-field" id="field-pincode">
+            <label for="coPincode">Pincode</label>
+            <input type="text" id="coPincode" name="pincode" autocomplete="postal-code" placeholder="400050">
+            <span class="field-error">Pincode is required</span>
+          </div>
         </div>
-        <div class="checkout-field">
-          <label for="coNotes">Notes <span style="font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
-          <textarea id="coNotes" name="notes" rows="3" placeholder="Anything we should know about your space or order..."></textarea>
+        <div class="checkout-field" id="field-delivery-notes">
+          <label for="coDeliveryNotes">Delivery notes <span class="checkout-optional">(optional)</span></label>
+          <input type="text" id="coDeliveryNotes" name="deliveryNotes" maxlength="500" placeholder="e.g. Ring the bell twice, apartment 4B">
+          <span class="field-error"></span>
         </div>
-        <div class="checkout-submit-error" id="checkoutSubmitError">Something went wrong. Please try again.</div>
+        <div class="checkout-field" id="field-install-notes">
+          <label for="coInstallNotes">Installation notes <span class="checkout-optional">(optional)</span></label>
+          <input type="text" id="coInstallNotes" name="installationNotes" maxlength="500" placeholder="e.g. Please coordinate with the building manager">
+          <span class="field-error"></span>
+        </div>
       </form>
     </div>
     <div class="checkout-footer" id="checkoutFooter2" style="display:none">
       <p class="checkout-review-note">Reviewed within 1–2 business days. We'll email a print proof and payment link once approved.</p>
+      <div class="checkout-progress" id="checkoutProgress" role="status" aria-live="polite" hidden><span class="checkout-spinner" aria-hidden="true"></span><span id="checkoutProgressText">Submitting…</span></div>
+      <div class="checkout-submit-error" id="checkoutSubmitError" role="alert"></div>
       <button class="checkout-btn" id="checkoutBackBtn">← Back</button>
       <button class="checkout-btn primary" id="checkoutSubmitBtn">Submit Order Request</button>
     </div>
@@ -1032,12 +1050,17 @@
     <div class="checkout-success" id="checkoutSuccess" style="display:none">
       <span class="success-mark">◆</span>
       <h3>Order Received.</h3>
-      <p id="checkoutSuccessMsg">We'll be in touch at your email within 1–2 business days with a print proof and payment link.</p>
-      <button class="checkout-btn primary" id="checkoutDoneBtn">Back to Visualizer</button>
+      <p class="checkout-ref">Your order reference: <strong id="checkoutOrderRef"></strong></p>
+      <p id="checkoutSuccessMsg">We'll review your artwork and get back to you within 1–2 business days with a print proof and payment link.</p>
+      <div class="checkout-success-actions">
+        <button class="checkout-btn" id="checkoutNewDesignBtn">Clear Designs &amp; Start New</button>
+        <button class="checkout-btn primary" id="checkoutDoneBtn">Back to Visualizer</button>
+      </div>
     </div>
   </div>
 </div>
 
+<script src="order-submit.js"></script>
 <script>
 // CONSULT MODAL
 const consultModal = document.getElementById('consultModal');
@@ -1069,6 +1092,7 @@ function openCheckoutModal(){
   document.body.classList.add('modal-open');
 }
 function closeCheckoutModal(){
+  if(AudialOrder.isBusy()) return;   // never abandon an order mid-upload
   checkoutModal.classList.remove('open');
   document.body.classList.remove('modal-open');
 }
@@ -1096,20 +1120,22 @@ function renderCheckoutCart(){
   let subtotal = 0;
   const summaryLines = [];
   const rows = cart.map(item=>{
-    const price    = PANEL_PRICES[item.size]||0;
+    const isCustom = item.size === 'custom';
+    const price    = isCustom ? (item.price||0) : (PANEL_PRICES[item.size]||0);
     const qty      = item.quantity||1;
     const lineTotal = price*qty;
     subtotal += lineTotal;
     const wood = item.woodVarnish==='light' ? 'Light varnish' : 'Dark varnish';
     const wrap = item.fabricWrap==='half'   ? 'Half wrap'     : 'Full wrap';
-    summaryLines.push(`${item.size} ft · ${wood} · ${wrap} · Qty ${qty} · ₹${lineTotal.toLocaleString()}`);
+    const sizeLabel = isCustom ? `${item.effectiveW||item.baseW}×${item.effectiveH||item.baseH} ft Custom` : `${item.size} ft`;
+    summaryLines.push(`${sizeLabel} · ${wood} · ${wrap} · Qty ${qty} · ₹${lineTotal.toLocaleString()}`);
     const thumbHtml = item.image
       ? `<img src="${item.image}" alt="Panel artwork">`
       : '<div class="checkout-thumb-empty"></div>';
     return `<div class="checkout-item">
       <div class="checkout-thumb">${thumbHtml}</div>
       <div class="checkout-item-info">
-        <div class="checkout-item-name">${item.size} ft Panel</div>
+        <div class="checkout-item-name">${sizeLabel} Panel</div>
         <div class="checkout-item-meta">${wood} · ${wrap}</div>
       </div>
       <div class="checkout-item-right">
@@ -1118,7 +1144,10 @@ function renderCheckoutCart(){
       </div>
     </div>`;
   });
-  container.innerHTML = rows.join('')+`<div class="checkout-subtotal"><span>Subtotal</span><span>₹${subtotal.toLocaleString()}</span></div>`;
+  const problem = AudialOrder.cartProblem(cart);
+  container.innerHTML = rows.join('')+`<div class="checkout-subtotal"><span>Subtotal</span><span>₹${subtotal.toLocaleString()}</span></div>`
+    + (problem ? `<p class="checkout-cart-problem">${problem}</p>` : '');
+  continueBtn.disabled = !!problem;
   container.dataset.orderSummary = summaryLines.join('\n');
   container.dataset.subtotal = String(subtotal);
 }
@@ -1134,59 +1163,16 @@ document.addEventListener('keydown', e=>{
 document.querySelectorAll('[data-open-checkout]').forEach(el=>{
   el.addEventListener('click', e=>{ e.preventDefault(); openCheckoutModal(); });
 });
-document.getElementById('checkoutSubmitBtn').addEventListener('click', async ()=>{
-  const rules = [
-    {id:'field-name',    input:'coName',    ok: v=>v.trim().length>0},
-    {id:'field-email',   input:'coEmail',   ok: v=>/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)},
-    {id:'field-phone',   input:'coPhone',   ok: v=>v.trim().length>0},
-    {id:'field-address', input:'coAddress', ok: v=>v.trim().length>0},
-    {id:'field-pincode', input:'coPincode', ok: v=>v.trim().length>0},
-    {id:'field-city',    input:'coCity',    ok: v=>v.trim().length>0},
-  ];
-  let valid = true;
-  rules.forEach(r=>{
-    const val = document.getElementById(r.input).value;
-    const fieldEl = document.getElementById(r.id);
-    if(r.ok(val)){ fieldEl.classList.remove('invalid'); }
-    else          { fieldEl.classList.add('invalid'); valid=false; }
-  });
-  if(!valid) return;
-  const cartContainer = document.getElementById('checkoutCartItems');
-  const submitBtn     = document.getElementById('checkoutSubmitBtn');
-  const submitError   = document.getElementById('checkoutSubmitError');
-  submitBtn.disabled  = true;
-  submitBtn.textContent = 'Sending...';
-  submitError.style.display = 'none';
-  const email = document.getElementById('coEmail').value;
-  const payload = {
-    name:          document.getElementById('coName').value,
-    email,
-    phone:         document.getElementById('coPhone').value,
-    address:       document.getElementById('coAddress').value,
-    pincode:       document.getElementById('coPincode').value,
-    city:          document.getElementById('coCity').value,
-    notes:         document.getElementById('coNotes').value,
-    order_summary: cartContainer.dataset.orderSummary||'',
-    subtotal:      '₹'+Number(cartContainer.dataset.subtotal||0).toLocaleString(),
-  };
-  try{
-    const res = await fetch('https://formspree.io/f/xbdbzvao',{
-      method:'POST',
-      headers:{'Content-Type':'application/json','Accept':'application/json'},
-      body:JSON.stringify(payload),
-    });
-    if(!res.ok) throw new Error('non-ok');
-    checkoutStep2.style.display   = 'none';
-    checkoutFooter2.style.display = 'none';
-    checkoutSuccess.style.display = '';
-    checkoutHeaderLabel.textContent   = '◆ Audial';
-    checkoutStepIndicator.textContent = '';
-    document.getElementById('checkoutSuccessMsg').textContent =
-      `We'll be in touch at ${email} within 1–2 business days with a print proof and payment link.`;
-  }catch{
-    submitError.style.display = 'block';
-    submitBtn.disabled  = false;
-    submitBtn.textContent = 'Submit Order Request';
+// DEV-51: step 2 (validation, artwork capture, upload to /api/order/*) lives in order-submit.js,
+// shared with configurator.html.
+AudialOrder.init({
+  onDesignsCleared(){
+    // The room plan keeps its own snapshot of each placed design, so it survives this.
+    state.designedCart = [];
+    state.selectedDesignedId = null;
+    renderDesignedPanels();
+    saveRoomPlan();
+    window.location.href = 'configurator.html';
   }
 });
 

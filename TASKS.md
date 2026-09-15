@@ -3851,10 +3851,32 @@ _Revised 2026-09-15 (founder's call): Drive is the record of the order; email is
 ---
 
 ## Task #DEV-51: Order Submission Form + Front-of-Panel Capture
-- **Status:** TODO
+- **Status:** IN PROGRESS — built and verified locally (2026-09-15), branch `dev-50-order-backend`; Deploy Preview test still open
 - **Priority:** HIGH
-- **File:** configurator.html
+- **File:** configurator.html, room-visualizer.html, new `order-submit.js`, netlify.toml
 - **Depends on:** DEV-49 (language), DEV-50 (backend endpoint)
+
+### Progress log (2026-09-15)
+
+**Founder's calls**
+- **Both pages are rewired**, not only the configurator: every "Place Order for Review" opener (there are exactly two, one per page) now goes to the DEV-50 backend. Formspree is gone from both order modals. (The Book Consultation forms are untouched; they open a `mailto:`.)
+- **Capture at SOURCE resolution:** one artwork pixel = one output pixel, cropped to exactly what the customer framed. This supersedes the spec's "~150 DPI" line, which would mean a 7200×3600 image for a 4×2 made from a 1200px upload (see DEV-50's print-quality follow-up).
+
+**What was built**
+- **`order-submit.js`** (repo root, shared, `cp`'d in `netlify.toml`) takes over step 2 of both modals. Pages keep their own step 1 (`renderCheckoutCart`, pricing) and call `AudialOrder.init({onDesignsCleared})`.
+- **Flow:** capture every design → `POST /api/order/start` → `panel` × N, **3 in parallel** → `finish`. A 409 `missingPanels` re-uploads just those and finishes again. Network errors and 5xx get one automatic retry. 4xx messages from the server are shown to the customer as written. A 401 (token expired) drops the order and the next Submit starts fresh.
+- **Retry resumes the same order.** If uploads fail after `start`, pressing Submit again uploads only the missing panels into the same `(INCOMPLETE)` folder instead of opening a second one. Any change to the details or designs starts a new order.
+- **After the first upload failure, in-flight uploads finish before the error shows.** Otherwise a quick retry could upload the same panel twice at once and the server's find-then-replace would duplicate the file.
+- **Capture** (`capturePanel`) redraws the saved transform on a canvas with the same maths as `applyImageTransform()`. The face is `savedPanelWidth/Height − 3` (the 1.5px border, border-box). **Artwork only:** a straight-on view shows none of the wood or the wrap, so the finish is carried by the filename and `order-details.txt`. PNG first; areas the artwork does not cover (the 10% "contain" fit) stay transparent. If a PNG would exceed the 4 MB cap it falls back to JPEG, then to smaller sizes. Carts saved before transforms were stored get a centred cover-fit at the panel's proportions.
+- **Form:** name, email, phone (fills `+91 ` on focus), street address (textarea), city, pincode, delivery notes, installation notes. **Deviation:** the spec had one multi-line address; City and Pincode stay as their own required fields (better delivery data) and are joined into the `address` the backend stores. Client validation mirrors `validate.mjs` (address total ≥ 20 chars, phone 7–15 digits).
+- **Guards:** step 1's Continue is disabled, with a reason, if the cart is empty or any design lacks artwork. While submitting, every field, Back and × are disabled, Escape/backdrop cannot close the modal, and a `beforeunload` prompt is armed. A progress line shows "Preparing artwork 2 of 3…", "Uploading artwork 1 of 3…", "Finishing up…".
+- **Success:** "Order Received", the `ORD-` reference, the proof + payment-link copy with the customer's email. "Clear Designs & Start New" empties `acousticCart` (configurator: resets the editor; visualizer: goes to the configurator, the room plan keeps its own snapshots). The cart is never cleared automatically or on failure.
+- Visualizer step 1 now labels custom sizes ("3×5 ft Custom Panel") and prices them, as the configurator already did.
+- `netlify/lib/validate.mjs` had raw control characters (incl. NUL) typed inside two regexes, so git treated it as **binary** and hid its diffs. Now `\x00-\x1f` escapes; 25/25 tests unchanged.
+
+**Verified (headless Chrome 1440×900 against `netlify dev`)**
+- **Capture fidelity, 6 scenarios on the real configurator** (upload path, preview flattened to 0°/0°, compared pixel-wise with the face): 4×2 H cover fit; 4×2 V rotate 90 + flipH + zoom + offset; 2×2 rotate 180 + flipV; custom 3×5 rotate 270; 4×2 contain fit; 1×1 zoom 2. Mean difference **0.8–6.3 / 255**, while a mirrored control scores **59–130**. Output width equals face/zoom to the pixel in every case. The 6.3 case is the preview container clipping a face taller than 540px at the forced zoom, not the capture.
+- **Testing trap:** the backend's 5 starts/hour limit (DEV-50) is easy to use up while testing — the first full browser run met a 429 left over from earlier probes. Rejected attempts don't count; read `Retry-After` from a valid POST before re-running.
 
 ### Goal
 Extend the configurator's "Place Order for Review" button to open a proper submission form collecting customer contact and delivery details, capture each designed panel as a front-view image with all image transforms applied, and submit everything to the Netlify Function endpoint from DEV-50. On success, show the "Order Received" confirmation. Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
