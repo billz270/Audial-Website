@@ -3891,3 +3891,71 @@ For each panel in the user's design, generate a PNG image capture:
 - Saved customer profiles (no accounts on the site)
 - Editing submitted orders (out of scope — customer emails Rohan for changes)
 - Deployment (separate action after acceptance)
+---
+
+## Task #DEV-52: Privacy Policy Page
+
+- **Status:** SHIPPED to master 2026-09-16 (branch `dev-52-privacy-page`, cut from master, NOT from `dev-50-order-backend`)
+- **Priority:** HIGH — unblocks the Google OAuth consent screen's "Publish app" button
+- **Files:** New `privacy-policy.html`; footer link on all 5 pages; `netlify.toml` (11 → 12 files); `CLAUDE.md`
+
+### Why it shipped ahead of DEV-49/50/51
+The Google Cloud **"Publish app" button is greyed out**, which is DEV-50 merge blocker #2 and
+gates blocker #1 (the refresh token expires ~2026-09-22). Google requires a production OAuth app
+to have an **app home page and a privacy policy URL on an authorized domain**; with those Branding
+fields empty the button stays disabled. So the page had to be LIVE before the button could turn on,
+which meant shipping it without the order backend.
+
+**Two wrong diagnoses were burned before this one — record them so nobody repeats them:**
+1. *"The privacy-policy requirement was ruled out."* It was not. A previous session **removed** the
+   Branding links and the authorized domain to test that theory. That was backwards: the fields must
+   be **filled**, not emptied. Publish stayed grey, which looked like exoneration and was the opposite.
+2. *"'Publish app' is not the greyed button — 'Make Internal' is."* Wrong, though the underlying
+   fact is true and worth keeping: **"Make Internal" is a different button on the same Audience page
+   and is greyed out permanently and correctly**, because a consumer Gmail has no Workspace org.
+   `drive.file` is also genuinely **non-sensitive**, so no verification is needed — publishing is one
+   click *once Branding is complete*. The founder checked: Publish app itself is disabled.
+
+### §6.4 and §7 were REWORDED before publishing — do not lose this on merge
+The founder's .docx describes the Netlify→Drive→Resend pipeline in the **present** tense and calls
+Formspree "our earlier website form". On master that is **false**: master has no `netlify/`, no
+`order-submit.js`, and both order modals still post to Formspree (verified). Publishing as written
+would have been a self-attested policy that misdescribes the live site. The page now says Formspree
+is **current** and Drive/Resend are **incoming**, with "This Policy will be updated when that change
+takes effect" (which §16 already promises).
+**→ WHEN DEV-50/51 GOES LIVE, §6.4 and §7 must be flipped back to the .docx wording.**
+**→ The .docx itself was NOT edited** — the page and the source document currently differ in these
+two sections. The founder needs to make the matching edit in Word, or accept the divergence.
+
+### Other decisions
+- **One page only.** Terms of Use, Refund, and User Content & IP still contain unfilled
+  `[PLACEHOLDER]` fields and must not be published until filled.
+- **Footer link on all 5 pages in 3 idioms, because the footers are not uniform:** index.html has a
+  4-column footer (Company column); about.html has a one-line `.foot-links` span; configurator,
+  room-visualizer and how-it-works had **no footer links at all** and needed the span plus 4 CSS
+  rules each. The last two are where personal data is actually collected.
+- Rendered by hand, not generated from the .docx — the build must stay a pure `cp`.
+
+### Traps
+- **`.legal-toc` is a `<nav>`**, so the global `nav{position:sticky;display:flex;…}` rule applied to
+  it. Class specificity beat the element rule for `border`/`padding` but NOT for `position`,
+  `display`, `z-index`, `background` — the TOC silently became a second sticky bar. Explicit resets added.
+- **about.html's script has a `contactForm` listener** that would throw on a page without that form
+  and kill the hamburger JS below it. Deliberately omitted.
+- `footer a{}` is new on three pages; verified it cannot reach `.checkout-footer`, which is a `<div>`.
+
+### Verified
+- Real `netlify.toml` build run: **12 files**, privacy page present, no `.docx`, no `legal/` in `dist/`.
+- 17 TOC anchors → 17 section ids; zero placeholders; tags balanced; one link per page, all in `<footer>`.
+- Branch isolation confirmed: no `netlify/`, no `order-submit.js`, no `/api/order` references.
+- **NOT verified visually.** No puppeteer installed, Chrome extension declined. The 1440×900 and
+  390×844 renders — including the mobile table restack and the 3→1 column TOC — are unlooked-at.
+  DEV-42 and DEV-47 both had defects that only screenshots caught. **Check the live page.**
+
+### Next
+1. Branding: app home page `https://www.audial.in`, privacy `https://www.audial.in/privacy-policy.html`,
+   authorized domain `audial.in`. Confirm App name / support email / developer contact are non-empty.
+2. Click **Publish app**.
+3. `node scripts/dev-50/oauth-setup.mjs --renew <client.json> website/google-oauth-token.json`
+   — Testing-era tokens keep their 7-day expiry, so publishing alone does NOT renew. Due ~2026-09-22.
+   This `--renew` sign-in path has never been exercised.
