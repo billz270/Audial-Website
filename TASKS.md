@@ -3973,3 +3973,67 @@ For each panel in the user's design, generate a PNG image capture:
 - Saved customer profiles (no accounts on the site)
 - Editing submitted orders (out of scope — customer emails Rohan for changes)
 - Deployment (separate action after acceptance)
+---
+
+## Task #DEV-52: Privacy Policy Page
+
+- **Status:** BUILT, not pushed (2026-09-16; branch `dev-50-order-backend`)
+- **Priority:** HIGH — required for Google OAuth production compliance and DPDPA
+- **File:** New: `privacy-policy.html`. Modified: all 5 pages (footer link), `netlify.toml`, `CLAUDE.md`
+
+### What this is
+`privacy-policy.html` renders `legal/AUDIAL_PRIVACY_POLICY.docx` as a real page at
+`https://www.audial.in/privacy-policy.html`. **The .docx stays private** — the allowlist copies
+the PAGE, never the source doc. It is the first of the four policies to ship; the other three
+(Terms of Use, Refund/Return/Cancellation, User Content & IP) **still contain unfilled
+`[PLACEHOLDER]` fields and must not be published until filled**.
+
+### The finding that reframed the task
+This was started to unblock DEV-50's merge blocker #2, "Publish app is greyed out". **It is
+very likely not a blocker at all — "Make Internal" and "Publish app" are two different buttons
+on the same Audience page.** "Make Internal" is greyed out permanently and correctly, because
+a consumer Gmail account has no Google Workspace organisation to be internal to. That is almost
+certainly the button that was observed. Confirmed separately: **`drive.file` is a NON-SENSITIVE
+scope, so the app needs no verification to publish** — publishing should be one click.
+The privacy policy is still required, but for a different reason: Google's OAuth policy requires
+every *production* app to have a public home page with privacy-policy and terms links. So the
+page is needed for **compliance after publishing**, not as a gate on the button.
+**Blocker #1 (refresh token expiry ~2026-09-22) is the real deadline and is untouched by this.**
+
+### Decisions
+- **One page, not four.** The other three .docx files have unfilled placeholders.
+- **Ships with DEV-49/50/51, not before.** §6.4 and §7 describe the Netlify→Drive→Resend order
+  pipeline in the PRESENT tense and call Formspree "earlier". That is false until DEV-50 is live,
+  so shipping the page alone would publish a self-attested policy that misdescribes the site.
+  Google is not blocked meanwhile: publish the app now, fill the Branding links when the bundle lands.
+- **Footer link on all 5 pages, in three different idioms — because the footers are NOT uniform.**
+  `index.html` has a 4-column footer (link added to the Company column); `about.html` has a
+  one-line `.foot-links` span; **`configurator.html`, `room-visualizer.html` and `how-it-works.html`
+  had NO footer links at all** and needed a `.foot-links` span plus four CSS rules each.
+  Those last two are where personal data is actually collected, so they mattered most.
+- **Rendered by hand, not generated from the .docx.** A converter was considered and rejected:
+  the fidelity work (bold runs, two tables, nested lists) costs more than it saves for a document
+  that changes ~twice a year, and the build must stay a pure `cp` with no compilation step.
+- Order-modal privacy link was offered and declined — footer only.
+
+### Traps hit
+- **`.legal-toc` is a `<nav>`, and the global `nav{position:sticky;display:flex;…}` rule applies
+  to it.** Class specificity beat the element rule for `border`/`padding` but NOT for `position`,
+  `display`, `z-index` or `background`, which are not declared on the class — so the table of
+  contents silently became a second sticky flex bar. Fixed with explicit resets on `.legal-toc`.
+- **`about.html`'s script has a `contactForm` listener** that would throw on a page without that
+  form and kill the hamburger JS below it. Deliberately omitted from the new page.
+- `footer a{}` is a new rule on three pages; verified it cannot reach `.checkout-footer`, which
+  is a `<div>`, not a `<footer>`. No regression to the order modals.
+
+### Verified
+- The real `netlify.toml` build command was executed: **13 files published**, `privacy-policy.html`
+  present, no `.docx` and no `legal/` directory in `dist/`.
+- 17 TOC anchors all resolve to 17 section ids; zero `[PLACEHOLDER]` strings survive; both tables
+  have exactly 2 cells per row; tags balanced on all six pages.
+- Exactly one privacy link per page, all inside `<footer>`; one `<footer>` element per page.
+- All six pages serve HTTP 200 from `python -m http.server 8000`.
+- **NOT verified visually.** No puppeteer/playwright installed and the Chrome extension was
+  declined, so the 1440×900 and 390×844 renders — including the mobile table restack and the
+  3→1 column TOC — have not been looked at. Several past tasks here (DEV-42, DEV-47) had defects
+  that only screenshots caught. **Eyeball before merging.**

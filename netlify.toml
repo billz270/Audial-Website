@@ -8,7 +8,7 @@
 # file — it stays on the CDN, and a real file beats the rule unless forced.)
 #
 # The ONLY reliable control is what lands in the publish directory. So the build
-# below starts from an empty `dist/` and copies in the 12 files the live site
+# below starts from an empty `dist/` and copies in the 13 files the live site
 # actually needs. Everything else in the repo — internal notes, design source
 # material, build tooling — is never uploaded, because it is never in `dist/`.
 #
@@ -28,6 +28,9 @@ mkdir -p dist/design-references/assets/3d-models
 
 # --- The five pages ---
 cp index.html configurator.html room-visualizer.html how-it-works.html about.html dist/
+
+# --- Legal (DEV-52) ---
+cp privacy-policy.html dist/
 
 # --- Order submission script (configurator.html + room-visualizer.html, DEV-51) ---
 cp order-submit.js dist/
@@ -75,8 +78,10 @@ echo "--- total: $(find dist -type f | wc -l) files ---"
 #   legal/*.docx  (4 files)             — policy SOURCE documents. Founder's call
 #                                         2026-09-13: keep them OFF the site. They
 #                                         were publicly fetchable on the old Vercel
-#                                         deploy; this withholds them. Proper HTML
-#                                         policy pages are planned as a separate
-#                                         task — when those exist, cp the PAGES
-#                                         here, never the .docx.
+#                                         deploy; this withholds them. The PAGE is
+#                                         what ships: privacy-policy.html is copied
+#                                         above (DEV-52). The .docx stays private.
+#                                         Terms of Use, Refund and User Content/IP
+#                                         still have unfilled placeholders — do not
+#                                         publish those until they are filled.
 #   .gitignore, .vercelignore           — repo config

@@ -6,7 +6,7 @@ This file documents the Audial website project. It's read by Claude Code at the 
 
 ## What this is
 
-**Audial** is a custom acoustic-panel business based in Mumbai. The website lets customers design panels with their own artwork, plan panel layouts in their rooms, and place orders. Five static HTML pages, no backend (yet), and **no compilation step** — there is a minimal Netlify build, but its only job is deciding which files go public (see **Deployment**).
+**Audial** is a custom acoustic-panel business based in Mumbai. The website lets customers design panels with their own artwork, plan panel layouts in their rooms, and place orders. Six static HTML pages (five product pages + the privacy policy), no backend (yet), and **no compilation step** — there is a minimal Netlify build, but its only job is deciding which files go public (see **Deployment**).
 
 The brand name is Sanskrit — "human effort striking sound" — paired with the concept of *Nada* in Carnatic music. Five logo shapes = five fingers of a hand = five letters of the name.
 
@@ -27,6 +27,7 @@ audial-website/
 ├── room-visualizer.html       ← wall layout planner with drag/marquee/snap
 ├── how-it-works.html          ← explainer page (acoustics myths above CTA)
 ├── about.html                 ← about/founder page
+├── privacy-policy.html        ← DEV-52: DPDPA privacy policy, rendered from legal/AUDIAL_PRIVACY_POLICY.docx
 ├── order-submit.js            ← DEV-51: order modal step 2 + artwork capture, shared by configurator + visualizer
 ├── netlify/
 │   ├── functions/             ← DEV-50: POST /api/order/start|panel|finish (thin wrappers)
@@ -64,7 +65,7 @@ The nav logo is composed of two `<img>` tags inside `.logo`: `Audial Logo.png` (
 
 **Why it must work this way — there is no exclude list to write.** `netlify.toml` has *no* mechanism for excluding files from a publish directory. `[build] ignore` is a command that decides whether to **skip the build**, not a file filter; and a redirect rule that 404s a path doesn't remove the file (it stays on the CDN, and a real file beats the rule unless forced). The only reliable control is what lands in the publish directory — hence an allowlist.
 
-**So the rule is inverted from `.gitignore`: if it isn't copied, it isn't public.** Anything sensitive stays private by being absent from the copy list; anything that must be public has to be added to it. Currently published: **12 files** — the 5 pages, `order-submit.js`, the 2 logo PNGs, the 3 hero video assets, and `Panels-web.glb`. The order functions are not files in `dist/`; Netlify bundles them server-side from `[functions]`. Deliberately withheld: `CLAUDE.md`, `TASKS.md`, `DESIGN.md`, `docs/superpowers/**` (14 files), 322 `design-references/` design-source files, the `3d-models/` build tooling, and `legal/*.docx` (founder's call 2026-09-13 — proper HTML policy pages are a future task).
+**So the rule is inverted from `.gitignore`: if it isn't copied, it isn't public.** Anything sensitive stays private by being absent from the copy list; anything that must be public has to be added to it. Currently published: **13 files** — the 5 product pages, `privacy-policy.html`, `order-submit.js`, the 2 logo PNGs, the 3 hero video assets, and `Panels-web.glb`. The order functions are not files in `dist/`; Netlify bundles them server-side from `[functions]`. Deliberately withheld: `CLAUDE.md`, `TASKS.md`, `DESIGN.md`, `docs/superpowers/**` (14 files), 322 `design-references/` design-source files, the `3d-models/` build tooling, and `legal/*.docx` — **the .docx sources stay private even for the policy that is now published**; the HTML page is what ships. The other three policies still contain unfilled placeholders and must not be published until filled.
 
 **The one failure mode this creates:** a new image, video, font or model works locally and 404s in production. Add its `cp` line in the same change. The deploy log prints the full published file list — if something unexpected appears there, it is about to go public.
 
