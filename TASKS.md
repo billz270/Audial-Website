@@ -3689,6 +3689,35 @@ Just above or beside the "Place Order for Review" button, add short copy explain
 
 **Next step:** DEV-51 (form + panel capture calling the three endpoints) → Deploy Preview test.
 
+### DEV-50 MERGE BLOCKERS 1, 2 & 3 — ALL CLOSED 2026-09-16
+- **Blocker 2 ("Publish app" greyed out) was simply the Branding fields never being filled in.**
+  Founder: "I hadn't filled out the fields." Two wrong theories were burned first, recorded so
+  nobody retries them: (a) that the privacy-policy requirement had been *ruled out* — in fact a
+  previous session had **removed** the Branding links to test it, which is backwards, they must be
+  **filled**; and (b) that the greyed control was "Make Internal" rather than "Publish app".
+  **"Make Internal" IS a separate button and IS permanently greyed** (a consumer Gmail has no
+  Workspace org) — true, but never the blocker. Sequence that worked: privacy page live (DEV-52) →
+  Branding filled (home page `https://audial.in`, privacy `https://audial.in/privacy-policy`,
+  authorized domain `audial.in`) → `drive.file` added under Data Access, **which had ZERO rows** →
+  Publish app → **In production**.
+- **The "Your app requires verification" banner is NOISE — do NOT submit for review.** `drive.file`
+  is non-sensitive; verification is mandatory only for sensitive/restricted scopes, or optionally
+  to render an app name/logo on the consent screen.
+- **Blocker 1 (7-day token) CLOSED.** `oauth-setup.mjs --renew` ran green **8/8** — its sign-in path
+  had never been exercised before; it works. Local `.env` updated. Founder updated Netlify's
+  `GOOGLE_OAUTH_REFRESH_TOKEN` and pointed `AUDIAL_ORDERS_FOLDER_ID` at the new orders folder,
+  both enabled for Deploy Previews.
+- **Blocker 3 (renew-only mode) CLOSED** — it is what performed the renewal above.
+
+### ⚠ OPEN: AUDIAL_ORDERS_FOLDER_ID is the PRODUCTION folder in every deploy context
+`isProduction` in `netlify/lib/env.mjs` only prefixes the **email subject** with `[TEST]`
+(`order.mjs` lines 54 and 174). **Nothing redirects the Drive destination** — the folder comes
+solely from `AUDIAL_ORDERS_FOLDER_ID`. So a Deploy Preview run will create real `ORD-xxxxxx`
+folders **inside the live "Audial Orders" folder**, alongside genuine customer orders. Fix before
+the preview test: give the variable a per-context value in Netlify — Deploy Previews →
+`1Urd-6DBpXff05DsWwXi7Wcy11Tc8dRk0` (TEST), Production → `1bT-aTv-1w5xudFRO69baIf192D29HZfx`.
+The local `.env` already points at TEST, so local runs are unaffected.
+
 **⚠️ MERGE BLOCKERS — do not merge to `master` until all are resolved**
 1. **The refresh token expires after 7 days.** "Publish app" is greyed out, so the app is stuck in **Testing** mode, where refresh tokens last 7 days. Tokens issued in Testing **keep** that expiry even after publishing, so the token must be re-issued once the app is published. If an expired token reaches production, every order fails.
 2. **Why "Publish app" is greyed out is still unknown.** Suspects, none confirmed:
@@ -3973,6 +4002,36 @@ For each panel in the user's design, generate a PNG image capture:
 - Saved customer profiles (no accounts on the site)
 - Editing submitted orders (out of scope — customer emails Rohan for changes)
 - Deployment (separate action after acceptance)
+---
+
+### ORDER-FLOW TEST PASSED 2026-09-16 — 24/24
+`node scripts/dev-51/order-flow.mjs <shots>` against `netlify dev` on :8888, real headless Chrome,
+real Drive. Orders **`ORD-a6ajhg`** (configurator, 3 panels) and **`ORD-3lhgr8`** (visualizer,
+1 custom panel) — both left in the TEST folder, and two `[TEST]` emails were sent.
+
+The three things that had never been verified all passed:
+1. **The full flow** — the earlier attempt died on a 429 from the 5-starts/hour limit before
+   reaching a single assertion.
+2. **The error-state submit button really is enabled, opacity 1** — the screenshot that looked
+   faded was not a bug.
+3. **The 409 recovery path** — `finish` returned `[409, 200]`, the missing panel was re-uploaded,
+   and a retry **reused the started order instead of calling `start` twice**.
+
+Also green: artwork-less design blocks Continue with a named panel; 6 required fields flagged and
+**no request sent** for an invalid form; `+91` added on phone focus; busy state disables close and
+inputs and **Escape is suppressed mid-submit**; upload failure retries each panel exactly once and
+keeps the cart; exact Drive filenames
+(`ORD-a6ajhg_panel-1_4x2h-light-halfwrap.png`, `…_panel-3_custom-3x5-light-fullwrap.png`);
+success copy names the customer's email; "Clear Designs & Start New" on both pages; **no
+horizontal overflow at 390px**; zero page errors.
+
+Ran against the **renewed** refresh token, so that credential is confirmed working from
+application code, not just from the setup script.
+
+**Remaining before merge:** the Deploy Preview test with a ~3.9 MB image (Netlify's real 4.5 MB
+request cap and the built-in burst `rateLimit` cannot be exercised by `netlify dev`), and the
+`AUDIAL_ORDERS_FOLDER_ID` per-context fix flagged in the DEV-50 section above.
+
 ---
 
 ## Task #DEV-52: Privacy Policy Page
