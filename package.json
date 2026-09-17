@@ -1,0 +1,14 @@
+{
+  "name": "audial-website",
+  "private": true,
+  "description": "Audial static site. No bundler for the pages; dependencies here are for Netlify Functions only (DEV-50).",
+  "scripts": {
+    "test": "node --test scripts/dev-50/tests/order.test.mjs"
+  },
+  "dependencies": {
+    "@netlify/blobs": "11.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

@@ -11,7 +11,7 @@ design-references/assets/3d-models/node_modules/
 
 # Local-only credential files — never commit. Also excluded from deploys via .vercelignore.
 website/
-# Local secrets for `netlify dev` (Netlify's own env vars are marked secret and not readable locally).
+# DEV-50: local secrets for `netlify dev` (Netlify's own env vars are marked secret and not readable locally).
 .env
 .env.*
 # Netlify Functions dependencies (package.json at repo root) and CLI state.

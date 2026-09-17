@@ -8,7 +8,7 @@
 # file — it stays on the CDN, and a real file beats the rule unless forced.)
 #
 # The ONLY reliable control is what lands in the publish directory. So the build
-# below starts from an empty `dist/` and copies in the 12 files the live site
+# below starts from an empty `dist/` and copies in the 13 files the live site
 # actually needs. Everything else in the repo — internal notes, design source
 # material, build tooling — is never uploaded, because it is never in `dist/`.
 #
@@ -32,6 +32,9 @@ cp index.html configurator.html room-visualizer.html how-it-works.html about.htm
 # --- Legal (DEV-52) ---
 cp privacy-policy.html dist/
 
+# --- Order submission script (configurator.html + room-visualizer.html, DEV-51) ---
+cp order-submit.js dist/
+
 # --- Nav logo (index.html …, all pages) ---
 cp "design-references/assets/logos/Audial Logo.png"       dist/design-references/assets/logos/
 cp "design-references/assets/logos/Audial Logo_Black.png" dist/design-references/assets/logos/
@@ -50,6 +53,16 @@ echo "--- files being published ---"
 find dist -type f | sort
 echo "--- total: $(find dist -type f | wc -l) files ---"
 """
+
+# --- Order backend (DEV-50) ---
+# Functions are NOT files in `dist/`. Netlify bundles netlify/functions/*.mjs
+# (and the netlify/lib/ code they import) into server-side functions; their
+# source is never served. They answer only at the paths each file declares:
+#   POST /api/order/start   POST /api/order/panel   POST /api/order/finish
+# Secrets come from Netlify env vars (see TASKS.md DEV-50), never from the repo.
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
 
 # Deliberately NOT published (all currently git-tracked, so a root publish
 # would expose them):

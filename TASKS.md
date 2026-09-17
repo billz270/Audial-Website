@@ -3647,10 +3647,92 @@ Just above or beside the "Place Order for Review" button, add short copy explain
 ---
 
 ## Task #DEV-50: Google Drive + Netlify Function Backend for Order Submissions
-- **Status:** BLOCKED (awaiting Rohan to create Gmail business account for Drive access)
+- **Status:** DONE — Deploy Preview test passed 2026-09-17; ready to merge (branch `dev-50-order-backend`, PR #1)
 - **Priority:** HIGH
 - **File:** New files: /netlify/functions/submit-order.js, /netlify/functions/utils/drive.js, netlify.toml (update)
 - **Depends on:** Gmail business account created, Google Cloud service account configured
+
+### Progress log (checkpoint 2026-09-16, ~5AM — paused overnight)
+
+**Decided / done**
+- Branch `dev-50-order-backend`. DEV-49, DEV-50 and DEV-51 merge and go live **together**, on purpose.
+- Email: Resend, sent from `support@audial.in` to `NOTIFICATION_EMAIL`. If Drive succeeds and the email fails, the customer still gets success and the failure is logged (spec below updated).
+- **Service account route is DEAD — proven, not assumed.** `scripts/dev-50/drive-spike.mjs` against the TEST folder: signing in OK, the account can see the folder, creating a folder OK, **file upload → 403 `storageQuotaExceeded`** ("Service Accounts do not have storage quota"); the account's `storageQuota.limit` is `"0"`. A consumer Gmail account can't use shared drives, so the fix is **OAuth** as `audial.orders@gmail.com`.
+- OAuth consent screen configured and saved. Test users: `audial.orders@gmail.com`, `rohan270@gmail.com`.
+- `scripts/dev-50/oauth-setup.mjs` is written and syntax-checked, **not yet run**. It uses scope `drive.file` (the app can only reach files it created), so it creates **new** app-owned "Audial Orders" + "Audial Orders (TEST)" folders. The two folders made by hand can't be reached and should be trashed first. The script stops if the wrong Google account signs in and never prints the refresh token.
+- Scripts live in `scripts/dev-50/`. They are not in `netlify.toml`'s copy list, so they are never published.
+
+- **Step D DONE (2026-09-15).** Hand-made folders trashed; Desktop client `audial-order-uploader-desktop` created (JSON in `website/`). `oauth-setup.mjs` ran green as `audial.orders@gmail.com` (scope `drive.file`, 15 GB quota): folders created, test upload + cleanup OK. Token saved to `website/google-oauth-token.json` (gitignored). New app-owned folder IDs:
+  - "Audial Orders": `1bT-aTv-1w5xudFRO69baIf192D29HZfx`
+  - "Audial Orders (TEST)": `1Urd-6DBpXff05DsWwXi7Wcy11Tc8dRk0`
+- The old TEST ID `1Rko81wTe6odEdq3TtW15q7W_ioUz6snn` pointed at a hand-made folder that is now trashed. Do not use it.
+- "Publish app" is still greyed out even with the Branding links and authorized domain removed, so blocker 2's first suspect is ruled out. Continuing in Testing mode: **this token expires around 2026-09-22.**
+
+- **Blocker 3 resolved in code:** `oauth-setup.mjs --renew <client.json> <token.json>` signs in again, checks both existing folders are still reachable and not trashed, runs a test upload in TEST, and replaces only the refresh token. It creates no folders. Its bad-path guard is tested; the full sign-in path has **not** run yet, so exercise it at the first real renewal (due by ~2026-09-22).
+- **Order upload is SPLIT into three requests (founder's call 2026-09-15).** Netlify caps a buffered request at 6 MB, and a binary (base64-encoded) request at **~4.5 MB** (docs.netlify.com/build/functions/configuration, checked 2026-09-15). Sync functions now run for up to **60 s** (the old 10 s concern is gone). The spec's 20 MB-per-file limit is therefore impossible; the cap is **4 MB per image**.
+  - `POST /api/order/start` (JSON): validate, rate-limit, create folder `ORD-xxxxxx (INCOMPLETE)`, upload `order-details.txt`, return a signed `uploadToken` (HMAC-SHA256, 60 min) carrying the ref, folder ID, file stems and the customer summary.
+  - `POST /api/order/panel` (multipart: `token`, `index`, `image`): one image per request, type sniffed from bytes (PNG/JPG/WEBP), a retry replaces the file instead of duplicating it.
+  - `POST /api/order/finish` (JSON: `token`): checks every panel image exists (**409** + `missingPanels` if not), renames the folder to `ORD-xxxxxx`, sends the notification. A retried finish does not re-send the email.
+  - **An abandoned order is visible in Drive as a folder still named `(INCOMPLETE)`.**
+- **Layout:** `netlify/functions/order-{start,panel,finish}.mjs` are thin wrappers; everything else is in `netlify/lib/` (`order.mjs` logic with injected deps, `validate.mjs`, `token.mjs`, `drive.mjs`, `email.mjs`, `rate-limit.mjs`, `env.mjs`). `[functions]` added to `netlify.toml`. Root `package.json` exists only for `@netlify/blobs`.
+- **Rate limit:** 5 starts/IP/hour in Netlify Blobs (IP stored as an HMAC, never raw; fails OPEN if Blobs is down). Netlify's built-in `config.rateLimit` window maxes at 180 s so it can't express an hour; it's used only as a burst guard (start 10/min, panel 90/min). Invalid submissions do not use up the limit.
+- **New env var `ORDER_TOKEN_SECRET`** (≥32 chars, random) signs the upload token.
+- **Verified:** `npm test` gives 25/25, with in-memory Drive/email/Blobs. It covers validation, spec filenames, token forgery and expiry, the rate limit, the happy path, and every failure rule (Drive fail → 500 + alert; email fail after Drive → success + log; 4xx → no alert; the alert names an expired Google token as the likely cause). Three deliberate bugs were each caught by their test. `scripts/dev-50/drive-live-check.mjs` passed 9/9 against the **real TEST folder**, then deleted what it made.
+- **Local `.env`** (gitignored) is filled from `website/google-oauth-token.json`, points at the TEST folder, and needs `RESEND_API_KEY` pasted in by the founder.
+- **FOLLOW-UP (print quality, founder's call: note it, decide later):** the configurator shrinks every upload to **max 1200px JPEG q0.82** before storing it (`configurator.html` `handleImageUpload`, the localStorage quota fix) and never keeps the original. The best image an order can carry is 1200px, about **25 DPI on a 4×2 ft panel**. DEV-50/51 send it as a review reference, as specced; getting print-resolution originals needs its own task (e.g. ask the customer to email the full file after review).
+
+- **End-to-end test PASSED locally (2026-09-15)** with `npx netlify-cli@27.6.0 dev --offline --no-open --port 8888 --dir .` (the `.env` vars are injected, all 3 functions load, Blobs runs in sandbox mode). Nothing is installed globally. `scripts/dev-50/e2e-order.mjs http://localhost:8888 website/google-oauth-token.json` passed 14/14: invalid email 400, wrong content type 415, GET 404, start 200, finish-before-images 409 `[0,1]`, forged token 401, non-image 400, two panels 200, a retried panel replaced rather than duplicated, finish 200, retried finish 200. Drive then held exactly `order-details.txt` + `…_panel-1_2x2-light-halfwrap.png` + `…_panel-2_4x2v-dark-fullwrap.jpg` in folder `ORD-ol9hqf` (INCOMPLETE suffix removed). No email failure was logged. **The hourly limit was proven against real Blobs:** 200 ×4 then **429, Retry-After 3547**. The 4 probe folders were deleted.
+- **Timing, for DEV-51:** each Drive call is ~2.5–3.3 s locally (start 2.5 s, panel ~3 s, finish 2.7 s). Uploading panels one at a time, a 10-design order is ~35 s, so **DEV-51 should upload 3 panels in parallel** and show progress. Every request stays well inside the 60 s limit.
+- **Not verifiable locally:** Netlify's real request cap and the built-in burst `rateLimit` rules (`netlify dev` enforces neither). **CLOSED 2026-09-17 by the Deploy Preview test** — see "Deploy Preview test" below.
+
+- **Notification email confirmed** in the `support@audial.in` inbox (Titan, via GoDaddy), not junk. Resend DKIM (`resend._domainkey`) and the `send.audial.in` SPF/MX records are in place.
+
+**Next step:** DEV-51 (form + panel capture calling the three endpoints) → Deploy Preview test.
+
+### DEV-50 MERGE BLOCKERS 1, 2 & 3 — ALL CLOSED 2026-09-16
+- **Blocker 2 ("Publish app" greyed out) was simply the Branding fields never being filled in.**
+  Founder: "I hadn't filled out the fields." Two wrong theories were burned first, recorded so
+  nobody retries them: (a) that the privacy-policy requirement had been *ruled out* — in fact a
+  previous session had **removed** the Branding links to test it, which is backwards, they must be
+  **filled**; and (b) that the greyed control was "Make Internal" rather than "Publish app".
+  **"Make Internal" IS a separate button and IS permanently greyed** (a consumer Gmail has no
+  Workspace org) — true, but never the blocker. Sequence that worked: privacy page live (DEV-52) →
+  Branding filled (home page `https://audial.in`, privacy `https://audial.in/privacy-policy`,
+  authorized domain `audial.in`) → `drive.file` added under Data Access, **which had ZERO rows** →
+  Publish app → **In production**.
+- **The "Your app requires verification" banner is NOISE — do NOT submit for review.** `drive.file`
+  is non-sensitive; verification is mandatory only for sensitive/restricted scopes, or optionally
+  to render an app name/logo on the consent screen.
+- **Blocker 1 (7-day token) CLOSED.** `oauth-setup.mjs --renew` ran green **8/8** — its sign-in path
+  had never been exercised before; it works. Local `.env` updated. Founder updated Netlify's
+  `GOOGLE_OAUTH_REFRESH_TOKEN` and pointed `AUDIAL_ORDERS_FOLDER_ID` at the new orders folder,
+  both enabled for Deploy Previews.
+- **Blocker 3 (renew-only mode) CLOSED** — it is what performed the renewal above.
+
+### ⚠ OPEN: AUDIAL_ORDERS_FOLDER_ID is the PRODUCTION folder in every deploy context
+`isProduction` in `netlify/lib/env.mjs` only prefixes the **email subject** with `[TEST]`
+(`order.mjs` lines 54 and 174). **Nothing redirects the Drive destination** — the folder comes
+solely from `AUDIAL_ORDERS_FOLDER_ID`. So a Deploy Preview run will create real `ORD-xxxxxx`
+folders **inside the live "Audial Orders" folder**, alongside genuine customer orders. Fix before
+the preview test: give the variable a per-context value in Netlify — Deploy Previews →
+`1Urd-6DBpXff05DsWwXi7Wcy11Tc8dRk0` (TEST), Production → `1bT-aTv-1w5xudFRO69baIf192D29HZfx`.
+The local `.env` already points at TEST, so local runs are unaffected.
+
+**⚠️ MERGE BLOCKERS — do not merge to `master` until all are resolved**
+1. **The refresh token expires after 7 days.** "Publish app" is greyed out, so the app is stuck in **Testing** mode, where refresh tokens last 7 days. Tokens issued in Testing **keep** that expiry even after publishing, so the token must be re-issued once the app is published. If an expired token reaches production, every order fails.
+2. **Why "Publish app" is greyed out is still unknown.** Suspects, none confirmed:
+   - listing `audial.in` as an authorized domain (it brings in home-page / privacy-policy / Search Console ownership requirements, and the site has no privacy policy page)
+   - a Branding field left empty
+   - a sensitive scope listed under Data Access
+
+   Try removing the authorized domain and the home-page / privacy-policy links first.
+3. **`oauth-setup.mjs` needs a "renew token only" mode** that reuses the existing folder IDs. Re-running it as written creates a duplicate pair of folders. Needed for the post-publish re-issue (blocker 1) and for any renewal during development.
+
+**Also pending (not blockers of the code, but required before go-live)**
+- Share the new app-owned folders with `rohan270@gmail.com` as Editor.
+- Netlify env vars: add `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN`; point `AUDIAL_ORDERS_FOLDER_ID` at the new folder; enable the vars for the Deploy Preview context.
+- Remove the dead service-account credentials: delete `GOOGLE_SERVICE_ACCOUNT_JSON` from Netlify, delete the key in Cloud Console, delete `website/audial-orders-4cd27f0c08f1.json`.
+- Weekly scheduled keep-alive function (Google revokes refresh tokens unused for 6 months).
 
 ### Goal
 Build the backend infrastructure to receive order submissions from the configurator, generate unguessable order reference codes, create a unique folder per order in Google Drive, upload artwork and order details, and send email notifications. This is the "server-side" work that makes the review-first flow real. Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
@@ -3724,8 +3806,9 @@ Build the backend infrastructure to receive order submissions from the configura
    - Each panel gets its own file at the top level of the order folder (flat structure, no subfolders)
 
 6. **Email notification to Rohan:**
-   - Send via ProtonMail-compatible SMTP OR use a transactional email service (Resend, SendGrid free tier, or similar — decide during implementation based on ProtonMail's outbound relay setup)
-   - To: Rohan's ProtonMail address (e.g., support@audial.in on Titan, or a dedicated orders@audial.in — Rohan to confirm)
+   - Send via Resend (decided 2026-09-15; audial.in domain verified in Resend)
+   - From: `support@audial.in`
+   - To: `NOTIFICATION_EMAIL` env var (currently `support@audial.in`)
    - Subject: `New Order: ORD-a7k9x3 — [Customer Name]`
    - Body includes:
      - Order reference code
@@ -3740,11 +3823,17 @@ Build the backend infrastructure to receive order submissions from the configura
 
 **Failure handling (critical):**
 
-- If any step fails (Drive upload error, network timeout, quota exceeded, etc.):
+_Revised 2026-09-15 (founder's call): Drive is the record of the order; email is only the notification._
+
+- If the **Drive** steps fail (folder create, details upload, artwork upload, network timeout, quota exceeded, etc.):
   - Return HTTP 500 with error message
   - Send Rohan an alert email: `Subject: Order Submission Failed — [timestamp]` with details
   - Browser must show a visible error: "Something went wrong. Please try again or email us at support@audial.in"
   - Do NOT silently accept a broken submission
+- If Drive **succeeded** but the notification email fails:
+  - Return success (`{ "success": true, "orderRef": ... }`) — the order is safely captured, and a 500 here would make the customer retry and create a duplicate order
+  - Log the failure prominently in the Netlify function logs (order ref + error, never customer data) so it can be caught
+- Validation failures (400) and rate-limit rejections (429) return a clear error but send NO alert email — otherwise anyone could flood the inbox with bad requests
 
 **Security requirements:**
 
@@ -3780,6 +3869,57 @@ Build the backend infrastructure to receive order submissions from the configura
 ✅ Drive folder remains private (viewable only by Rohan and service account)
 ✅ Fully tested with real submissions on Netlify preview environment before production
 
+### Deploy Preview test — PASSED 2026-09-17 (the last merge gate)
+
+Ran against **PR #1 → `https://deploy-preview-1--audialin.netlify.app`**.
+
+**The Netlify site slug is `audialin`, not `audial`.** `audial.netlify.app` resolves and returns
+200 — it is SOMEBODY ELSE'S SITE. Get the preview host from the GitHub commit status
+(`netlify/audialin/deploy-preview`), never by guessing the slug from the domain.
+
+**First run returned 500 on every endpoint.** Cause: `GOOGLE_OAUTH_CLIENT_ID`,
+`GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN` and `ORDER_TOKEN_SECRET` had never
+been added to Netlify at all (only `AUDIAL_ORDERS_FOLDER_ID`, `NOTIFICATION_EMAIL`,
+`RESEND_API_KEY` and the dead `GOOGLE_SERVICES_ACCOUNT_JSON` existed). **Netlify bakes env vars
+into a deploy at build time, so adding them is not enough — the deploy must be retried.**
+Diagnosis came from the function log line `[order] misconfigured: missing env vars: …`, which
+names them exactly; the HTTP response is deliberately generic.
+
+**Free config probe, worth reusing:** `validateOrder` runs BEFORE `rateLimiter.hit`
+(`order.mjs:69`), so `POST /api/order/start` with `{}` and `content-type: application/json`
+costs no rate-limit slot and touches neither Drive nor Blobs. 500 = misconfigured,
+400 + field errors = wired correctly.
+
+**THE SIZE CLIFF — there are TWO different 413s, and only one of them is Netlify's.**
+
+| Bytes sent | Rejected by | Response body |
+|---|---|---|
+| ≤ 4.00 MB | nobody — accepted | `{"success":true,...}` |
+| 4.1 – 4.4 MB | **our own function** (`order.mjs:123`) | `{"success":false,"error":"Image too large (max 4 MB)."}` |
+| ≥ 4.5 MB | **Netlify's edge**, before the function runs | **empty** |
+
+So the platform cap is ~4.5 MB binary (consistent with the documented 6 MB post-base64 limit),
+and our 4 MB limit sits safely inside it. Measured points: 1/2/3/3.9/3.95/4.0 MB accepted;
+4.1/4.2/4.3/4.4 ours; 4.5/5.5 the edge. The three layers nest with real margin:
+
+```
+client cap 3.97 MB  <  server cap 4.00 MB  <  Netlify edge ~4.5 MB
+(order-submit.js:24)   (LIMITS.imageBytes)    (measured)
+```
+
+`order-submit.js:24` is `4 MB − 32 KB` and re-encodes until the blob fits, so **no image a
+customer can produce reaches the edge**, and an oversized one gets our readable message rather
+than a bodyless platform 413. An empty-bodied 413 in production therefore means the client-side
+cap has been raised or bypassed — that is the signal to watch for.
+
+**e2e-order.mjs: 14/14.** Folder landed in the TEST folder, confirming the per-context
+`AUDIAL_ORDERS_FOLDER_ID` split works on a real deploy. Forged token → 401, non-image → 400,
+finish-before-upload → 409 listing `[0,1]`, panel retry replaces rather than duplicates, finish
+retried sends no second email. Test order `ORD-wyvvm5`.
+
+**Cost:** 3 of the 5 starts/IP/hour (two size probes + one e2e). The size probe replaces panel 0
+on a single start precisely because starts are the scarce resource; panel uploads get 90/min.
+
 ### Out of Scope
 - Customer confirmation email (handle in DEV-51 or later)
 - Order status page for customer (out of scope entirely — no public URLs)
@@ -3791,10 +3931,32 @@ Build the backend infrastructure to receive order submissions from the configura
 ---
 
 ## Task #DEV-51: Order Submission Form + Front-of-Panel Capture
-- **Status:** TODO
+- **Status:** DONE — verified locally (2026-09-15) and against Deploy Preview #1 (2026-09-17), branch `dev-50-order-backend`
 - **Priority:** HIGH
-- **File:** configurator.html
+- **File:** configurator.html, room-visualizer.html, new `order-submit.js`, netlify.toml
 - **Depends on:** DEV-49 (language), DEV-50 (backend endpoint)
+
+### Progress log (2026-09-15)
+
+**Founder's calls**
+- **Both pages are rewired**, not only the configurator: every "Place Order for Review" opener (there are exactly two, one per page) now goes to the DEV-50 backend. Formspree is gone from both order modals. (The Book Consultation forms are untouched; they open a `mailto:`.)
+- **Capture at SOURCE resolution:** one artwork pixel = one output pixel, cropped to exactly what the customer framed. This supersedes the spec's "~150 DPI" line, which would mean a 7200×3600 image for a 4×2 made from a 1200px upload (see DEV-50's print-quality follow-up).
+
+**What was built**
+- **`order-submit.js`** (repo root, shared, `cp`'d in `netlify.toml`) takes over step 2 of both modals. Pages keep their own step 1 (`renderCheckoutCart`, pricing) and call `AudialOrder.init({onDesignsCleared})`.
+- **Flow:** capture every design → `POST /api/order/start` → `panel` × N, **3 in parallel** → `finish`. A 409 `missingPanels` re-uploads just those and finishes again. Network errors and 5xx get one automatic retry. 4xx messages from the server are shown to the customer as written. A 401 (token expired) drops the order and the next Submit starts fresh.
+- **Retry resumes the same order.** If uploads fail after `start`, pressing Submit again uploads only the missing panels into the same `(INCOMPLETE)` folder instead of opening a second one. Any change to the details or designs starts a new order.
+- **After the first upload failure, in-flight uploads finish before the error shows.** Otherwise a quick retry could upload the same panel twice at once and the server's find-then-replace would duplicate the file.
+- **Capture** (`capturePanel`) redraws the saved transform on a canvas with the same maths as `applyImageTransform()`. The face is `savedPanelWidth/Height − 3` (the 1.5px border, border-box). **Artwork only:** a straight-on view shows none of the wood or the wrap, so the finish is carried by the filename and `order-details.txt`. PNG first; areas the artwork does not cover (the 10% "contain" fit) stay transparent. If a PNG would exceed the 4 MB cap it falls back to JPEG, then to smaller sizes. Carts saved before transforms were stored get a centred cover-fit at the panel's proportions.
+- **Form:** name, email, phone (fills `+91 ` on focus), street address (textarea), city, pincode, delivery notes, installation notes. **Deviation:** the spec had one multi-line address; City and Pincode stay as their own required fields (better delivery data) and are joined into the `address` the backend stores. Client validation mirrors `validate.mjs` (address total ≥ 20 chars, phone 7–15 digits).
+- **Guards:** step 1's Continue is disabled, with a reason, if the cart is empty or any design lacks artwork. While submitting, every field, Back and × are disabled, Escape/backdrop cannot close the modal, and a `beforeunload` prompt is armed. A progress line shows "Preparing artwork 2 of 3…", "Uploading artwork 1 of 3…", "Finishing up…".
+- **Success:** "Order Received", the `ORD-` reference, the proof + payment-link copy with the customer's email. "Clear Designs & Start New" empties `acousticCart` (configurator: resets the editor; visualizer: goes to the configurator, the room plan keeps its own snapshots). The cart is never cleared automatically or on failure.
+- Visualizer step 1 now labels custom sizes ("3×5 ft Custom Panel") and prices them, as the configurator already did.
+- `netlify/lib/validate.mjs` had raw control characters (incl. NUL) typed inside two regexes, so git treated it as **binary** and hid its diffs. Now `\x00-\x1f` escapes; 25/25 tests unchanged.
+
+**Verified (headless Chrome 1440×900 against `netlify dev`)**
+- **Capture fidelity, 6 scenarios on the real configurator** (upload path, preview flattened to 0°/0°, compared pixel-wise with the face): 4×2 H cover fit; 4×2 V rotate 90 + flipH + zoom + offset; 2×2 rotate 180 + flipV; custom 3×5 rotate 270; 4×2 contain fit; 1×1 zoom 2. Mean difference **0.8–6.3 / 255**, while a mirrored control scores **59–130**. Output width equals face/zoom to the pixel in every case. The 6.3 case is the preview container clipping a face taller than 540px at the forced zoom, not the capture.
+- **Testing trap:** the backend's 5 starts/hour limit (DEV-50) is easy to use up while testing — the first full browser run met a 429 left over from earlier probes. Rejected attempts don't count; read `Retry-After` from a valid POST before re-running.
 
 ### Goal
 Extend the configurator's "Place Order for Review" button to open a proper submission form collecting customer contact and delivery details, capture each designed panel as a front-view image with all image transforms applied, and submit everything to the Netlify Function endpoint from DEV-50. On success, show the "Order Received" confirmation. Since the website is live, all changes must be developed and tested locally, then deployed only after full functionality is confirmed.
@@ -3893,6 +4055,35 @@ For each panel in the user's design, generate a PNG image capture:
 - Deployment (separate action after acceptance)
 ---
 
+### ORDER-FLOW TEST PASSED 2026-09-16 — 24/24
+`node scripts/dev-51/order-flow.mjs <shots>` against `netlify dev` on :8888, real headless Chrome,
+real Drive. Orders **`ORD-a6ajhg`** (configurator, 3 panels) and **`ORD-3lhgr8`** (visualizer,
+1 custom panel) — both left in the TEST folder, and two `[TEST]` emails were sent.
+
+The three things that had never been verified all passed:
+1. **The full flow** — the earlier attempt died on a 429 from the 5-starts/hour limit before
+   reaching a single assertion.
+2. **The error-state submit button really is enabled, opacity 1** — the screenshot that looked
+   faded was not a bug.
+3. **The 409 recovery path** — `finish` returned `[409, 200]`, the missing panel was re-uploaded,
+   and a retry **reused the started order instead of calling `start` twice**.
+
+Also green: artwork-less design blocks Continue with a named panel; 6 required fields flagged and
+**no request sent** for an invalid form; `+91` added on phone focus; busy state disables close and
+inputs and **Escape is suppressed mid-submit**; upload failure retries each panel exactly once and
+keeps the cart; exact Drive filenames
+(`ORD-a6ajhg_panel-1_4x2h-light-halfwrap.png`, `…_panel-3_custom-3x5-light-fullwrap.png`);
+success copy names the customer's email; "Clear Designs & Start New" on both pages; **no
+horizontal overflow at 390px**; zero page errors.
+
+Ran against the **renewed** refresh token, so that credential is confirmed working from
+application code, not just from the setup script.
+
+**Deploy Preview test PASSED 2026-09-17** — see the DEV-50 section for the size-cliff numbers.
+Nothing remains before merge.
+
+---
+
 ## Task #DEV-52: Privacy Policy Page
 
 - **Status:** SHIPPED to master 2026-09-16 (branch `dev-52-privacy-page`, cut from master, NOT from `dev-50-order-backend`)
@@ -3959,3 +4150,18 @@ two sections. The founder needs to make the matching edit in Word, or accept the
 3. `node scripts/dev-50/oauth-setup.mjs --renew <client.json> website/google-oauth-token.json`
    — Testing-era tokens keep their 7-day expiry, so publishing alone does NOT renew. Due ~2026-09-22.
    This `--renew` sign-in path has never been exercised.
+
+### Merge resolution 2026-09-17 (branch `dev-50-order-backend` ← `master`)
+The "do not lose this on merge" warning above was honoured. Merging master into the branch
+conflicted in 5 files; all resolved toward the **branch** except this DEV-52 section, which was
+taken from **master** because master's record is the corrected one (Publish app really was the
+greyed button; empty Branding fields were the cause).
+
+- `privacy-policy.html` → **branch** version. Its §6.4/§7 use the PRESENT tense for
+  Netlify→Drive→Resend and call Formspree "earlier". That is false on master today and becomes
+  TRUE the moment this merge deploys, which is the whole reason DEV-52 was held to ship with
+  DEV-49/50/51.
+- `netlify.toml`, `CLAUDE.md`, `.gitignore` → **branch** (strict supersets; they add the
+  `order-submit.js` cp line and the `netlify/` + `scripts/dev-50/` tree).
+- **Published file count is 13 after this merge, not the 12 written above** — `order-submit.js`
+  is the 13th.

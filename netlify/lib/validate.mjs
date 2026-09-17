@@ -1,0 +1,162 @@
+// DEV-50 — order validation, naming and the order-details.txt body.
+// Pure functions only: no network, no env. Tested in scripts/dev-50/tests/.
+
+import { randomInt } from 'node:crypto';
+
+export const LIMITS = {
+  name: 100,
+  email: 254,
+  address: { min: 20, max: 1000 },
+  notes: 500,
+  panels: 30,          // distinct designs per order
+  quantity: 50,        // identical copies of one design
+  customFeet: { min: 1, max: 8 },
+  imageBytes: 4 * 1024 * 1024,    // Netlify's binary request cap is ~4.5 MB; leave room for the multipart envelope
+  startBodyBytes: 64 * 1024,
+};
+
+const CATALOG_SIZES = new Set(['1x1', '2x1', '2x2', '4x2', '1x4']);
+const SQUARE_SIZES = new Set(['1x1', '2x2']);
+const ORIENTATIONS = new Set(['horizontal', 'vertical']);
+const WOODS = new Set(['light', 'dark']);
+const WRAPS = new Set(['half', 'full']);
+
+// --- order reference ---------------------------------------------------------
+const REF_ALPHABET = 'abcdefghijklmnopqrstuvwxyz0123456789';
+export function newOrderRef() {
+  let s = '';
+  for (let i = 0; i < 6; i++) s += REF_ALPHABET[randomInt(REF_ALPHABET.length)];
+  return `ORD-${s}`;
+}
+
+// --- text cleaning -----------------------------------------------------------
+// Single-line fields lose every control character (this also stops a name
+// carrying a newline into an email subject). Multi-line fields keep \n only.
+const oneLine = (v) => String(v ?? '').replace(/[\x00-\x1f\x7f]/g, ' ').replace(/\s+/g, ' ').trim();
+const multiLine = (v) => String(v ?? '').replace(/\r\n?/g, '\n').replace(/[\x00-\x09\x0b-\x1f\x7f]/g, ' ').replace(/\n{3,}/g, '\n\n').trim();
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+const PHONE_CHARS_RE = /^\+?[0-9\s\-().]+$/;
+
+// --- validation --------------------------------------------------------------
+export function validateOrder(body) {
+  const errors = [];
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return { ok: false, errors: ['Request body must be a JSON object.'] };
+
+  const name = oneLine(body.name);
+  const email = oneLine(body.email).toLowerCase();
+  const phone = oneLine(body.phone);
+  const address = multiLine(body.address);
+  const deliveryNotes = multiLine(body.deliveryNotes);
+  const installationNotes = multiLine(body.installationNotes);
+
+  if (!name) errors.push('Name is required.');
+  else if (name.length > LIMITS.name) errors.push(`Name must be at most ${LIMITS.name} characters.`);
+
+  if (!email) errors.push('Email is required.');
+  else if (email.length > LIMITS.email || !EMAIL_RE.test(email)) errors.push('Email address is not valid.');
+
+  const phoneDigits = phone.replace(/\D/g, '');
+  if (!phone) errors.push('Phone is required.');
+  else if (!PHONE_CHARS_RE.test(phone) || phoneDigits.length < 7 || phoneDigits.length > 15) errors.push('Phone number is not valid.');
+
+  if (!address) errors.push('Delivery address is required.');
+  else if (address.length < LIMITS.address.min) errors.push(`Delivery address must be at least ${LIMITS.address.min} characters.`);
+  else if (address.length > LIMITS.address.max) errors.push(`Delivery address must be at most ${LIMITS.address.max} characters.`);
+
+  if (deliveryNotes.length > LIMITS.notes) errors.push(`Delivery notes must be at most ${LIMITS.notes} characters.`);
+  if (installationNotes.length > LIMITS.notes) errors.push(`Installation notes must be at most ${LIMITS.notes} characters.`);
+
+  const panels = [];
+  if (!Array.isArray(body.panels) || body.panels.length === 0) errors.push('At least one panel is required.');
+  else if (body.panels.length > LIMITS.panels) errors.push(`At most ${LIMITS.panels} panel designs per order.`);
+  else body.panels.forEach((p, i) => {
+    const r = validatePanel(p);
+    if (r.error) errors.push(`Panel ${i + 1}: ${r.error}`);
+    else panels.push(r.panel);
+  });
+
+  if (errors.length) return { ok: false, errors };
+  return { ok: true, order: { name, email, phone, address, deliveryNotes, installationNotes, panels } };
+}
+
+function validatePanel(p) {
+  if (!p || typeof p !== 'object') return { error: 'must be an object.' };
+  const size = String(p.size ?? '');
+  const orientation = String(p.orientation ?? '');
+  const wood = String(p.wood ?? '');
+  const wrap = String(p.wrap ?? '');
+  const quantity = Number(p.quantity ?? 1);
+
+  let width = null, height = null;
+  if (size === 'custom') {
+    width = Number(p.width); height = Number(p.height);
+    const { min, max } = LIMITS.customFeet;
+    const okDim = (n) => Number.isInteger(n) && n >= min && n <= max;
+    if (!okDim(width) || !okDim(height)) return { error: `custom width and height must be whole feet from ${min} to ${max}.` };
+  } else if (!CATALOG_SIZES.has(size)) {
+    return { error: 'unknown size.' };
+  }
+  if (!ORIENTATIONS.has(orientation)) return { error: 'orientation must be horizontal or vertical.' };
+  if (!WOODS.has(wood)) return { error: 'wood must be light or dark.' };
+  if (!WRAPS.has(wrap)) return { error: 'wrap must be half or full.' };
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > LIMITS.quantity) return { error: `quantity must be a whole number from 1 to ${LIMITS.quantity}.` };
+
+  return { panel: { size, width, height, orientation, wood, wrap, quantity } };
+}
+
+// --- naming ------------------------------------------------------------------
+// ORD-a7k9x3_panel-1_2x2-light-halfwrap   (square: no orientation letter)
+// ORD-a7k9x3_panel-2_4x2h-dark-fullwrap   (non-square catalog: h / v)
+// ORD-a7k9x3_panel-3_custom-3x5-light-halfwrap
+export function sizeTag(p) {
+  if (p.size === 'custom') return `custom-${p.width}x${p.height}`;
+  if (SQUARE_SIZES.has(p.size)) return p.size;
+  return `${p.size}${p.orientation === 'vertical' ? 'v' : 'h'}`;
+}
+
+export const panelFileStem = (ref, p, i) => `${ref}_panel-${i + 1}_${sizeTag(p)}-${p.wood}-${p.wrap}wrap`;
+
+export function panelSummary(p) {
+  const size = p.size === 'custom' ? `${p.width}x${p.height} ft (custom)` : `${p.size} ft`;
+  return `${size}, ${p.orientation}, ${p.wood} varnish, ${p.wrap} wrap, qty ${p.quantity}`;
+}
+
+// --- image type sniffing -----------------------------------------------------
+// Trust the bytes, never the browser-supplied MIME type or filename.
+export function sniffImage(bytes) {
+  const b = bytes;
+  if (b.length >= 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47 && b[4] === 0x0d && b[5] === 0x0a && b[6] === 0x1a && b[7] === 0x0a) return { ext: 'png', mime: 'image/png' };
+  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return { ext: 'jpg', mime: 'image/jpeg' };
+  if (b.length >= 12 && b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50) return { ext: 'webp', mime: 'image/webp' };
+  return null;
+}
+
+// --- order-details.txt ---------------------------------------------------------
+export function orderDetailsText(ref, order, dateIso) {
+  const totalQty = order.panels.reduce((n, p) => n + p.quantity, 0);
+  return [
+    `ORDER: ${ref}`,
+    `DATE: ${dateIso}`,
+    '',
+    'CUSTOMER:',
+    `Name: ${order.name}`,
+    `Email: ${order.email}`,
+    `Phone: ${order.phone}`,
+    '',
+    'DELIVERY ADDRESS:',
+    order.address,
+    '',
+    'DELIVERY NOTES:',
+    order.deliveryNotes || 'None',
+    '',
+    'INSTALLATION NOTES:',
+    order.installationNotes || 'None',
+    '',
+    'PANELS:',
+    ...order.panels.map((p, i) => `${i + 1}. ${panelSummary(p)}`),
+    '',
+    `TOTAL PANELS: ${totalQty} (${order.panels.length} design${order.panels.length === 1 ? '' : 's'})`,
+    '',
+  ].join('\n');
+}
