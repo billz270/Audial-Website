@@ -3647,7 +3647,7 @@ Just above or beside the "Place Order for Review" button, add short copy explain
 ---
 
 ## Task #DEV-50: Google Drive + Netlify Function Backend for Order Submissions
-- **Status:** DONE — Deploy Preview test passed 2026-09-17; ready to merge (branch `dev-50-order-backend`, PR #1)
+- **Status:** SHIPPED — live on audial.in 2026-09-17 (PR #1 merged, `ba9c53a`)
 - **Priority:** HIGH
 - **File:** New files: /netlify/functions/submit-order.js, /netlify/functions/utils/drive.js, netlify.toml (update)
 - **Depends on:** Gmail business account created, Google Cloud service account configured
@@ -3931,7 +3931,7 @@ on a single start precisely because starts are the scarce resource; panel upload
 ---
 
 ## Task #DEV-51: Order Submission Form + Front-of-Panel Capture
-- **Status:** DONE — verified locally (2026-09-15) and against Deploy Preview #1 (2026-09-17), branch `dev-50-order-backend`
+- **Status:** SHIPPED — live on audial.in 2026-09-17 (PR #1 merged, `ba9c53a`)
 - **Priority:** HIGH
 - **File:** configurator.html, room-visualizer.html, new `order-submit.js`, netlify.toml
 - **Depends on:** DEV-49 (language), DEV-50 (backend endpoint)
@@ -4086,7 +4086,7 @@ Nothing remains before merge.
 
 ## Task #DEV-52: Privacy Policy Page
 
-- **Status:** SHIPPED to master 2026-09-16 (branch `dev-52-privacy-page`, cut from master, NOT from `dev-50-order-backend`)
+- **Status:** SHIPPED to master 2026-09-16 (branch `dev-52-privacy-page`, cut from master, NOT from `dev-50-order-backend`); §6.4/§7 flipped to the live-backend wording when PR #1 merged 2026-09-17
 - **Priority:** HIGH — unblocks the Google OAuth consent screen's "Publish app" button
 - **Files:** New `privacy-policy.html`; footer link on all 5 pages; `netlify.toml` (11 → 12 files); `CLAUDE.md`
 
@@ -4150,6 +4150,26 @@ two sections. The founder needs to make the matching edit in Word, or accept the
 3. `node scripts/dev-50/oauth-setup.mjs --renew <client.json> website/google-oauth-token.json`
    — Testing-era tokens keep their 7-day expiry, so publishing alone does NOT renew. Due ~2026-09-22.
    This `--renew` sign-in path has never been exercised.
+
+### SHIPPED 2026-09-17 — production verified
+
+PR #1 merged as `ba9c53a`; Netlify published master. Checked against `https://audial.in`:
+
+- `POST /api/order/start` with `{}` → **400** with field errors (Production env vars loaded,
+  `@netlify/blobs` initialised). `panel` → **415** (demands multipart), `finish` → **401**
+  (rejects a missing token). All three behaving correctly.
+- All **13** published files → 200.
+- `TASKS.md`, `CLAUDE.md`, `DESIGN.md`, `.env`, `netlify/lib/order.mjs`,
+  `netlify/functions/order-start.mjs`, `legal/*.docx`, `scripts/dev-50/*`,
+  `website/google-oauth-token.json`, `package.json` → **all 404**. The allowlist holds with the
+  functions present; function SOURCE is not served even though `netlify/` is in the repo.
+- `configurator` and `room-visualizer` carry **zero** Formspree references and load
+  `order-submit.js`, which calls `/api/order/start|panel|finish`.
+- Live `privacy-policy` now reads "earlier website form" with no "currently processed by" and no
+  "We are moving Order" — the policy is accurate as of this deploy.
+
+**No production order was placed.** The `{}` probe proves the wiring without a Drive write, a
+notification email, or a rate-limit slot. The first real order will be a customer's.
 
 ### Merge resolution 2026-09-17 (branch `dev-50-order-backend` ← `master`)
 The "do not lose this on merge" warning above was honoured. Merging master into the branch
