@@ -4086,63 +4086,82 @@ Nothing remains before merge.
 
 ## Task #DEV-52: Privacy Policy Page
 
-- **Status:** BUILT, not pushed (2026-09-16; branch `dev-50-order-backend`)
-- **Priority:** HIGH — required for Google OAuth production compliance and DPDPA
-- **File:** New: `privacy-policy.html`. Modified: all 5 pages (footer link), `netlify.toml`, `CLAUDE.md`
+- **Status:** SHIPPED to master 2026-09-16 (branch `dev-52-privacy-page`, cut from master, NOT from `dev-50-order-backend`)
+- **Priority:** HIGH — unblocks the Google OAuth consent screen's "Publish app" button
+- **Files:** New `privacy-policy.html`; footer link on all 5 pages; `netlify.toml` (11 → 12 files); `CLAUDE.md`
 
-### What this is
-`privacy-policy.html` renders `legal/AUDIAL_PRIVACY_POLICY.docx` as a real page at
-`https://www.audial.in/privacy-policy.html`. **The .docx stays private** — the allowlist copies
-the PAGE, never the source doc. It is the first of the four policies to ship; the other three
-(Terms of Use, Refund/Return/Cancellation, User Content & IP) **still contain unfilled
-`[PLACEHOLDER]` fields and must not be published until filled**.
+### Why it shipped ahead of DEV-49/50/51
+The Google Cloud **"Publish app" button is greyed out**, which is DEV-50 merge blocker #2 and
+gates blocker #1 (the refresh token expires ~2026-09-22). Google requires a production OAuth app
+to have an **app home page and a privacy policy URL on an authorized domain**; with those Branding
+fields empty the button stays disabled. So the page had to be LIVE before the button could turn on,
+which meant shipping it without the order backend.
 
-### The finding that reframed the task
-This was started to unblock DEV-50's merge blocker #2, "Publish app is greyed out". **It is
-very likely not a blocker at all — "Make Internal" and "Publish app" are two different buttons
-on the same Audience page.** "Make Internal" is greyed out permanently and correctly, because
-a consumer Gmail account has no Google Workspace organisation to be internal to. That is almost
-certainly the button that was observed. Confirmed separately: **`drive.file` is a NON-SENSITIVE
-scope, so the app needs no verification to publish** — publishing should be one click.
-The privacy policy is still required, but for a different reason: Google's OAuth policy requires
-every *production* app to have a public home page with privacy-policy and terms links. So the
-page is needed for **compliance after publishing**, not as a gate on the button.
-**Blocker #1 (refresh token expiry ~2026-09-22) is the real deadline and is untouched by this.**
+**Two wrong diagnoses were burned before this one — record them so nobody repeats them:**
+1. *"The privacy-policy requirement was ruled out."* It was not. A previous session **removed** the
+   Branding links and the authorized domain to test that theory. That was backwards: the fields must
+   be **filled**, not emptied. Publish stayed grey, which looked like exoneration and was the opposite.
+2. *"'Publish app' is not the greyed button — 'Make Internal' is."* Wrong, though the underlying
+   fact is true and worth keeping: **"Make Internal" is a different button on the same Audience page
+   and is greyed out permanently and correctly**, because a consumer Gmail has no Workspace org.
+   `drive.file` is also genuinely **non-sensitive**, so no verification is needed — publishing is one
+   click *once Branding is complete*. The founder checked: Publish app itself is disabled.
 
-### Decisions
-- **One page, not four.** The other three .docx files have unfilled placeholders.
-- **Ships with DEV-49/50/51, not before.** §6.4 and §7 describe the Netlify→Drive→Resend order
-  pipeline in the PRESENT tense and call Formspree "earlier". That is false until DEV-50 is live,
-  so shipping the page alone would publish a self-attested policy that misdescribes the site.
-  Google is not blocked meanwhile: publish the app now, fill the Branding links when the bundle lands.
-- **Footer link on all 5 pages, in three different idioms — because the footers are NOT uniform.**
-  `index.html` has a 4-column footer (link added to the Company column); `about.html` has a
-  one-line `.foot-links` span; **`configurator.html`, `room-visualizer.html` and `how-it-works.html`
-  had NO footer links at all** and needed a `.foot-links` span plus four CSS rules each.
-  Those last two are where personal data is actually collected, so they mattered most.
-- **Rendered by hand, not generated from the .docx.** A converter was considered and rejected:
-  the fidelity work (bold runs, two tables, nested lists) costs more than it saves for a document
-  that changes ~twice a year, and the build must stay a pure `cp` with no compilation step.
-- Order-modal privacy link was offered and declined — footer only.
+### §6.4 and §7 were REWORDED before publishing — do not lose this on merge
+The founder's .docx describes the Netlify→Drive→Resend pipeline in the **present** tense and calls
+Formspree "our earlier website form". On master that is **false**: master has no `netlify/`, no
+`order-submit.js`, and both order modals still post to Formspree (verified). Publishing as written
+would have been a self-attested policy that misdescribes the live site. The page now says Formspree
+is **current** and Drive/Resend are **incoming**, with "This Policy will be updated when that change
+takes effect" (which §16 already promises).
+**→ WHEN DEV-50/51 GOES LIVE, §6.4 and §7 must be flipped back to the .docx wording.**
+**→ The .docx itself was NOT edited** — the page and the source document currently differ in these
+two sections. The founder needs to make the matching edit in Word, or accept the divergence.
 
-### Traps hit
-- **`.legal-toc` is a `<nav>`, and the global `nav{position:sticky;display:flex;…}` rule applies
-  to it.** Class specificity beat the element rule for `border`/`padding` but NOT for `position`,
-  `display`, `z-index` or `background`, which are not declared on the class — so the table of
-  contents silently became a second sticky flex bar. Fixed with explicit resets on `.legal-toc`.
-- **`about.html`'s script has a `contactForm` listener** that would throw on a page without that
-  form and kill the hamburger JS below it. Deliberately omitted from the new page.
-- `footer a{}` is a new rule on three pages; verified it cannot reach `.checkout-footer`, which
-  is a `<div>`, not a `<footer>`. No regression to the order modals.
+### Other decisions
+- **One page only.** Terms of Use, Refund, and User Content & IP still contain unfilled
+  `[PLACEHOLDER]` fields and must not be published until filled.
+- **Footer link on all 5 pages in 3 idioms, because the footers are not uniform:** index.html has a
+  4-column footer (Company column); about.html has a one-line `.foot-links` span; configurator,
+  room-visualizer and how-it-works had **no footer links at all** and needed the span plus 4 CSS
+  rules each. The last two are where personal data is actually collected.
+- Rendered by hand, not generated from the .docx — the build must stay a pure `cp`.
+
+### Traps
+- **`.legal-toc` is a `<nav>`**, so the global `nav{position:sticky;display:flex;…}` rule applied to
+  it. Class specificity beat the element rule for `border`/`padding` but NOT for `position`,
+  `display`, `z-index`, `background` — the TOC silently became a second sticky bar. Explicit resets added.
+- **about.html's script has a `contactForm` listener** that would throw on a page without that form
+  and kill the hamburger JS below it. Deliberately omitted.
+- `footer a{}` is new on three pages; verified it cannot reach `.checkout-footer`, which is a `<div>`.
 
 ### Verified
-- The real `netlify.toml` build command was executed: **13 files published**, `privacy-policy.html`
-  present, no `.docx` and no `legal/` directory in `dist/`.
-- 17 TOC anchors all resolve to 17 section ids; zero `[PLACEHOLDER]` strings survive; both tables
-  have exactly 2 cells per row; tags balanced on all six pages.
-- Exactly one privacy link per page, all inside `<footer>`; one `<footer>` element per page.
-- All six pages serve HTTP 200 from `python -m http.server 8000`.
-- **NOT verified visually.** No puppeteer/playwright installed and the Chrome extension was
-  declined, so the 1440×900 and 390×844 renders — including the mobile table restack and the
-  3→1 column TOC — have not been looked at. Several past tasks here (DEV-42, DEV-47) had defects
-  that only screenshots caught. **Eyeball before merging.**
+- Real `netlify.toml` build run: **12 files**, privacy page present, no `.docx`, no `legal/` in `dist/`.
+- 17 TOC anchors → 17 section ids; zero placeholders; tags balanced; one link per page, all in `<footer>`.
+- Branch isolation confirmed: no `netlify/`, no `order-submit.js`, no `/api/order` references.
+- **NOT verified visually.** No puppeteer installed, Chrome extension declined. The 1440×900 and
+  390×844 renders — including the mobile table restack and the 3→1 column TOC — are unlooked-at.
+  DEV-42 and DEV-47 both had defects that only screenshots caught. **Check the live page.**
+
+### Next
+1. Branding: app home page `https://www.audial.in`, privacy `https://www.audial.in/privacy-policy.html`,
+   authorized domain `audial.in`. Confirm App name / support email / developer contact are non-empty.
+2. Click **Publish app**.
+3. `node scripts/dev-50/oauth-setup.mjs --renew <client.json> website/google-oauth-token.json`
+   — Testing-era tokens keep their 7-day expiry, so publishing alone does NOT renew. Due ~2026-09-22.
+   This `--renew` sign-in path has never been exercised.
+
+### Merge resolution 2026-09-17 (branch `dev-50-order-backend` ← `master`)
+The "do not lose this on merge" warning above was honoured. Merging master into the branch
+conflicted in 5 files; all resolved toward the **branch** except this DEV-52 section, which was
+taken from **master** because master's record is the corrected one (Publish app really was the
+greyed button; empty Branding fields were the cause).
+
+- `privacy-policy.html` → **branch** version. Its §6.4/§7 use the PRESENT tense for
+  Netlify→Drive→Resend and call Formspree "earlier". That is false on master today and becomes
+  TRUE the moment this merge deploys, which is the whole reason DEV-52 was held to ship with
+  DEV-49/50/51.
+- `netlify.toml`, `CLAUDE.md`, `.gitignore` → **branch** (strict supersets; they add the
+  `order-submit.js` cp line and the `netlify/` + `scripts/dev-50/` tree).
+- **Published file count is 13 after this merge, not the 12 written above** — `order-submit.js`
+  is the 13th.
