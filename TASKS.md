@@ -3647,7 +3647,7 @@ Just above or beside the "Place Order for Review" button, add short copy explain
 ---
 
 ## Task #DEV-50: Google Drive + Netlify Function Backend for Order Submissions
-- **Status:** IN PROGRESS (prerequisites complete 2026-09-15; branch `dev-50-order-backend`)
+- **Status:** DONE — Deploy Preview test passed 2026-09-17; ready to merge (branch `dev-50-order-backend`, PR #1)
 - **Priority:** HIGH
 - **File:** New files: /netlify/functions/submit-order.js, /netlify/functions/utils/drive.js, netlify.toml (update)
 - **Depends on:** Gmail business account created, Google Cloud service account configured
@@ -3683,7 +3683,7 @@ Just above or beside the "Place Order for Review" button, add short copy explain
 
 - **End-to-end test PASSED locally (2026-09-15)** with `npx netlify-cli@27.6.0 dev --offline --no-open --port 8888 --dir .` (the `.env` vars are injected, all 3 functions load, Blobs runs in sandbox mode). Nothing is installed globally. `scripts/dev-50/e2e-order.mjs http://localhost:8888 website/google-oauth-token.json` passed 14/14: invalid email 400, wrong content type 415, GET 404, start 200, finish-before-images 409 `[0,1]`, forged token 401, non-image 400, two panels 200, a retried panel replaced rather than duplicated, finish 200, retried finish 200. Drive then held exactly `order-details.txt` + `…_panel-1_2x2-light-halfwrap.png` + `…_panel-2_4x2v-dark-fullwrap.jpg` in folder `ORD-ol9hqf` (INCOMPLETE suffix removed). No email failure was logged. **The hourly limit was proven against real Blobs:** 200 ×4 then **429, Retry-After 3547**. The 4 probe folders were deleted.
 - **Timing, for DEV-51:** each Drive call is ~2.5–3.3 s locally (start 2.5 s, panel ~3 s, finish 2.7 s). Uploading panels one at a time, a 10-design order is ~35 s, so **DEV-51 should upload 3 panels in parallel** and show progress. Every request stays well inside the 60 s limit.
-- **Not verifiable locally:** Netlify's real 4.5 MB request cap and the built-in burst `rateLimit` rules (`netlify dev` enforces neither). Re-run `e2e-order.mjs` against the **Deploy Preview** with a ~3.9 MB image before merge.
+- **Not verifiable locally:** Netlify's real request cap and the built-in burst `rateLimit` rules (`netlify dev` enforces neither). **CLOSED 2026-09-17 by the Deploy Preview test** — see "Deploy Preview test" below.
 
 - **Notification email confirmed** in the `support@audial.in` inbox (Titan, via GoDaddy), not junk. Resend DKIM (`resend._domainkey`) and the `send.audial.in` SPF/MX records are in place.
 
@@ -3869,6 +3869,57 @@ _Revised 2026-09-15 (founder's call): Drive is the record of the order; email is
 ✅ Drive folder remains private (viewable only by Rohan and service account)
 ✅ Fully tested with real submissions on Netlify preview environment before production
 
+### Deploy Preview test — PASSED 2026-09-17 (the last merge gate)
+
+Ran against **PR #1 → `https://deploy-preview-1--audialin.netlify.app`**.
+
+**The Netlify site slug is `audialin`, not `audial`.** `audial.netlify.app` resolves and returns
+200 — it is SOMEBODY ELSE'S SITE. Get the preview host from the GitHub commit status
+(`netlify/audialin/deploy-preview`), never by guessing the slug from the domain.
+
+**First run returned 500 on every endpoint.** Cause: `GOOGLE_OAUTH_CLIENT_ID`,
+`GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REFRESH_TOKEN` and `ORDER_TOKEN_SECRET` had never
+been added to Netlify at all (only `AUDIAL_ORDERS_FOLDER_ID`, `NOTIFICATION_EMAIL`,
+`RESEND_API_KEY` and the dead `GOOGLE_SERVICES_ACCOUNT_JSON` existed). **Netlify bakes env vars
+into a deploy at build time, so adding them is not enough — the deploy must be retried.**
+Diagnosis came from the function log line `[order] misconfigured: missing env vars: …`, which
+names them exactly; the HTTP response is deliberately generic.
+
+**Free config probe, worth reusing:** `validateOrder` runs BEFORE `rateLimiter.hit`
+(`order.mjs:69`), so `POST /api/order/start` with `{}` and `content-type: application/json`
+costs no rate-limit slot and touches neither Drive nor Blobs. 500 = misconfigured,
+400 + field errors = wired correctly.
+
+**THE SIZE CLIFF — there are TWO different 413s, and only one of them is Netlify's.**
+
+| Bytes sent | Rejected by | Response body |
+|---|---|---|
+| ≤ 4.00 MB | nobody — accepted | `{"success":true,...}` |
+| 4.1 – 4.4 MB | **our own function** (`order.mjs:123`) | `{"success":false,"error":"Image too large (max 4 MB)."}` |
+| ≥ 4.5 MB | **Netlify's edge**, before the function runs | **empty** |
+
+So the platform cap is ~4.5 MB binary (consistent with the documented 6 MB post-base64 limit),
+and our 4 MB limit sits safely inside it. Measured points: 1/2/3/3.9/3.95/4.0 MB accepted;
+4.1/4.2/4.3/4.4 ours; 4.5/5.5 the edge. The three layers nest with real margin:
+
+```
+client cap 3.97 MB  <  server cap 4.00 MB  <  Netlify edge ~4.5 MB
+(order-submit.js:24)   (LIMITS.imageBytes)    (measured)
+```
+
+`order-submit.js:24` is `4 MB − 32 KB` and re-encodes until the blob fits, so **no image a
+customer can produce reaches the edge**, and an oversized one gets our readable message rather
+than a bodyless platform 413. An empty-bodied 413 in production therefore means the client-side
+cap has been raised or bypassed — that is the signal to watch for.
+
+**e2e-order.mjs: 14/14.** Folder landed in the TEST folder, confirming the per-context
+`AUDIAL_ORDERS_FOLDER_ID` split works on a real deploy. Forged token → 401, non-image → 400,
+finish-before-upload → 409 listing `[0,1]`, panel retry replaces rather than duplicates, finish
+retried sends no second email. Test order `ORD-wyvvm5`.
+
+**Cost:** 3 of the 5 starts/IP/hour (two size probes + one e2e). The size probe replaces panel 0
+on a single start precisely because starts are the scarce resource; panel uploads get 90/min.
+
 ### Out of Scope
 - Customer confirmation email (handle in DEV-51 or later)
 - Order status page for customer (out of scope entirely — no public URLs)
@@ -3880,7 +3931,7 @@ _Revised 2026-09-15 (founder's call): Drive is the record of the order; email is
 ---
 
 ## Task #DEV-51: Order Submission Form + Front-of-Panel Capture
-- **Status:** IN PROGRESS — built and verified locally (2026-09-15), branch `dev-50-order-backend`; Deploy Preview test still open
+- **Status:** DONE — verified locally (2026-09-15) and against Deploy Preview #1 (2026-09-17), branch `dev-50-order-backend`
 - **Priority:** HIGH
 - **File:** configurator.html, room-visualizer.html, new `order-submit.js`, netlify.toml
 - **Depends on:** DEV-49 (language), DEV-50 (backend endpoint)
@@ -4028,9 +4079,8 @@ horizontal overflow at 390px**; zero page errors.
 Ran against the **renewed** refresh token, so that credential is confirmed working from
 application code, not just from the setup script.
 
-**Remaining before merge:** the Deploy Preview test with a ~3.9 MB image (Netlify's real 4.5 MB
-request cap and the built-in burst `rateLimit` cannot be exercised by `netlify dev`), and the
-`AUDIAL_ORDERS_FOLDER_ID` per-context fix flagged in the DEV-50 section above.
+**Deploy Preview test PASSED 2026-09-17** — see the DEV-50 section for the size-cliff numbers.
+Nothing remains before merge.
 
 ---
 
